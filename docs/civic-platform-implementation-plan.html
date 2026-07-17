@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="ru" dir="ltr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>План реализации — Платформа коллективного гражданского запроса</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap&subset=cyrillic" rel="stylesheet">
+<style>
+:root{
+  --paper:#F3F5F9; --surface:#FFFFFF; --ink:#0E1726; --muted:#5B6577;
+  --line:#DCE1EA; --blue:#2247C9; --blue-deep:#142B7A; --blue-soft:#E8EDFB;
+  --teal:#0E7A6B; --teal-soft:#E2F2EF; --amber:#A96A0B; --amber-soft:#FBF1DE;
+  --red:#B3362B; --red-soft:#F9E9E7; --mono:'JetBrains Mono',monospace;
+  --r:10px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--paper);color:var(--ink);font-family:'IBM Plex Sans',system-ui,sans-serif;font-size:15px;line-height:1.55}
+.wrap{max-width:1060px;margin:0 auto;padding:0 20px 80px}
+h1,h2{font-family:'Unbounded',sans-serif;letter-spacing:-.01em}
+h3{font-weight:600}
+a{color:var(--blue)}
+
+/* ---------- header ---------- */
+header.hero{padding:44px 0 26px;border-bottom:2px solid var(--ink)}
+.eyebrow{font-family:var(--mono);font-size:12px;text-transform:uppercase;letter-spacing:.14em;color:var(--blue);margin-bottom:12px}
+header.hero h1{font-size:clamp(21px,3.4vw,32px);line-height:1.22;font-weight:700;max-width:820px}
+.hero-meta{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px}
+.chip{font-family:var(--mono);font-size:11.5px;padding:4px 10px;border:1px solid var(--line);border-radius:999px;background:var(--surface);color:var(--muted)}
+.locales{display:flex;flex-wrap:wrap;gap:6px;margin-top:14px}
+.loc{font-family:var(--mono);font-size:12px;font-weight:600;padding:5px 11px;border-radius:6px;background:var(--blue-soft);color:var(--blue-deep)}
+.loc.rtl{background:var(--blue-deep);color:#fff}
+.loc small{font-weight:400;opacity:.75;margin-inline-start:6px;font-size:10px}
+
+/* ---------- tabs ---------- */
+nav.tabs{position:sticky;top:0;z-index:10;background:var(--paper);border-bottom:1px solid var(--line);display:flex;gap:2px;overflow-x:auto;padding:10px 0 0;margin-bottom:28px;-webkit-overflow-scrolling:touch}
+nav.tabs button{font-family:var(--mono);font-size:12.5px;white-space:nowrap;border:0;background:none;color:var(--muted);padding:9px 13px 11px;cursor:pointer;border-bottom:3px solid transparent}
+nav.tabs button:hover{color:var(--ink)}
+nav.tabs button.on{color:var(--blue-deep);font-weight:600;border-bottom-color:var(--blue)}
+nav.tabs button:focus-visible,.acc-h:focus-visible,.dod label:focus-within{outline:2px solid var(--blue);outline-offset:2px}
+section.panel{display:none;animation:fade .25s ease}
+section.panel.on{display:block}
+@keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){section.panel{animation:none}}
+
+/* ---------- common blocks ---------- */
+h2.sec{font-size:19px;margin:30px 0 14px}
+h2.sec:first-child{margin-top:4px}
+h2.sec span{font-family:var(--mono);font-size:12px;font-weight:400;color:var(--blue);display:block;margin-bottom:6px;letter-spacing:.1em;text-transform:uppercase}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px 18px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+@media(max-width:760px){.grid2,.grid3{grid-template-columns:1fr}}
+ul.tick{list-style:none}
+ul.tick li{padding-inline-start:20px;position:relative;margin-bottom:7px}
+ul.tick li::before{content:"";position:absolute;inset-inline-start:0;top:8px;width:8px;height:8px;background:var(--blue);border-radius:2px}
+ul.tick.dim li::before{background:var(--muted)}
+ul.tick.no li::before{background:var(--red);border-radius:50%}
+.kpi{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.kpi .card{text-align:center;padding:14px 8px}
+.kpi b{font-family:'Unbounded',sans-serif;font-size:20px;color:var(--blue-deep);display:block}
+.kpi span{font-size:12px;color:var(--muted)}
+table{width:100%;border-collapse:collapse;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;font-size:13.5px}
+th{font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:.08em;text-align:start;background:var(--blue-soft);color:var(--blue-deep);padding:9px 12px}
+td{padding:9px 12px;border-top:1px solid var(--line);vertical-align:top}
+code,.mono{font-family:var(--mono);font-size:.92em;background:var(--blue-soft);color:var(--blue-deep);padding:1px 5px;border-radius:4px}
+pre{background:var(--ink);color:#DCE6FF;font-family:var(--mono);font-size:13px;padding:14px 16px;border-radius:var(--r);overflow-x:auto;line-height:1.6}
+.note{border-inline-start:4px solid var(--amber);background:var(--amber-soft);padding:10px 14px;border-radius:0 var(--r) var(--r) 0;font-size:13.5px;margin:12px 0}
+.note.blue{border-color:var(--blue);background:var(--blue-soft)}
+.tag{font-family:var(--mono);font-size:10.5px;padding:2px 8px;border-radius:999px;font-weight:600}
+.tag.b{background:var(--blue-soft);color:var(--blue-deep)}
+.tag.t{background:var(--teal-soft);color:var(--teal)}
+.tag.a{background:var(--amber-soft);color:var(--amber)}
+.tag.r{background:var(--red-soft);color:var(--red)}
+
+/* ---------- stepper ---------- */
+.steps{list-style:none;counter-reset:s;position:relative}
+.steps::before{content:"";position:absolute;inset-inline-start:15px;top:8px;bottom:8px;width:2px;background:var(--line)}
+.steps li{counter-increment:s;position:relative;padding-inline-start:48px;padding-bottom:16px}
+.steps li::before{content:counter(s);position:absolute;inset-inline-start:0;top:0;width:32px;height:32px;border-radius:50%;background:var(--blue);color:#fff;font-family:var(--mono);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.steps li b{display:block}
+.steps li span{color:var(--muted);font-size:13.5px}
+
+/* ---------- schema cards ---------- */
+.tbl-group{margin-bottom:16px}
+.tbl-group h3{font-family:var(--mono);font-size:12px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:8px}
+.tbls{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px}
+.tbl{background:var(--surface);border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.tbl .tn{font-family:var(--mono);font-size:12.5px;font-weight:600;background:var(--blue-deep);color:#fff;padding:7px 11px}
+.tbl .tf{font-family:var(--mono);font-size:11.5px;color:var(--muted);padding:8px 11px;line-height:1.7}
+
+/* ---------- accordion ---------- */
+.acc{border:1px solid var(--line);border-radius:var(--r);background:var(--surface);margin-bottom:10px;overflow:hidden}
+.acc-h{width:100%;border:0;background:none;font:inherit;display:flex;align-items:center;gap:12px;padding:14px 16px;cursor:pointer;text-align:start}
+.acc-h .ph{font-family:'Unbounded',sans-serif;font-size:13px;color:var(--blue);min-width:34px}
+.acc-h b{flex:1;font-weight:600}
+.acc-h .est{font-family:var(--mono);font-size:11px;color:var(--muted)}
+.acc-h .ar{transition:transform .2s;color:var(--muted)}
+.acc.open .acc-h .ar{transform:rotate(90deg)}
+.acc-b{display:none;padding:0 16px 16px 62px;font-size:13.5px}
+@media(max-width:600px){.acc-b{padding-inline-start:16px}}
+.acc.open .acc-b{display:block}
+.exit{margin-top:10px;font-size:13px;border-inline-start:3px solid var(--teal);background:var(--teal-soft);padding:8px 12px;border-radius:0 8px 8px 0}
+.exit b{color:var(--teal)}
+
+/* ---------- DoD ---------- */
+.prog{position:sticky;top:46px;z-index:5;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 16px;margin-bottom:18px;display:flex;align-items:center;gap:14px}
+.prog .bar{flex:1;height:10px;background:var(--blue-soft);border-radius:999px;overflow:hidden}
+.prog .fill{height:100%;width:0%;background:var(--blue);border-radius:999px;transition:width .25s}
+.prog .num{font-family:var(--mono);font-size:13px;font-weight:600;color:var(--blue-deep);min-width:64px;text-align:end}
+.dod h3{font-family:var(--mono);font-size:12px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin:18px 0 8px}
+.dod label{display:flex;gap:10px;align-items:flex-start;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:9px 12px;margin-bottom:6px;cursor:pointer;font-size:13.5px}
+.dod label:hover{border-color:var(--blue)}
+.dod input{margin-top:3px;accent-color:var(--blue);width:15px;height:15px;flex:none}
+.dod input:checked + span{color:var(--muted);text-decoration:line-through}
+.dod .n{font-family:var(--mono);font-size:11px;color:var(--blue);min-width:24px;margin-top:2px}
+
+/* ---------- svg ---------- */
+.diagram{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:10px;overflow-x:auto}
+.diagram svg{min-width:640px;width:100%;height:auto;display:block}
+.legend{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--muted);padding:8px 6px 2px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-inline-end:5px;vertical-align:-1px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="hero">
+  <div class="eyebrow">PRD → план реализации · MVP</div>
+  <h1>Платформа коллективного гражданского запроса</h1>
+  <div class="hero-meta">
+    <span class="chip">Hono + TS</span><span class="chip">SSR JSX</span><span class="chip">HTMX</span>
+    <span class="chip">Pico CSS</span><span class="chip">SQLite / WAL</span><span class="chip">Render 0.5 CPU · 512 MB</span>
+    <span class="chip">Cloudflare CDN + Turnstile + Access</span><span class="chip">R2/S3</span>
+  </div>
+  <div class="locales" title="6 локалей с первого релиза">
+    <span class="loc rtl">he <small>RTL</small></span>
+    <span class="loc rtl">ar <small>RTL</small></span>
+    <span class="loc rtl">yi <small>RTL</small></span>
+    <span class="loc">ru <small>LTR</small></span>
+    <span class="loc">en <small>LTR</small></span>
+    <span class="loc">am <small>LTR</small></span>
+  </div>
+</header>
+
+<nav class="tabs" role="tablist">
+  <button class="on" data-t="t1">01 Обзор</button>
+  <button data-t="t2">02 Архитектура</button>
+  <button data-t="t3">03 Данные</button>
+  <button data-t="t4">04 Потоки</button>
+  <button data-t="t5">05 i18n / RTL</button>
+  <button data-t="t6">06 Качество</button>
+  <button data-t="t7">07 Роадмап</button>
+  <button data-t="t8">08 DoD</button>
+</nav>
+
+<!-- ================= 01 ОБЗОР ================= -->
+<section class="panel on" id="t1">
+  <h2 class="sec"><span>Гипотеза</span>Что проверяет MVP</h2>
+  <div class="card">Граждане готовы: <b>поддержать требования</b> → <b>отправить персональное обращение партии</b> → <b>распространить кампанию</b> → <b>передать полученный ответ</b>. Платформа не мониторит политиков и не гарантирует ответ — она создаёт массовый, измеримый, публичный запрос.</div>
+
+  <h2 class="sec"><span>Критерий успеха</span>Достаточно одного из</h2>
+  <div class="kpi">
+    <div class="card"><b>10 000</b><span>подтверждённых сторонников</span></div>
+    <div class="card"><b>2 000</b><span>сформированных обращений</span></div>
+    <div class="card"><b>1 000</b><span>заявленных «отправлено»</span></div>
+    <div class="card"><b>≥ 10%</b><span>поддержавших → генератор</span></div>
+    <div class="card"><b>≥ 25%</b><span>из генератора → действие</span></div>
+    <div class="card"><b>≥ 1</b><span>проверяемый ответ партии</span></div>
+    <div class="card"><b>≥ 1</b><span>НКО/медиа используют данные</span></div>
+  </div>
+
+  <h2 class="sec"><span>Scope</span>Границы первой версии</h2>
+  <div class="grid2">
+    <div class="card">
+      <h3 style="margin-bottom:8px"><span class="tag t">В MVP</span></h3>
+      <ul class="tick">
+        <li>Главная + требования на 6 языках, RTL/LTR</li>
+        <li>Поддержка с email-подтверждением, публичный счётчик</li>
+        <li>Выбор партии/политика, генератор обращения</li>
+        <li>Отправка: mailto / WhatsApp / копирование + отметка «отправил»</li>
+        <li>Передача ответа + очередь модерации, файлы в R2/S3</li>
+        <li>Админка: требования, адресаты, шаблоны, переводы, CSV, audit log</li>
+        <li>Turnstile, rate limiting, дедуп, privacy policy, удаление данных</li>
+        <li>WCAG 2.1 AA, mobile layout, кэш через Cloudflare</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3 style="margin-bottom:8px"><span class="tag r">Вне MVP</span></h3>
+      <ul class="tick no">
+        <li>Мониторинг заявлений, импорт голосований Кнессета</li>
+        <li>Авто-классификация ответов, публичная таблица ответов</li>
+        <li>Массовая рассылка от имени пользователей, напоминания</li>
+        <li>API для журналистов, мобильное приложение, аккаунты</li>
+        <li>Realtime-счётчики, Redis, workers, PostgreSQL, мульти-instance</li>
+        <li>Автоматический AI-перевод опубликованного контента</li>
+      </ul>
+    </div>
+  </div>
+
+  <h2 class="sec"><span>Метрики продукта</span>Что измеряем</h2>
+  <div class="card" style="font-size:13.5px">Подтверждённые сторонники · сформированные обращения · переходы email · переходы WhatsApp · копирования · отметки «отправлено» · переданные ответы · разбивка по партиям и языкам. <b>Только агрегаты</b> — персонализированный текст обращения в аналитику не пишется.</div>
+</section>
+
+<!-- ================= 02 АРХИТЕКТУРА ================= -->
+<section class="panel" id="t2">
+  <h2 class="sec"><span>Схема</span>Один сервис, тонкая инфраструктура</h2>
+  <div class="diagram">
+  <svg viewBox="0 0 880 470" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Архитектурная схема">
+    <defs><marker id="m" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L8,4.5 L0,9" fill="none" stroke="#5B6577" stroke-width="1.6"/></marker></defs>
+    <style>
+      .bx{fill:#fff;stroke:#DCE1EA;rx:10}
+      .bx-blue{fill:#142B7A;stroke:#142B7A;rx:10}
+      .bx-soft{fill:#E8EDFB;stroke:#C6D2F2;rx:10}
+      .t1{font:600 14px 'IBM Plex Sans',sans-serif;fill:#0E1726}
+      .t1w{font:600 14px 'IBM Plex Sans',sans-serif;fill:#fff}
+      .t2{font:11.5px 'JetBrains Mono',monospace;fill:#5B6577}
+      .t2w{font:11.5px 'JetBrains Mono',monospace;fill:#BFCBF0}
+      .lb{font:11px 'JetBrains Mono',monospace;fill:#2247C9}
+      .ln{stroke:#5B6577;stroke-width:1.6;fill:none;marker-end:url(#m)}
+    </style>
+
+    <rect class="bx" x="30" y="35" width="170" height="64"/>
+    <text class="t1" x="48" y="62">Пользователь</text>
+    <text class="t2" x="48" y="82">браузер · mobile</text>
+
+    <rect class="bx-soft" x="320" y="24" width="240" height="104"/>
+    <text class="t1" x="338" y="50">Cloudflare</text>
+    <text class="t2" x="338" y="70">CDN-кэш публичных GET</text>
+    <text class="t2" x="338" y="88">Turnstile · TLS · WAF</text>
+    <text class="t2" x="338" y="106">Access → /admin/* · SSO+2FA</text>
+
+    <rect class="bx-blue" x="320" y="170" width="240" height="104"/>
+    <text class="t1w" x="338" y="196">Render Web Service</text>
+    <text class="t2w" x="338" y="216">Hono + SSR JSX + HTMX</text>
+    <text class="t2w" x="338" y="234">1 instance · 0.5 CPU · 512 MB</text>
+    <text class="t2w" x="338" y="252">rate limits · CSRF · CSP</text>
+
+    <rect class="bx" x="30" y="180" width="190" height="84"/>
+    <text class="t1" x="48" y="206">SQLite</text>
+    <text class="t2" x="48" y="226">WAL · foreign_keys ON</text>
+    <text class="t2" x="48" y="244">Persistent Disk 5 GB</text>
+
+    <rect class="bx" x="650" y="150" width="200" height="70"/>
+    <text class="t1" x="668" y="176">R2 / S3</text>
+    <text class="t2" x="668" y="196">файлы ответов ≤10 MB</text>
+
+    <rect class="bx" x="650" y="250" width="200" height="70"/>
+    <text class="t1" x="668" y="276">Email-провайдер</text>
+    <text class="t2" x="668" y="296">подтверждение подписи</text>
+
+    <rect class="bx" x="30" y="350" width="250" height="78"/>
+    <text class="t1" x="48" y="376">Backup-задача</text>
+    <text class="t2" x="48" y="396">ежедневно ×7 + weekly</text>
+    <text class="t2" x="48" y="414">→ внешнее хранилище</text>
+
+    <path class="ln" d="M200,67 L316,67"/><text class="lb" x="222" y="58">HTTPS</text>
+    <path class="ln" d="M440,128 L440,166"/><text class="lb" x="450" y="150">cache miss / POST</text>
+    <path class="ln" d="M320,222 L224,222"/><text class="lb" x="240" y="213">чтение/запись</text>
+    <path class="ln" d="M560,205 L646,190"/><text class="lb" x="572" y="188">upload</text>
+    <path class="ln" d="M560,250 L646,278"/><text class="lb" x="572" y="278">verify-письма</text>
+    <path class="ln" d="M120,264 L120,346"/><text class="lb" x="130" y="310">snapshot БД</text>
+  </svg>
+  <div class="legend"><span><i style="background:#142B7A"></i>приложение</span><span><i style="background:#E8EDFB;border:1px solid #C6D2F2"></i>edge</span><span><i style="background:#fff;border:1px solid #DCE1EA"></i>хранилища и сервисы</span></div>
+  </div>
+
+  <h2 class="sec"><span>Решения</span>Ключевые фиксации</h2>
+  <div class="grid2">
+    <div class="card"><h3>SQLite — обязательные PRAGMA</h3>
+<pre>PRAGMA journal_mode = WAL;
+PRAGMA synchronous = NORMAL;
+PRAGMA foreign_keys = ON;
+PRAGMA busy_timeout = 5000;</pre>
+    <p style="font-size:13px;margin-top:8px;color:var(--muted)">Одно соединение на запись, короткие транзакции. Бинарные файлы в БД не хранятся.</p></div>
+    <div class="card"><h3>Кэширование Cloudflare</h3>
+      <ul class="tick" style="margin-top:8px;font-size:13.5px">
+        <li>Кэшируем: публичные GET-страницы, статику</li>
+      </ul>
+      <ul class="tick no" style="font-size:13.5px">
+        <li>Никогда: POST, подтверждение email, админка, персонализированные результаты, формы с чувствительными данными</li>
+      </ul>
+      <p style="font-size:13px;color:var(--muted)">Счётчики на публичных страницах — с TTL кэша, не realtime.</p></div>
+  </div>
+  <div class="card" style="margin-top:14px"><h3>Cloudflare Access — периметр админки</h3>
+    <ul class="tick" style="margin-top:8px;font-size:13.5px">
+      <li>Access-приложение на <code>/admin/*</code>: allow-list email админов, вход через SSO с <b>принудительной 2FA</b> — закрывает требование PRD о двухфакторной аутентификации</li>
+      <li><b>Обязательная</b> JWT-валидация на origin: middleware Hono проверяет <code>Cf-Access-Jwt-Assertion</code> (jose · JWKS <code>&lt;team&gt;.cloudflareaccess.com</code> · кэш ключей · проверка <code>aud</code>); нет валидного токена → 403</li>
+      <li>Причина: origin <code>*.onrender.com</code> достижим напрямую — без проверки JWT Access обходится</li>
+      <li>Своя auth-подсистема не строится: <code>admins</code> = email + роль; email из JWT → <code>admin_id</code> → audit log</li>
+    </ul>
+  </div>
+  <div class="note blue">Масштаб до 1 млн сторонников достигается кэшем на edge + SQLite/WAL — <b>без смены архитектуры</b>. Redis, очереди и PostgreSQL сознательно исключены из MVP.</div>
+</section>
+
+<!-- ================= 03 ДАННЫЕ ================= -->
+<section class="panel" id="t3">
+  <h2 class="sec"><span>Схема БД</span>14 таблиц, 6 групп</h2>
+
+  <div class="tbl-group"><h3>Контент</h3><div class="tbls">
+    <div class="tbl"><div class="tn">campaigns</div><div class="tf">id · slug · status</div></div>
+    <div class="tbl"><div class="tn">demands</div><div class="tf">id · order · is_active</div></div>
+    <div class="tbl"><div class="tn">demand_translations</div><div class="tf">demand_id · locale · title · body</div></div>
+    <div class="tbl"><div class="tn">message_templates</div><div class="tf">locale · channel · subject · body</div></div>
+  </div></div>
+
+  <div class="tbl-group"><h3>Адресаты</h3><div class="tbls">
+    <div class="tbl"><div class="tn">recipients</div><div class="tf">id · type (party|politician) · email · whatsapp · website · is_active</div></div>
+    <div class="tbl"><div class="tn">recipient_translations</div><div class="tf">recipient_id · locale · name</div></div>
+  </div></div>
+
+  <div class="tbl-group"><h3>Сторонники</h3><div class="tbls">
+    <div class="tbl"><div class="tn">supporters</div><div class="tf">id · email_normalized · name · city · locale · public_name_allowed · privacy_consent_at · email_verified_at · created_at · deleted_at</div></div>
+    <div class="tbl"><div class="tn">email_verifications</div><div class="tf">supporter_id · token_hash · expires_at · used_at</div></div>
+  </div></div>
+
+  <div class="tbl-group"><h3>Обращения и действия</h3><div class="tbls">
+    <div class="tbl"><div class="tn">generated_requests</div><div class="tf">id · recipient_id · locale · selected_demands · created_at</div></div>
+    <div class="tbl"><div class="tn">request_actions</div><div class="tf">id · generated_request_id · action_type · created_at</div></div>
+  </div></div>
+
+  <div class="tbl-group"><h3>Ответы</h3><div class="tbls">
+    <div class="tbl"><div class="tn">submitted_responses</div><div class="tf">id · recipient_id · received_at · channel · response_text · submitter_email · consent_at · status · reviewed_at</div></div>
+    <div class="tbl"><div class="tn">submitted_response_files</div><div class="tf">response_id · object_key · mime · size · uploaded_at</div></div>
+  </div></div>
+
+  <div class="tbl-group"><h3>Администрирование</h3><div class="tbls">
+    <div class="tbl"><div class="tn">admins</div><div class="tf">id · email (identity из Access JWT) · role · is_active — без паролей и TOTP</div></div>
+    <div class="tbl"><div class="tn">admin_audit_events</div><div class="tf">admin_id · action · entity · payload · created_at</div></div>
+  </div></div>
+
+  <h2 class="sec"><span>Инварианты</span>Правила данных</h2>
+  <div class="grid2">
+    <div class="card"><ul class="tick" style="font-size:13.5px">
+      <li><b>Уникальность:</b> <code>email_normalized</code> UNIQUE — один подтверждённый email = +1 к счётчику, ровно один раз</li>
+      <li><b>Не хранить</b> персональный текст обращения без отдельной необходимости — только <code>selected_demands</code> + локаль</li>
+      <li><b>Файлы:</b> в БД только object key, MIME, размер, дата — сами файлы в R2/S3</li>
+    </ul></div>
+    <div class="card">
+      <h3 style="margin-bottom:8px">Статусы переданного ответа</h3>
+      <p style="font-family:var(--mono);font-size:12.5px;line-height:2">
+        <span class="tag b">новый</span> → <span class="tag a">проверяется</span> →<br>
+        <span class="tag t">подтверждён</span> · <span class="tag a">недостаточно данных</span> · <span class="tag a">дубликат</span> · <span class="tag r">отклонён</span>
+      </p>
+      <h3 style="margin:12px 0 6px">Типы действий</h3>
+      <p style="font-family:var(--mono);font-size:12px">email_opened · whatsapp_opened · text_copied · reported_sent</p>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 04 ПОТОКИ ================= -->
+<section class="panel" id="t4">
+  <h2 class="sec"><span>Основной сценарий</span>От визита до переданного ответа</h2>
+  <ol class="steps">
+    <li><b>Вход и язык</b><span>Главная → выбор языка (cookie) → краткое объяснение и требования кампании</span></li>
+    <li><b>«Поддержать»</b><span>Email + согласие с privacy policy + Turnstile; опционально имя, город, профессия, разрешение публиковать имя</span></li>
+    <li><b>Подтверждение email</b><span>Письмо со ссылкой → verify → <b>только теперь</b> счётчик сторонников +1</span></li>
+    <li><b>Выбор адресата</b><span>Партия или политик (только с официальным публичным контактом)</span></li>
+    <li><b>Сборка обращения</b><span>Выбор вопросов + опционально имя, город, короткий личный контекст, язык обращения</span></li>
+    <li><b>Предпросмотр</b><span>Тема email + тело + короткая версия для WhatsApp; возврат к редактированию</span></li>
+    <li><b>Действие</b><span><code>mailto:</code> · WhatsApp deep link · копирование темы/текста — каждое логируется отдельно</span></li>
+    <li><b>«Я отправил»</b><span>Самостоятельная отметка → страница результата + кнопки распространения (WhatsApp, Telegram, Facebook, ссылка)</span></li>
+    <li><b>Передача ответа</b><span>Форма: адресат, дата, канал, текст, файл (JPG/PNG/WebP/PDF ≤10 MB), email, согласие → очередь модерации</span></li>
+  </ol>
+  <div class="note">Переход к email/WhatsApp <b>≠</b> доказанная отправка. Публичные показатели строго раздельны: <b>поддержали</b> / <b>сформировали</b> / <b>сообщили об отправке</b> / <b>передали ответ</b>.</div>
+
+  <h2 class="sec"><span>Rate limits</span>Стартовые лимиты (конфиг без деплоя)</h2>
+  <table>
+    <tr><th>Endpoint</th><th>Лимит</th><th>Окно</th></tr>
+    <tr><td class="mono" style="background:none">POST /support</td><td>5 попыток / IP</td><td>15 минут</td></tr>
+    <tr><td class="mono" style="background:none">POST /verify-email</td><td>10 попыток / IP</td><td>1 час</td></tr>
+    <tr><td class="mono" style="background:none">POST /request/preview</td><td>30 попыток / IP</td><td>1 час</td></tr>
+    <tr><td class="mono" style="background:none">POST /request/action</td><td>30 попыток / IP</td><td>1 час</td></tr>
+    <tr><td class="mono" style="background:none">POST /responses</td><td>3 отправки / IP</td><td>1 час</td></tr>
+  </table>
+
+  <h2 class="sec"><span>Админ-поток</span>Возможности администратора</h2>
+  <div class="card"><ul class="tick" style="font-size:13.5px;columns:2;column-gap:28px">
+    <li>Вход через Cloudflare Access (SSO + принудительная 2FA)</li>
+    <li>CRUD требований и переводов</li>
+    <li>CRUD партий, политиков, контактов</li>
+    <li>Email- и WhatsApp-шаблоны</li>
+    <li>Агрегированная статистика</li>
+    <li>Список сторонников + CSV-экспорт</li>
+    <li>Модерация ответов, смена статусов</li>
+    <li>Журнал всех изменений (audit log)</li>
+    <li>Kill-switch форм и адресатов</li>
+  </ul></div>
+</section>
+
+<!-- ================= 05 i18n ================= -->
+<section class="panel" id="t5">
+  <h2 class="sec"><span>Локали</span>Шесть языков с первого релиза</h2>
+  <table>
+    <tr><th>Язык</th><th>Код</th><th>Направление</th><th>URL</th></tr>
+    <tr><td>Иврит</td><td class="mono" style="background:none">he</td><td><span class="tag b">RTL</span></td><td class="mono" style="background:none">/he/…</td></tr>
+    <tr><td>Арабский</td><td class="mono" style="background:none">ar</td><td><span class="tag b">RTL</span></td><td class="mono" style="background:none">/ar/…</td></tr>
+    <tr><td>Идиш</td><td class="mono" style="background:none">yi</td><td><span class="tag b">RTL</span></td><td class="mono" style="background:none">/yi/…</td></tr>
+    <tr><td>Русский</td><td class="mono" style="background:none">ru</td><td><span class="tag t">LTR</span></td><td class="mono" style="background:none">/ru/…</td></tr>
+    <tr><td>Английский</td><td class="mono" style="background:none">en</td><td><span class="tag t">LTR</span></td><td class="mono" style="background:none">/en/…</td></tr>
+    <tr><td>Амхарский</td><td class="mono" style="background:none">am</td><td><span class="tag t">LTR</span></td><td class="mono" style="background:none">/am/…</td></tr>
+  </table>
+
+  <div class="grid2" style="margin-top:16px">
+    <div class="card"><h3>Хранение переводов</h3>
+      <ul class="tick" style="margin-top:8px;font-size:13.5px">
+        <li>Короткий UI → JSON-словари</li>
+        <li>Длинные тексты кампании → Markdown</li>
+        <li>Шаблоны обращений → локализованные версии в БД/файлах</li>
+        <li>Политические и юридические тексты — только после человеческой проверки</li>
+      </ul>
+      <div class="note" style="margin-bottom:0">Нет утверждённого перевода → страница <b>не подменяет</b> язык незаметно.</div>
+    </div>
+    <div class="card"><h3>Правила RTL/LTR</h3>
+      <ul class="tick" style="margin-top:8px;font-size:13.5px">
+        <li><code>&lt;html lang dir&gt;</code> на каждой странице</li>
+        <li>Cookie языка; переключение → эквивалентная страница</li>
+        <li>Только logical properties: <code>margin-inline</code>, <code>padding-inline</code>, <code>inset-inline</code>, <code>text-align:start</code></li>
+        <li>Email, URL, телефоны — в изолированном LTR-контексте (<code>bdi</code> / <code>dir="ltr"</code>)</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 06 КАЧЕСТВО ================= -->
+<section class="panel" id="t6">
+  <h2 class="sec"><span>Производительность</span>Целевые показатели</h2>
+  <div class="kpi">
+    <div class="card"><b>100k</b><span>посетителей / час</span></div>
+    <div class="card"><b>25 rps</b><span>динамика, постоянно</span></div>
+    <div class="card"><b>50 rps</b><span>кратковременные пики</span></div>
+    <div class="card"><b>10 /с</b><span>записей поддержки</span></div>
+    <div class="card"><b>1 млн</b><span>сторонников без смены архитектуры</span></div>
+    <div class="card"><b>≤300 мс</b><span>p95 публичный GET</span></div>
+    <div class="card"><b>≤500 мс</b><span>p95 POST</span></div>
+    <div class="card"><b>&lt;1%</b><span>доля ошибок</span></div>
+  </div>
+
+  <h2 class="sec"><span>Защита</span>Безопасность и приватность</h2>
+  <div class="grid2">
+    <div class="card"><h3>Безопасность</h3>
+      <ul class="tick" style="margin-top:8px;font-size:13.5px">
+        <li>Cloudflare Turnstile на всех публичных формах</li>
+        <li>Rate limiting + лимит размера тела запроса</li>
+        <li>CSRF, secure/httpOnly cookies, строгая CSP</li>
+        <li>Проверка типов загружаемых файлов</li>
+        <li>Админка за Cloudflare Access (SSO + 2FA) + JWT-проверка на origin + audit log</li>
+        <li>Быстрое отключение любых пользовательских форм</li>
+      </ul></div>
+    <div class="card"><h3>Приватность</h3>
+      <ul class="tick" style="margin-top:8px;font-size:13.5px">
+        <li>Минимум персональных данных; электоральный выбор не собираем без отдельной необходимости</li>
+        <li>Индивидуальные данные не публикуются без согласия</li>
+        <li>Механизм удаления данных пользователя</li>
+        <li>Privacy policy на всех 6 языках</li>
+        <li>Файлы и письма — только HTTPS</li>
+        <li>Публичная статистика отделена от персональных записей</li>
+      </ul></div>
+  </div>
+
+  <h2 class="sec"><span>Доступность</span>WCAG 2.1 AA</h2>
+  <div class="card"><ul class="tick" style="font-size:13.5px;columns:2;column-gap:28px">
+    <li>Полное управление клавиатурой, видимый focus</li>
+    <li>Семантический HTML, настоящие labels</li>
+    <li>Сообщения HTMX через <code>aria-live</code></li>
+    <li>Skip link, корректные заголовки</li>
+    <li>Без горизонтального overflow на 320 px</li>
+    <li>Lighthouse Accessibility ≥ 95</li>
+    <li>axe-core: 0 critical / serious</li>
+  </ul></div>
+
+  <h2 class="sec"><span>Backup</span>Резервное копирование</h2>
+  <div class="card"><ul class="tick" style="font-size:13.5px">
+    <li>Ежедневный внешний backup SQLite, хранение ≥ 7 копий + отдельный weekly</li>
+    <li>Документированная процедура восстановления, <b>протестированная до запуска</b></li>
+    <li>Экспорт критических таблиц в CSV/JSON</li>
+    <li>Snapshots Render — <b>не</b> единственный механизм</li>
+  </ul></div>
+</section>
+
+<!-- ================= 07 РОАДМАП ================= -->
+<section class="panel" id="t7">
+  <h2 class="sec"><span>Этапы</span>Последовательность реализации</h2>
+
+  <div class="acc open">
+    <button class="acc-h"><span class="ph">Э0</span><b>Фундамент</b><span class="ar">▸</span></button>
+    <div class="acc-b">
+      Репозиторий · Hono + TypeScript + SSR JSX · HTMX + Pico CSS · миграции SQLite с PRAGMA · конфиг через env · деплой на Render с persistent disk · Cloudflare перед сервисом.
+      <div class="exit"><b>Выход:</b> страница деплоится, БД переживает рестарт и новый деплой.</div>
+    </div>
+  </div>
+  <div class="acc">
+    <button class="acc-h"><span class="ph">Э1</span><b>Ядро i18n</b><span class="ar">▸</span></button>
+    <div class="acc-b">
+      Роутинг <code>/{locale}/…</code> · загрузчик JSON-словарей · Markdown-пайплайн для длинных текстов · cookie языка · <code>lang</code>/<code>dir</code> на html · logical properties в CSS · переключатель с сохранением текущей страницы · запрет тихого fallback-языка.
+      <div class="exit"><b>Выход:</b> все 6 локалей открываются, RTL/LTR корректны на 320–1440 px.</div>
+    </div>
+  </div>
+  <div class="acc">
+    <button class="acc-h"><span class="ph">Э2</span><b>Публичный контент</b><span class="ar">▸</span></button>
+    <div class="acc-b">
+      Главная (проблема, решение, требования, счётчики, CTA) · страница полного текста требований · агрегатные счётчики из БД · кнопки распространения с локализованным текстом.
+      <div class="exit"><b>Выход:</b> контент и требования редактируются данными, а не кодом.</div>
+    </div>
+  </div>
+  <div class="acc">
+    <button class="acc-h"><span class="ph">Э3</span><b>Поддержка + верификация</b><span class="ar">▸</span></button>
+    <div class="acc-b">
+      Форма поддержки · Turnstile · rate limit · нормализация email · отправка verify-письма · подтверждение по токену · <code>email_verified_at</code> → счётчик · UNIQUE-дедуп.
+      <div class="exit"><b>Выход:</b> повторные отправки и двойные клики не создают дублей; счётчик растёт только после verify.</div>
+    </div>
+  </div>
+  <div class="acc">
+    <button class="acc-h"><span class="ph">Э4</span><b>Генератор обращения</b><span class="ar">▸</span></button>
+    <div class="acc-b">
+      Сид адресатов с официальными контактами · выбор вопросов · опциональная персонализация · локализованные шаблоны (тема, тело, короткая WA-версия) · предпросмотр · <code>mailto:</code> · WhatsApp deep link · копирование · логирование 4 типов действий в <code>request_actions</code>.
+      <div class="exit"><b>Выход:</b> обращение генерируется на любом из 6 языков; действия считаются раздельно; персональный текст не сохраняется.</div>
+    </div>
+  </div>
+  <div class="acc">
+    <button class="acc-h"><span class="ph">Э5</span><b>Передача ответов</b><span class="ar">▸</span></button>
+    <div class="acc-b">
+      Форма передачи · валидация типа (JPG/PNG/WebP/PDF) и размера ≤10 MB · загрузка в R2/S3 · метаданные файла в БД · статусная модель · страница подтверждения приёма.
+      <div class="exit"><b>Выход:</b> файлы не касаются persistent disk приложения; ничего не публикуется автоматически.</div>
+    </div>
+  </div>
+  <div class="acc">
+    <button class="acc-h"><span class="ph">Э6</span><b>Админка</b><span class="ar">▸</span></button>
+    <div class="acc-b">
+      <b>Периметр:</b> Access-приложение на <code>/admin/*</code> (allow-list email · SSO + принудительная 2FA) → middleware Hono: валидация <code>Cf-Access-Jwt-Assertion</code> через JWKS + <code>aud</code>, кэш ключей, 403 без токена → email из JWT → <code>admins.role</code> → <code>admin_id</code> в audit log.<br><br>
+      <b>Функции:</b> CRUD требований, адресатов, контактов, шаблонов, переводов · очередь модерации ответов со сменой статусов · агрегированная статистика · CSV-экспорт сторонников и метрик · audit log каждой мутации · kill-switch форм и адресатов. Без собственной формы логина, паролей и сложного CMS.
+      <div class="exit"><b>Выход:</b> любая мутация — в журнале; <code>/admin/*</code> без валидного JWT → 403.</div>
+    </div>
+  </div>
+  <div class="acc">
+    <button class="acc-h"><span class="ph">Э7</span><b>Закалка и запуск</b><span class="ar">▸</span></button>
+    <div class="acc-b">
+      Cache rules Cloudflare · строгая CSP · конфигурируемые rate limits · тест обхода Access: прямой запрос к <code>*.onrender.com/admin</code> получает 403 · прогон Lighthouse и axe-core · нагрузочный тест 25/50 rps + 10 POST/с · backup-cron + тестовое восстановление · privacy policy ×6 + удаление данных · финальный прогон DoD.
+      <div class="exit"><b>Выход:</b> все 35 пунктов DoD закрыты → запуск.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 08 DoD ================= -->
+<section class="panel" id="t8">
+  <div class="prog"><div class="bar"><div class="fill" id="fill"></div></div><div class="num" id="num">0 / 33</div></div>
+  <div class="dod" id="dod">
+    <h3>Языки и доступ</h3>
+    <label><span class="n">01</span><input type="checkbox"><span>Сайт доступен на всех шести языках</span></label>
+    <label><span class="n">02</span><input type="checkbox"><span>RTL и LTR корректны на всех публичных страницах</span></label>
+    <label><span class="n">03</span><input type="checkbox"><span>Пользователь может прочитать требования кампании</span></label>
+    <h3>Поддержка</h3>
+    <label><span class="n">04</span><input type="checkbox"><span>Пользователь может поддержать кампанию</span></label>
+    <label><span class="n">05</span><input type="checkbox"><span>Поддержка учитывается только после подтверждения email</span></label>
+    <label><span class="n">06</span><input type="checkbox"><span>Один email не увеличивает счётчик более одного раза</span></label>
+    <h3>Обращения</h3>
+    <label><span class="n">07</span><input type="checkbox"><span>Можно выбрать партию или политика</span></label>
+    <label><span class="n">08</span><input type="checkbox"><span>Можно выбрать вопросы</span></label>
+    <label><span class="n">09</span><input type="checkbox"><span>Система формирует локализованное обращение</span></label>
+    <label><span class="n">10</span><input type="checkbox"><span>Можно открыть email (mailto)</span></label>
+    <label><span class="n">11</span><input type="checkbox"><span>Можно открыть WhatsApp</span></label>
+    <label><span class="n">12</span><input type="checkbox"><span>Можно скопировать текст</span></label>
+    <label><span class="n">13</span><input type="checkbox"><span>Можно отметить обращение отправленным</span></label>
+    <label><span class="n">14</span><input type="checkbox"><span>Показатели «сформировано» и «заявлено отправленным» разделены</span></label>
+    <h3>Ответы</h3>
+    <label><span class="n">15</span><input type="checkbox"><span>Можно передать полученный ответ</span></label>
+    <label><span class="n">16</span><input type="checkbox"><span>Файлы ответов сохраняются во внешнем object storage</span></label>
+    <h3>Админка</h3>
+    <label><span class="n">17</span><input type="checkbox"><span>Админ управляет требованиями, адресатами и шаблонами</span></label>
+    <label><span class="n">18</span><input type="checkbox"><span>Админ просматривает и модерирует переданные ответы</span></label>
+    <label><span class="n">19</span><input type="checkbox"><span>Доступен CSV-экспорт сторонников и статистики</span></label>
+    <h3>Безопасность и приватность</h3>
+    <label><span class="n">20</span><input type="checkbox"><span>Работают Turnstile и rate limiting</span></label>
+    <label><span class="n">21</span><input type="checkbox"><span>Есть privacy policy и механизм удаления данных</span></label>
+    <label><span class="n">34</span><input type="checkbox"><span>/admin/* недоступен без валидного Access JWT — включая прямой запрос к origin (*.onrender.com)</span></label>
+    <label><span class="n">35</span><input type="checkbox"><span>2FA администраторов принудительно обеспечена на уровне SSO / политики Access</span></label>
+    <h3>Данные и резервирование</h3>
+    <label><span class="n">22</span><input type="checkbox"><span>SQLite сохраняется после рестарта и деплоя</span></label>
+    <label><span class="n">23</span><input type="checkbox"><span>Ежедневный внешний backup успешно создаётся</span></label>
+    <label><span class="n">24</span><input type="checkbox"><span>Проверено восстановление из backup</span></label>
+    <h3>Качество</h3>
+    <label><span class="n">25</span><input type="checkbox"><span>Lighthouse Accessibility ≥ 95</span></label>
+    <label><span class="n">26</span><input type="checkbox"><span>axe-core: без critical и serious ошибок</span></label>
+    <label><span class="n">27</span><input type="checkbox"><span>Нагрузочный тест проходит при 25 rps</span></label>
+    <label><span class="n">28</span><input type="checkbox"><span>10 POST/с не даёт ошибок и дублей</span></label>
+    <label><span class="n">29</span><input type="checkbox"><span>p95 GET ≤ 300 мс</span></label>
+    <label><span class="n">30</span><input type="checkbox"><span>p95 POST ≤ 500 мс</span></label>
+    <label><span class="n">31</span><input type="checkbox"><span>Доля ошибок под нагрузкой &lt; 1%</span></label>
+    <h3>Инварианты</h3>
+    <label><span class="n">32</span><input type="checkbox"><span>Пользовательские файлы не хранятся на persistent disk</span></label>
+    <label><span class="n">33</span><input type="checkbox"><span>Все административные изменения пишутся в audit log</span></label>
+  </div>
+</section>
+
+</div>
+<script>
+// tabs
+const tabs=[...document.querySelectorAll('nav.tabs button')];
+tabs.forEach(b=>b.addEventListener('click',()=>{
+  tabs.forEach(x=>x.classList.remove('on'));
+  document.querySelectorAll('section.panel').forEach(p=>p.classList.remove('on'));
+  b.classList.add('on');
+  document.getElementById(b.dataset.t).classList.add('on');
+  window.scrollTo({top:0});
+}));
+// accordion
+document.querySelectorAll('.acc-h').forEach(h=>h.addEventListener('click',()=>h.parentElement.classList.toggle('open')));
+// DoD progress (in-memory only)
+const boxes=[...document.querySelectorAll('#dod input')];
+function upd(){
+  const c=boxes.filter(b=>b.checked).length;
+  document.getElementById('fill').style.width=(c/boxes.length*100)+'%';
+  document.getElementById('num').textContent=c+' / '+boxes.length;
+}
+boxes.forEach(b=>b.addEventListener('change',upd));
+upd();
+</script>
+</body>
+</html>
