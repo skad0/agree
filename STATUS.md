@@ -4,7 +4,8 @@ _Last updated: 2026-07-17 23:05 (+03) — session paused, will continue later on
 
 > **Session paused.** The orchestrator and its Builder subagent were stopped by the user
 > before any application code was written. Current work (spec + status) is committed.
-> To resume: read this file and `docs/SPEC.md`, then restart from "Remaining" below.
+> To resume: read this file, `docs/ORCHESTRATION.md` (how the agent workflow operates),
+> and `docs/SPEC.md`, then restart from "Remaining" below.
 
 ## What this is
 Implementation of the "Платформа коллективного гражданского запроса" (collective civic request platform) described in `docs/civic-platform-implementation-plan.html`. Work is orchestrated by a lead agent that delegates to subagents.
