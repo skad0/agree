@@ -1,0 +1,31 @@
+{
+  "name": "agree-civic-platform",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "dev": "npm run build && node --watch dist/src/server.js",
+    "build": "tsc",
+    "start": "node dist/src/server.js",
+    "typecheck": "tsc --noEmit",
+    "test": "npm run build && node --test dist/test/*.test.js",
+    "smoke": "npm run build && node dist/scripts/smoke.js",
+    "smoke:pages": "npm run build && node dist/scripts/pages-smoke.js",
+    "backup": "npm run build && node dist/scripts/backup.js",
+    "restore": "npm run build && node dist/scripts/restore.js",
+    "load": "npm run build && node dist/scripts/load.js"
+  },
+  "dependencies": {
+    "@hono/node-server": "1.19.14",
+    "hono": "4.12.29",
+    "jose": "6.2.3",
+    "marked": "17.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "24.2.1",
+    "typescript": "5.9.3"
+  }
+}
