@@ -84,6 +84,10 @@ function demandList(locale: Locale, demands: Demand[], full = false) {
   </li>)}</ol>;
 }
 
+marked.use({ walkTokens(token) {
+  if ((token.type === "link" || token.type === "image") && !/^(https?:|mailto:|\/(?!\/)|#)/i.test(token.href ?? "")) token.href = "#";
+} });
+
 function markdown(value: string) {
   const escaped = value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
   return String(marked.parse(escaped));

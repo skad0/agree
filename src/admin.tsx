@@ -16,7 +16,7 @@ export function registerAdminRoutes(app: Hono, db: Db, config: Config) {
   async function protect(context: any, next: () => Promise<void>) {
     const email = await accessEmail(context, config);
     if (!email) return context.text("Forbidden", 403);
-    db.prepare("INSERT INTO admins (email, role) VALUES (?, 'admin') ON CONFLICT(email) DO NOTHING").run(email);
+    if (config.adminEmails.includes(email)) db.prepare("INSERT INTO admins (email, role) VALUES (?, 'admin') ON CONFLICT(email) DO NOTHING").run(email);
     const admin = db.prepare("SELECT id, email, role FROM admins WHERE email = ? AND is_active = 1").get(email) as Admin | undefined;
     if (!admin) return context.text("Forbidden", 403);
     context.set("admin", admin);

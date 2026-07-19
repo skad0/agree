@@ -135,11 +135,14 @@ test("admin rejects direct access and accepts a valid Cloudflare Access JWT", as
   const jwk = await exportJWK(publicKey); Object.assign(jwk, { kid: "test-key", alg: "RS256", use: "sig" });
   const issuer = "https://access-test.example";
   try {
-    const runtime = createApp({ sqlitePath: join(dir, "app.db"), env: { NODE_ENV: "test", SESSION_SECRET: "test-secret", CF_ACCESS_TEAM_DOMAIN: issuer, CF_ACCESS_AUD: "test-audience", CF_ACCESS_TEST_JWKS: JSON.stringify({ keys: [jwk] }) } });
+    const runtime = createApp({ sqlitePath: join(dir, "app.db"), env: { NODE_ENV: "test", SESSION_SECRET: "test-secret", ADMIN_EMAILS: "admin@example.org", CF_ACCESS_TEAM_DOMAIN: issuer, CF_ACCESS_AUD: "test-audience", CF_ACCESS_TEST_JWKS: JSON.stringify({ keys: [jwk] }) } });
     assert.equal((await runtime.app.request("/admin")).status, 403);
     const token = await new SignJWT({ email: "admin@example.org" }).setProtectedHeader({ alg: "RS256", kid: "test-key" })
       .setIssuer(issuer).setAudience("test-audience").setIssuedAt().setExpirationTime("5m").sign(privateKey);
     assert.equal((await runtime.app.request("/admin", { headers: { "Cf-Access-Jwt-Assertion": token } })).status, 200);
+    const outsider = await new SignJWT({ email: "outsider@example.org" }).setProtectedHeader({ alg: "RS256", kid: "test-key" })
+      .setIssuer(issuer).setAudience("test-audience").setIssuedAt().setExpirationTime("5m").sign(privateKey);
+    assert.equal((await runtime.app.request("/admin", { headers: { "Cf-Access-Jwt-Assertion": outsider } })).status, 403);
     runtime.close();
   } finally {
     rmSync(dir, { recursive: true, force: true });
@@ -149,7 +152,7 @@ test("admin rejects direct access and accepts a valid Cloudflare Access JWT", as
 test("admin content mutations and kill switches are audited", async () => {
   const dir = mkdtempSync(join(tmpdir(), "agree-admin-"));
   try {
-    const runtime = createApp({ sqlitePath: join(dir, "app.db"), env: { NODE_ENV: "test", SESSION_SECRET: "test-secret" } });
+    const runtime = createApp({ sqlitePath: join(dir, "app.db"), env: { NODE_ENV: "test", SESSION_SECRET: "test-secret", ADMIN_EMAILS: "admin@example.org" } });
     const headers = { "X-Test-Admin-Email": "admin@example.org" };
     const form = await getForm(runtime.app, "/admin/demands", headers);
     const created = await postForm(runtime.app, "/admin/demands", { csrf: form.csrf, action: "save", sortOrder: "2", isActive: "yes", locale: "en", title: "A tested demand", body: "Test body" }, form.cookie, headers);
@@ -206,6 +209,23 @@ async function submitSupport(app: ReturnType<typeof createApp>["app"], email: st
   assert.ok(token, html);
   return { token };
 }
+
+test("demand body markdown cannot inject scripts or javascript: links", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "agree-xss-"));
+  try {
+    const runtime = createApp({ sqlitePath: join(dir, "app.db"), env: { NODE_ENV: "test", SESSION_SECRET: "test-secret" } });
+    const demandId = Number(runtime.db.prepare("INSERT INTO demands (campaign_id, sort_order, is_active) VALUES (1, 99, 1)").run().lastInsertRowid);
+    runtime.db.prepare("INSERT INTO demand_translations (demand_id, locale, title, body) VALUES (?, 'en', 'XSS probe', ?)")
+      .run(demandId, "<script>alert(1)</script> [click](javascript:alert(1)) ![x](data:text/html,x)");
+    const html = await (await runtime.app.request("/en/demands")).text();
+    assert.doesNotMatch(html, /<script>alert/);
+    assert.doesNotMatch(html, /javascript:/);
+    assert.doesNotMatch(html, /data:text/);
+    runtime.close();
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
 
 async function verifySupport(app: ReturnType<typeof createApp>["app"], token: string) {
   const form = await getForm(app, `/verify-email?token=${token}&locale=en`);

@@ -15,6 +15,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env) {
     isEphemeralSessionSecret: !env.SESSION_SECRET,
     turnstileSiteKey: env.TURNSTILE_SITE_KEY,
     turnstileSecretKey: env.TURNSTILE_SECRET_KEY,
+    adminEmails: (env.ADMIN_EMAILS ?? "").split(",").map((value) => value.trim().toLowerCase()).filter(Boolean),
     accessTeamDomain: env.CF_ACCESS_TEAM_DOMAIN,
     accessAud: env.CF_ACCESS_AUD,
     accessTestJwks: env.NODE_ENV === "test" ? env.CF_ACCESS_TEST_JWKS : undefined,
