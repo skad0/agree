@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: agree
+    runtime: node
+    plan: starter
+    numInstances: 1
+    buildCommand: npm ci --ignore-scripts && npm run build
+    startCommand: npm start
+    healthCheckPath: /health
+    disk:
+      name: agree-data
+      mountPath: /data
+      sizeGB: 5
+    envVars:
+      - key: NODE_VERSION
+        value: 24.16.0
+      - key: NODE_ENV
+        value: production
+      - key: APP_BASE_URL
+        value: https://agree.onrender.com
+      - key: SQLITE_PATH
+        value: /data/app.db
+      - key: SESSION_SECRET
+        generateValue: true
+
