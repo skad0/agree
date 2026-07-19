@@ -1,41 +1,46 @@
 # Project Status — Civic Platform (agree)
 
-_Last updated: 2026-07-17 23:05 (+03) — session paused, will continue later on Mac_
+_Last updated: 2026-07-19 (+03)_
 
-> **Session paused.** The orchestrator and its Builder subagent were stopped by the user
-> before any application code was written. Current work (spec + status) is committed.
-> To resume: read this file, `docs/ORCHESTRATION.md` (how the agent workflow operates),
-> and `docs/SPEC.md`, then restart from "Remaining" below.
+## Current state
 
-## What this is
-Implementation of the "Платформа коллективного гражданского запроса" (collective civic request platform) described in `docs/civic-platform-implementation-plan.html`. Work is orchestrated by a lead agent that delegates to subagents.
+The Hono/TypeScript MVP is implemented in the working tree with SSR JSX/HTMX, Pico CSS, SQLite WAL, six locales, Render configuration, tests, and operational documentation. It starts without third-party configuration at the application layer; admin fails closed and credential-dependent actions degrade as documented.
 
-## Subagent roles
-| Role | Model | Responsibility | State |
-|---|---|---|---|
-| Spec Analyst | composer-2.5-fast | Extract `docs/SPEC.md` from the HTML plan | done |
-| Builder | cursor-grok-4.5-high | Implement MVP per SPEC.md, clean git commits, Render-ready | aborted (no code produced) |
-| Docs & Release | composer-2.5-fast | README, `.env.example`, `docs/SECRETS.md`, push to origin | not started |
-| Orchestrator | — | Coordination, Render deployment via MCP, this file | stopped by user |
+Work is committed on `main` in four focused commits (MVP implementation, docs, Render config, status). Orchestrator verified independently outside the build sandbox: `npm test` 10/10, `npm run typecheck` clean, and `npm run smoke` — a real keyless TCP server start serving all locale/public pages with 200 and `/admin` 403.
 
-## Completed
-- Reviewed workspace: repo contains only `docs/civic-platform-implementation-plan.html`; git remote is `https://github.com/skad0/agree.git` (branch `main`).
-- `docs/SPEC.md` written by Spec Analyst: Hono + TypeScript + SSR JSX/HTMX + Pico CSS, SQLite (WAL) on a Render persistent disk, Cloudflare (Turnstile, Access for `/admin/*`), R2 for uploads, external email provider for verification. 14 tables, MVP features E0–E7, 6 locales incl. RTL.
+## Implemented
 
-## In progress
-- Nothing. Session paused; nothing running.
+- E0: Hono Node server binds `0.0.0.0:$PORT`; 14-table migrations, foreign keys, WAL, NORMAL sync, 5s busy timeout, `/health`, 5 GB `/data` Render disk, one instance.
+- E1: six locale dictionaries/routes; cookie/Accept-Language selection; equivalent language links; correct `lang`/`dir`; logical responsive CSS; explicit missing-translation state.
+- E2: DB-seeded localized demands/recipients/templates, home/demands pages, separate aggregate counters, short public cache headers.
+- E3: support form, CSRF/Turnstile/rate checks, normalized unique email, expiring hashed verification tokens, Resend delivery, keyless development link, exactly-once verified count.
+- E4: localized recipient/demand builder and templates, preview, email/WhatsApp/copy/report-sent actions, share result, separate action metrics, no personalized message storage.
+- E5: response form/moderation state, date/text/email validation, 10 MB limit, MIME magic-byte validation, in-memory S3/R2 streaming, DB metadata, admin-only download.
+- E6: Cloudflare Access JWKS issuer/audience JWT validation, 403 without credentials/token, demand/recipient/template management, response moderation, stats/supporter CSV, audit transaction for every mutation, form/recipient/campaign kill switches.
+- E7 application work: strict CSP/HSTS/security headers, body limits, CSRF, optional Turnstile, rate limits, six privacy pages, confirmed data deletion/anonymization, external daily/weekly SQLite backup, integrity-checked restore, semantic/keyboard-friendly markup and skip link.
+- Docs/deploy: `README.md`, `.env.example`, `docs/SECRETS.md`, `render.yaml`, backup/restore/load/smoke scripts.
 
-## Remaining (in order, for next session)
-1. Implement MVP per `docs/SPEC.md` (Builder role, cursor-grok-4.5-high). It was designed to degrade gracefully when third-party keys are absent, so the service can deploy before credentials are provided.
-2. Write README / `.env.example` / `docs/SECRETS.md` with notes on where to obtain and manage each credential (Docs & Release role, composer-2.5-fast).
-3. Push to GitHub (`https://github.com/skad0/agree.git`, branch `main`), deploy to Render via MCP, verify live service.
-4. Keep git history clean: small focused commits (spec, scaffold, features, docs, deploy config).
+## Verification completed
 
-## Key decisions
-- Deployment target: Render (deploy from the GitHub repo; bind `0.0.0.0:$PORT`; SQLite lives on a Render persistent disk per SPEC.md — note this forces a single instance).
-- Stack per `docs/SPEC.md`: Hono + TypeScript + SSR JSX/HTMX + Pico CSS, SQLite (WAL), Cloudflare Turnstile/Access, R2 uploads, external email provider.
+- Clean offline frozen install from the existing npm cache: 7 packages installed, exit 0.
+- `npm test`: 10/10 integration tests pass, exit 0.
+- `npm run typecheck`: exit 0.
+- `npm run build`: exit 0.
+- `npm audit --offline --omit=dev`: 0 vulnerabilities, exit 0.
+- `env -i PATH="$PATH" npm run smoke:pages`: all six locale homes and main keyless pages returned 200; `/admin` returned 403, exit 0.
+- S3 upload, Access JWT/JWKS, backup/restore, deletion, audit, dedup, and no-personal-text invariants are exercised with local deterministic fakes (no provider credentials).
 
-## Blockers / needs from user
-- On this Windows machine the agent's local shell returned no output (environment issue); this may not apply on the Mac.
-- Pushing to GitHub requires the user's stored git credentials to work non-interactively.
-- Any third-party API keys identified in the plan must be provided by the user (will be listed in `docs/SECRETS.md`): Cloudflare Turnstile + Access, R2, email provider.
+## Remaining launch gates / environment blockers
+
+- Chrome DevTools MCP is not configured, so Lighthouse ≥95, axe zero serious/critical, console, focus order, and 320/768/1024/1440 visual checks are unverified.
+- `npm run load` (staging p95/error/load targets) has not been run against a deployed instance.
+- Real Cloudflare Turnstile/Access, R2, Resend, external backup bucket, Cloudflare cache/WAF, Render persistence across redeploy, and live restore require credentials/infrastructure and remain unverified.
+- Political/legal/privacy translations require human review before launch.
+- Deploy to Render and verify the live service (Render MCP not connected in this session).
+
+## Key deployment decisions
+
+- Render paid Starter web service, single instance, persistent disk at `/data`, SQLite at `/data/app.db`.
+- Cloudflare caches only public GET/assets and protects `/admin*`; origin independently validates Access JWTs.
+- Response files and backups use private S3-compatible buckets; no binary blobs are written to the app disk.
+- Missing third-party keys never prevent health/public-page startup. Access fails closed; file/email/backup-dependent operations report unavailable or remain disabled.
