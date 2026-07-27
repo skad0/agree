@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: agree
+    name: rafmeshutaf
     runtime: node
     plan: starter
     numInstances: 1
@@ -17,7 +17,7 @@ services:
       - key: NODE_ENV
         value: production
       - key: APP_BASE_URL
-        value: https://agree.onrender.com
+        value: https://rafmeshutaf.org.il
       - key: SQLITE_PATH
         value: /data/app.db
       - key: SESSION_SECRET
