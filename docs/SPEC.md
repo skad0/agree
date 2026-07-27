@@ -51,11 +51,15 @@ All tables use SQLite. Binary blobs are **not** stored in DB. `PRAGMA foreign_ke
 
 **`demand_translations`:** `demand_id` FK, `locale` (`he|ar|yi|ru|en|am`), `title`, `body` (Markdown); UNIQUE (`demand_id`,`locale`)
 
-**`message_templates`:** `id` PK (DECISION), `locale`, `channel` (`email`|`whatsapp` — DECISION), `subject` (nullable), `body` (placeholders)
+**`message_templates`:** `id` PK (DECISION), `locale`, `channel` (`email`|`whatsapp`|`social` — DECISION), `subject` (nullable), `body` (placeholders `{recipient}`, `{demands}`, `{handle}`, `{link}`, `{name}`, `{city}`, `{context}`)
+
+**Note:** SQLite does not interpret `\n` inside a string literal. Seeds must insert real newlines, or convert with `replace(body, '\n', char(10))` as migration `003` does.
 
 ### 3.2 Recipients
 
-**`recipients`:** `id` PK, `type` (`party`|`politician`), `email`, `whatsapp`, `website`, `is_active`
+**`recipients`:** `id` PK, `type` (`party`|`politician`), `email`, `whatsapp`, `website`, `social_handle` (nullable), `is_active`
+
+**`{handle}` resolution:** `social_handle` if set → else `Knesset member <name>` for `politician` → else the localized `name`.
 
 **`recipient_translations`:** `recipient_id` FK, `locale`, `name`; UNIQUE (`recipient_id`,`locale`)
 
@@ -71,7 +75,7 @@ All tables use SQLite. Binary blobs are **not** stored in DB. `PRAGMA foreign_ke
 
 **`generated_requests`:** `id` PK, `recipient_id` FK, `locale`, `selected_demands` (JSON array), `created_at`; optional `supporter_id` FK (DECISION). **Invariant:** never store full personalized message body.
 
-**`request_actions`:** `id` PK, `generated_request_id` FK, `action_type` (`email_opened`|`whatsapp_opened`|`text_copied`|`reported_sent`), `created_at`
+**`request_actions`:** `id` PK, `generated_request_id` FK, `action_type` (`email_opened`|`whatsapp_opened`|`text_copied`|`reported_sent`|`shared_x`|`shared_facebook`|`shared_whatsapp`|`shared_telegram`), `created_at`
 
 ### 3.5 Submitted Responses
 
@@ -135,10 +139,13 @@ Phasing follows plan roadmap **E0–E7**. All items below are **Phase 1 / MVP** 
 **E4 — Appeal generator**
 - Recipient list (parties/politicians with official contacts)
 - Select demands; optional name, city, short personal context; message locale
-- Localized templates → preview (email subject/body + WhatsApp short text)
-- Actions: mailto, WhatsApp deep link, copy — each logged in `request_actions`
+- Localized templates → preview (email subject/body, WhatsApp short text, public post text)
+- Every generated text is editable on the preview before any action is taken
+- Private actions: mailto, WhatsApp deep link, copy — each logged in `request_actions`
+- Public actions: post to X, Facebook, WhatsApp, Telegram, mentioning `{handle}` and linking the campaign
+- Facebook's sharer accepts a URL only, so `shared_facebook` also renders the post text for manual copy
 - "I sent it" → result page + share (WhatsApp, Telegram, Facebook, link)
-- **Acceptance:** Appeals in all 6 languages; four action types counted separately; personal text not stored in DB
+- **Acceptance:** Appeals in all 6 languages; eight action types counted separately; personal text not stored in DB
 
 **E5 — Response submission**
 - Form: recipient, received date, channel, text, file (JPG/PNG/WebP/PDF ≤10 MB), email, consent
@@ -203,7 +210,7 @@ Phasing follows plan roadmap **E0–E7**. All items below are **Phase 1 / MVP** 
 | `GET /verify-email?token=…` | DECISION: global path for email link simplicity |
 | `POST /verify-email` | Confirm token (rate limited) |
 | `POST /{locale}/request/preview` | Build preview from selections |
-| `POST /{locale}/request/action` | Log action; return mailto/WA/copy UI |
+| `POST /{locale}/request/action` | Log action from the submit button's value; return mailto/WA/copy/share UI |
 | `POST /{locale}/request/report-sent` | Log `reported_sent` |
 | `POST /{locale}/responses` | Submit response + file upload |
 | `POST /{locale}/delete-data` | Process deletion request |
@@ -214,7 +221,7 @@ Phasing follows plan roadmap **E0–E7**. All items below are **Phase 1 / MVP** 
 |-------|---------|
 | `/admin` | Dashboard + aggregate stats |
 | `/admin/demands` | CRUD demands + translations |
-| `/admin/recipients` | CRUD recipients + contacts + translations |
+| `/admin/recipients` | CRUD recipients + contacts + social handle + translations |
 | `/admin/templates` | CRUD message templates |
 | `/admin/supporters` | List + CSV export |
 | `/admin/responses` | Moderation queue |

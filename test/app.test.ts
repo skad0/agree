@@ -73,7 +73,7 @@ test("support verification increments the counter once for a normalized email", 
   }
 });
 
-test("appeals render in six locales, count four actions, and do not store personal text", async () => {
+test("appeals render in six locales, count every action, and do not store personal text", async () => {
   const dir = mkdtempSync(join(tmpdir(), "agree-request-"));
   try {
     const runtime = createApp({ sqlitePath: join(dir, "app.db"), env: { NODE_ENV: "test", SESSION_SECRET: "test-secret" } });
@@ -84,19 +84,75 @@ test("appeals render in six locales, count four actions, and do not store person
         name: "A Citizen", city: "A City", context: "PRIVATE-CONTEXT"
       }, form.cookie);
       assert.equal(response.status, 200, locale);
-      assert.match(await response.text(), /PRIVATE-CONTEXT/);
+      const html = await response.text();
+      assert.match(html, /PRIVATE-CONTEXT/);
+      // Templates must carry real line breaks, not the literal backslash-n that SQLite stores verbatim.
+      assert.doesNotMatch(html, /\\n/, locale);
     }
     const request = runtime.db.prepare("SELECT id, selected_demands FROM generated_requests ORDER BY id DESC LIMIT 1").get() as { id: number; selected_demands: string };
     assert.doesNotMatch(request.selected_demands, /PRIVATE-CONTEXT/);
     const actionForm = await getForm(runtime.app, "/en/request/build?recipient=1");
-    for (const action of ["email_opened", "whatsapp_opened", "text_copied"]) {
-      const response = await postForm(runtime.app, "/en/request/action", { csrf: actionForm.csrf, requestId: String(request.id), action }, actionForm.cookie);
+    const performed = ["email_opened", "whatsapp_opened", "text_copied", "shared_x", "shared_facebook", "shared_whatsapp", "shared_telegram"];
+    for (const action of performed) {
+      const response = await postForm(runtime.app, "/en/request/action", {
+        csrf: actionForm.csrf, requestId: String(request.id), action,
+        subject: "S", message: "EMAIL", whatsappMessage: "WA", socialMessage: "POST"
+      }, actionForm.cookie);
       assert.equal(response.status, 200, action);
     }
     const sent = await postForm(runtime.app, "/en/request/report-sent", { csrf: actionForm.csrf, requestId: String(request.id) }, actionForm.cookie);
     assert.equal(sent.status, 303);
     const actions = runtime.db.prepare("SELECT action_type FROM request_actions WHERE generated_request_id = ? ORDER BY action_type").all(request.id).map((row) => row.action_type);
-    assert.deepEqual(actions, ["email_opened", "reported_sent", "text_copied", "whatsapp_opened"]);
+    assert.deepEqual(actions, [...performed, "reported_sent"].sort());
+    runtime.close();
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("public post text mentions the handle, falls back to Knesset plus name, and builds share links", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "agree-social-"));
+  try {
+    const runtime = createApp({ sqlitePath: join(dir, "app.db"), env: { NODE_ENV: "test", SESSION_SECRET: "test-secret", APP_BASE_URL: "https://campaign.test" } });
+    const add = (id: number, handle: string | null) => {
+      runtime.db.prepare("INSERT INTO recipients (id, type, email, social_handle) VALUES (?, 'politician', 'mk@example.org', ?)").run(id, handle);
+      runtime.db.prepare("INSERT INTO recipient_translations (recipient_id, locale, name) VALUES (?, 'en', ?)").run(id, `MK Number ${id}`);
+    };
+    add(2, "@mk_handle");
+    add(3, null);
+
+    const preview = async (recipientId: number) => {
+      const form = await getForm(runtime.app, `/en/request/build?recipient=${recipientId}`);
+      const response = await postForm(runtime.app, "/en/request/preview", {
+        csrf: form.csrf, recipientId: String(recipientId), demandId: "1", messageLocale: "en"
+      }, form.cookie);
+      assert.equal(response.status, 200);
+      return await response.text();
+    };
+
+    const withHandle = await preview(2);
+    assert.match(withHandle, /@mk_handle/);
+    assert.doesNotMatch(withHandle, /Knesset member/);
+    assert.match(withHandle, /https:\/\/campaign.test\/en/);
+
+    const withoutHandle = await preview(3);
+    assert.match(withoutHandle, /Knesset member MK Number 3/);
+
+    const request = runtime.db.prepare("SELECT id FROM generated_requests ORDER BY id DESC LIMIT 1").get() as { id: number };
+    const form = await getForm(runtime.app, "/en/request/build?recipient=3");
+    const targets: Record<string, RegExp> = {
+      shared_x: /https:\/\/x\.com\/intent\/post\?text=POST/,
+      shared_facebook: /facebook\.com\/sharer\/sharer\.php\?u=https%3A%2F%2Fcampaign\.test%2Fen/,
+      shared_whatsapp: /https:\/\/wa\.me\/\?text=POST/,
+      shared_telegram: /t\.me\/share\/url\?url=https%3A%2F%2Fcampaign\.test%2Fen&amp;text=POST/
+    };
+    for (const [action, expected] of Object.entries(targets)) {
+      const response = await postForm(runtime.app, "/en/request/action", {
+        csrf: form.csrf, requestId: String(request.id), action, socialMessage: "POST"
+      }, form.cookie);
+      assert.equal(response.status, 200, action);
+      assert.match(await response.text(), expected, action);
+    }
     runtime.close();
   } finally {
     rmSync(dir, { recursive: true, force: true });

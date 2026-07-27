@@ -1,6 +1,6 @@
 # Collective Civic Request Platform
 
-A multilingual civic campaign MVP where supporters verify their email, create a personal appeal to an official recipient, send it through their own channel, and submit any reply for moderation. It is server-rendered with Hono JSX and progressively enhanced with HTMX, uses Pico CSS, and stores state in SQLite WAL mode.
+A multilingual civic campaign MVP where supporters verify their email, create a personal appeal to an official recipient, send it privately or post it publicly through their own channel, and submit any reply for moderation. It is server-rendered with Hono JSX and progressively enhanced with HTMX, uses Pico CSS, and stores state in SQLite WAL mode.
 
 ## Quick start
 
@@ -37,11 +37,13 @@ No third-party keys are needed to boot. With no keys:
 
 - `src/server.ts` binds `0.0.0.0:$PORT` and schedules a backup every 24 hours when backup credentials exist.
 - `src/app.tsx` builds one Hono app and one SQLite connection.
-- `migrations/` contains the 14-table schema and localized seed content.
+- `migrations/` contains the 14-table schema, localized seed content, and additive upgrades applied on boot.
+- The appeal preview generates email, WhatsApp and public-post text from localized templates; every field is editable before the supporter acts on it.
+- Public posting targets X, Facebook, WhatsApp and Telegram. The post mentions the recipient's `social_handle`, or falls back to `Knesset member <name>` for politicians. Facebook's sharer accepts a URL only, so that path also shows the text for manual copy.
 - `src/locales/` contains all six short-string dictionaries: Hebrew, Arabic, Yiddish, Russian, English, and Amharic. Hebrew, Arabic, and Yiddish render RTL.
 - Public POST routes use signed CSRF cookies, optional Turnstile, body limits, validation, and per-IP limits.
 - Cloudflare Access JWTs are verified at origin through the team JWKS. There is no application password system.
-- Appeal personalization stays in the response HTML and form payload; only recipient, locale, selected demand IDs, and aggregate actions are stored.
+- Appeal personalization stays in the response HTML and form payload; only recipient, locale, selected demand IDs, and aggregate actions are stored. This holds for public-post text too — the text a supporter posts is never written to the database.
 - Response files are held in memory only long enough to validate and stream to S3-compatible storage; only metadata enters SQLite.
 
 The product contract and route inventory are in [docs/SPEC.md](docs/SPEC.md). Credential setup is in [docs/SECRETS.md](docs/SECRETS.md).

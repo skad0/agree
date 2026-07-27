@@ -62,6 +62,7 @@ export function registerAdminRoutes(app: Hono, db: Db, config: Config) {
       <label>Action<select name="action"><option value="save">Save</option><option value="delete">Delete</option></select></label>
       <label>Type<select name="type"><option>party</option><option>politician</option></select></label><label>Locale<input name="locale" value="en" /></label>
       <label>Name<input name="name" /></label><label>Email<input name="email" type="email" /></label><label>WhatsApp<input name="whatsapp" /></label><label>Website<input name="website" type="url" /></label>
+      <label>Social handle<input name="socialHandle" placeholder="@handle — blank falls back to the localized name" /></label>
       <label><input name="isActive" type="checkbox" value="yes" checked /> Active</label><button>Apply</button></form></>);
   });
 
@@ -72,9 +73,9 @@ export function registerAdminRoutes(app: Hono, db: Db, config: Config) {
     mutate(db, currentAdmin(context), action, "recipient", body, () => {
       if (action === "delete" && id) return void db.prepare("DELETE FROM recipients WHERE id = ?").run(id);
       if (action !== "save" || !["party", "politician"].includes(text(body.type)) || !["he", "ar", "yi", "ru", "en", "am"].includes(text(body.locale)) || !text(body.name)) throw new Error("Invalid recipient");
-      const recipientId = id ?? Number((db.prepare("INSERT INTO recipients (type, email, whatsapp, website, is_active) VALUES (?, ?, ?, ?, ?) RETURNING id")
-        .get(text(body.type), nullable(body.email), nullable(body.whatsapp), nullable(body.website), text(body.isActive) === "yes" ? 1 : 0) as { id: number }).id);
-      if (id) db.prepare("UPDATE recipients SET type = ?, email = ?, whatsapp = ?, website = ?, is_active = ? WHERE id = ?").run(text(body.type), nullable(body.email), nullable(body.whatsapp), nullable(body.website), text(body.isActive) === "yes" ? 1 : 0, id);
+      const recipientId = id ?? Number((db.prepare("INSERT INTO recipients (type, email, whatsapp, website, social_handle, is_active) VALUES (?, ?, ?, ?, ?, ?) RETURNING id")
+        .get(text(body.type), nullable(body.email), nullable(body.whatsapp), nullable(body.website), nullable(body.socialHandle), text(body.isActive) === "yes" ? 1 : 0) as { id: number }).id);
+      if (id) db.prepare("UPDATE recipients SET type = ?, email = ?, whatsapp = ?, website = ?, social_handle = ?, is_active = ? WHERE id = ?").run(text(body.type), nullable(body.email), nullable(body.whatsapp), nullable(body.website), nullable(body.socialHandle), text(body.isActive) === "yes" ? 1 : 0, id);
       db.prepare(`INSERT INTO recipient_translations (recipient_id, locale, name) VALUES (?, ?, ?)
         ON CONFLICT(recipient_id, locale) DO UPDATE SET name = excluded.name`).run(recipientId, text(body.locale), text(body.name));
     });
@@ -85,7 +86,7 @@ export function registerAdminRoutes(app: Hono, db: Db, config: Config) {
     const csrf = issueCsrf(context, config);
     return adminPage(context, "Templates", <><h1>Templates</h1><pre>{JSON.stringify(db.prepare("SELECT * FROM message_templates ORDER BY locale, channel").all(), null, 2)}</pre><form method="post">
       <input type="hidden" name="csrf" value={csrf} /><label>Action<select name="action"><option value="save">Save</option><option value="delete">Delete</option></select></label>
-      <label>Locale<input name="locale" value="en" /></label><label>Channel<select name="channel"><option>email</option><option>whatsapp</option></select></label>
+      <label>Locale<input name="locale" value="en" /></label><label>Channel<select name="channel"><option>email</option><option>whatsapp</option><option>social</option></select></label>
       <label>Subject<input name="subject" /></label><label>Body<textarea name="body" required></textarea></label><button>Apply</button></form></>);
   });
 
@@ -94,7 +95,7 @@ export function registerAdminRoutes(app: Hono, db: Db, config: Config) {
     if (!validCsrf(context, config, body)) return context.text("Forbidden", 403);
     mutate(db, currentAdmin(context), text(body.action), "template", body, () => {
       if (text(body.action) === "delete") return void db.prepare("DELETE FROM message_templates WHERE locale = ? AND channel = ?").run(text(body.locale), text(body.channel));
-      if (!text(body.body) || !["he", "ar", "yi", "ru", "en", "am"].includes(text(body.locale)) || !["email", "whatsapp"].includes(text(body.channel))) throw new Error("Invalid template");
+      if (!text(body.body) || !["he", "ar", "yi", "ru", "en", "am"].includes(text(body.locale)) || !["email", "whatsapp", "social"].includes(text(body.channel))) throw new Error("Invalid template");
       db.prepare(`INSERT INTO message_templates (locale, channel, subject, body) VALUES (?, ?, ?, ?)
         ON CONFLICT(locale, channel) DO UPDATE SET subject = excluded.subject, body = excluded.body`).run(text(body.locale), text(body.channel), nullable(body.subject), text(body.body));
     });

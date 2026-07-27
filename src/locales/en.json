@@ -55,5 +55,10 @@
   "thanksTitle": "Reply submitted", "thanksBody": "Thank you. A moderator will review it before any use.",
   "privacyTitle": "Privacy policy", "privacyBody": "We collect only the information needed to verify support, generate aggregate metrics, and moderate replies. Personalized appeal text is never stored.\n\nWe do not publish personal information without consent, sell data, or send appeals for you. Administrators may access submitted data only for campaign operation and moderation.\n\nYou may request deletion below. Operational backups are retained under the documented schedule. Contact the campaign operator for privacy questions.",
   "deleteTitle": "Delete my data", "deleteBody": "Enter your email. We will send a confirmation link before deleting or anonymizing matching campaign records.",
-  "deleteConfirm": "Confirm deletion", "deleteSent": "Check your email to confirm deletion.", "deleted": "Matching personal data was deleted or anonymized."
+  "deleteConfirm": "Confirm deletion", "deleteSent": "Check your email to confirm deletion.", "deleted": "Matching personal data was deleted or anonymized.",
+  "editHint": "You can edit any text below before you send or post it.",
+  "socialText": "Public post text",
+  "shareHeading": "Or post it publicly",
+  "facebookNote": "Facebook cannot receive prefilled text. Copy the post text and paste it into Facebook.",
+  "knesset": "Knesset member"
 }
