@@ -1,14 +1,38 @@
 import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
+
+const fingerprint = (value: string | Uint8Array) => createHash("sha256").update(value).digest("base64url").slice(0, 10);
+const AMHARIC_REGULAR = readFileSync(new URL("./assets/NotoSansEthiopic-400.woff2", import.meta.url));
+const AMHARIC_BOLD = readFileSync(new URL("./assets/NotoSansEthiopic-700.woff2", import.meta.url));
+export { AMHARIC_REGULAR, AMHARIC_BOLD };
+export const amharicRegularPath = `/assets/noto-sans-ethiopic-400-${fingerprint(AMHARIC_REGULAR)}.woff2`;
+export const amharicBoldPath = `/assets/noto-sans-ethiopic-700-${fingerprint(AMHARIC_BOLD)}.woff2`;
 
 /**
  * "Techelet" — the national blue and white. Two hues only: techelet carries every action,
  * link, counter and clause number; amber appears nowhere except the caveats, where a warning
  * colour is the accurate signal. Rank is expressed by scale and weight rather than by hue.
- * No webfonts on purpose: the six scripts (Hebrew, Arabic, Ge'ez, Cyrillic, Latin) already ship
- * with every OS, and shipping display faces for all of them would cost this audience real bytes.
+ * Noto Sans Ethiopic is scoped to the Amharic document so the other five scripts keep their
+ * system-font rendering and the font bytes are only requested by pages that need them.
  * Pico is retuned through its own custom properties rather than by overriding its selectors.
  */
 export const CSS = `
+@font-face {
+  font-family: "Noto Sans Ethiopic";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url(${amharicRegularPath}) format("woff2");
+  unicode-range: U+030E, U+1200-1399, U+2D80-2DDE, U+AB01-AB2E, U+1E7E0-1E7E6, U+1E7E8-1E7EB, U+1E7ED-1E7EE, U+1E7F0-1E7FE;
+}
+@font-face {
+  font-family: "Noto Sans Ethiopic";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url(${amharicBoldPath}) format("woff2");
+  unicode-range: U+030E, U+1200-1399, U+2D80-2DDE, U+AB01-AB2E, U+1E7E0-1E7E6, U+1E7E8-1E7EB, U+1E7ED-1E7EE, U+1E7F0-1E7FE;
+}
 /* Pico declares its tokens at ':root:not([data-theme=dark])', so a bare ':root' here would lose
    the specificity contest and silently leave every button Pico blue. Hence the repeated ':root'. */
 /* Palette: techelet and white, the national colours.
@@ -24,6 +48,7 @@ export const CSS = `
   --font: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans Hebrew", "Noto Sans Arabic",
     "Noto Sans Ethiopic", "Helvetica Neue", sans-serif;
   --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  --amharic-font: "Noto Sans Ethiopic", "Noto Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
 
   --pico-font-family: var(--font);
   --pico-background-color: var(--paper);
@@ -84,6 +109,7 @@ p, li, label { line-height: 1.6; }
    the cursive joins in Arabic, and neither Hebrew, Yiddish nor Ge'ez has a case distinction. */
 :root:root:root { --track: .09em; --caps: uppercase; }
 html:is([lang=he], [lang=ar], [lang=yi], [lang=am]) { --track: 0; --caps: none; }
+html[lang=am] { --font: var(--amharic-font); }
 .eyebrow, .metrics span, .languages summary .label {
   font-size: .78rem; text-transform: var(--caps); letter-spacing: var(--track); color: var(--mute);
 }
@@ -147,6 +173,8 @@ input[type=checkbox] { inline-size: 1.5rem; block-size: 1.5rem; min-inline-size:
 
 /* Forms: the generated text is the content, so give it room and let it grow with what it holds. */
 textarea { font-size: .95rem; line-height: 1.55; min-block-size: 6lh; max-block-size: 24lh; field-sizing: content; }
+html[lang=am] h1 { line-height: 1.14; }
+html[lang=am] textarea { line-height: 1.65; }
 label { font-weight: 550; }
 .actions { display: flex; flex-wrap: wrap; gap: .6rem; margin-block: .5rem 1.25rem; }
 .actions button { inline-size: auto; flex: 1 1 12rem; margin: 0; }
@@ -387,7 +415,6 @@ mark();
 `.trim();
 
 /** Content-hashed so a deploy actually reaches browsers; the old URL simply stops being referenced. */
-const fingerprint = (value: string) => createHash("sha256").update(value).digest("base64url").slice(0, 10);
 export const cssPath = `/assets/app-${fingerprint(CSS)}.css`;
 export const jsPath = `/assets/app-${fingerprint(JS)}.js`;
 export const themePath = `/assets/theme-${fingerprint(THEME_JS)}.js`;

@@ -1,5 +1,5 @@
 import type { Hono } from "hono";
-import { CSS, JS, THEME_JS, cssPath, jsPath, themePath } from "./assets.js";
+import { AMHARIC_BOLD, AMHARIC_REGULAR, CSS, JS, THEME_JS, amharicBoldPath, amharicRegularPath, cssPath, jsPath, themePath } from "./assets.js";
 import { registerContentRoutes } from "./content.js";
 import { markdown } from "./markdown.js";
 import { getCookie, setCookie } from "hono/cookie";
@@ -24,6 +24,13 @@ export function registerPublicRoutes(app: Hono, db: Db, config: Config) {
   asset(cssPath, "text/css", CSS);
   asset(jsPath, "text/javascript", JS);
   asset(themePath, "text/javascript", THEME_JS);
+  const font = (path: string, body: Uint8Array) => app.get(path, (context) => {
+    context.header("Content-Type", "font/woff2");
+    context.header("Cache-Control", "public, max-age=31536000, immutable");
+    return context.body(body as any);
+  });
+  font(amharicRegularPath, AMHARIC_REGULAR);
+  font(amharicBoldPath, AMHARIC_BOLD);
 
   registerSupportRoutes(app, db, config);
   registerRequestRoutes(app, db, config);

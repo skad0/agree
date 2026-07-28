@@ -110,6 +110,38 @@ test("the appearance switcher is served and applied before paint", async () => {
   }
 });
 
+test("Amharic pages deliver hashed Ethiopic fonts with scoped metric rules", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "agree-amharic-fonts-"));
+  try {
+    const { app, close } = createApp({ sqlitePath: join(dir, "app.db") });
+    const page = await app.request("/am");
+    assert.equal(page.status, 200);
+    const html = await page.text();
+    const cssPath = html.match(/href="(\/assets\/app-[^"]+\.css)"/)?.[1];
+    assert.ok(cssPath, html);
+    const cssResponse = await app.request(cssPath);
+    assert.equal(cssResponse.status, 200);
+    const css = await cssResponse.text();
+    const fontPaths = [...css.matchAll(/url\((\/assets\/noto-sans-ethiopic-(?:400|700)-[^)]+\.woff2)\)/g)].map((match) => match[1]!);
+    assert.equal(new Set(fontPaths).size, 2);
+    assert.ok(fontPaths.some((path) => path.includes("-400-")));
+    assert.ok(fontPaths.some((path) => path.includes("-700-")));
+    assert.match(css, /html\[lang=am\]\s*\{[^}]*--font:\s*var\(--amharic-font\)/s);
+    assert.match(css, /html\[lang=am\]\s+h1\s*\{[^}]*line-height:\s*1\.14/s);
+    assert.match(css, /html\[lang=am\]\s+textarea\s*\{[^}]*line-height:\s*1\.65/s);
+    for (const fontPath of fontPaths) {
+      const font = await app.request(fontPath!);
+      assert.equal(font.status, 200, fontPath);
+      assert.equal(font.headers.get("content-type"), "font/woff2");
+      assert.match(font.headers.get("cache-control") ?? "", /immutable/);
+      assert.ok((await font.arrayBuffer()).byteLength > 0, fontPath);
+    }
+    close();
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("every locale has every key used by the templates", async () => {
   const dir = mkdtempSync(join(tmpdir(), "agree-i18n-"));
   try {
