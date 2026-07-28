@@ -28,6 +28,10 @@ Hebrew and Arabic matter most: they are the languages in which this campaign wil
 
 Statements of existing Israeli law need the closest reading: the 80-member threshold for extending a Knesset term, the 3.25% electoral threshold, the Commissions of Inquiry Law mechanism, and the repeated distinction between what the law currently requires and what this project merely proposes. The canonical package is careful about that distinction in Russian; the translations must stay equally careful.
 
+## Known deviations from the canonical package
+
+- **The "Initiator" section was removed from `aboutBody` in all six locales** (2026-07-28). Part X of the package lists the initiator among the things the project publishes. The page currently runs from the introduction straight into Funding, so the operator is not named anywhere on the site. Decide before launch whether to restore the section with a real name or legal entity.
+
 ## After review
 
 Correct the text in place, then note here who reviewed which locale and when. Until every row above says reviewed, `STATUS.md` keeps translation review listed as an open launch gate.

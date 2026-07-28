@@ -109,6 +109,7 @@ Verified: zero horizontal overflow at 320 px on every public page in every local
 - **Political, legal and privacy text in he/ar/yi/en/am is machine-translated and unreviewed.** This is the largest open gate; see [docs/TRANSLATION-REVIEW.md](docs/TRANSLATION-REVIEW.md).
 - Recipients are still the placeholder seed. Real party names and official contact addresses must be entered through `/admin/recipients`; they were deliberately not invented here.
 - `/terms`, `/accessibility` and `/corrections` from the canonical site map are not built yet.
+- The "Initiator" section was removed from the About page in all six locales on 2026-07-28, so the operator is not named anywhere on the site. Part X of the canonical package lists it among the published items; decide before launch whether to restore it with a real name or legal entity.
 - Share deep links (X, Facebook, WhatsApp, Telegram) are asserted in tests but have not been opened against the live platforms.
 - Deploy to Render and verify the live service (Render MCP not connected in this session).
 
