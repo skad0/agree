@@ -49,8 +49,14 @@ function clauseList(locale: Locale, rows: Clause[]) {
       <h2>{row.title}</h2>
       {row.body ? <><p class="clause-label">{t(locale, "obligation")}</p><p class="clause-body">{row.body}</p></> : null}
       {row.rationale ? <aside class="callout why"><p class="clause-label">{t(locale, "rationale")}</p><p>{row.rationale}</p></aside> : null}
-      {row.verification ? <aside class="callout how"><p class="clause-label">{t(locale, "verification")}</p>{splitList(row.verification)}</aside> : null}
-      {row.exceptions ? <aside class="callout except"><p class="clause-label">{t(locale, "exceptions")}</p><p>{row.exceptions}</p></aside> : null}
+      {/* Ten clauses of legal text is unreadable as one scroll. What the clause asks for and why
+          stay open; the reference detail collapses. <details> needs no JavaScript and is
+          keyboard-operable, so this survives with scripting off. */}
+      {row.verification || row.exceptions ? <details class="clause-detail">
+        <summary>{[row.verification && t(locale, "verification"), row.exceptions && t(locale, "exceptions")].filter(Boolean).join(" · ")}</summary>
+        {row.verification ? <aside class="callout how"><p class="clause-label">{t(locale, "verification")}</p>{splitList(row.verification)}</aside> : null}
+        {row.exceptions ? <aside class="callout except"><p class="clause-label">{t(locale, "exceptions")}</p><p>{row.exceptions}</p></aside> : null}
+      </details> : null}
     </> : <p role="status">{t(locale, "unavailable")}</p>}
   </li>)}</ol>;
 }

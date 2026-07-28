@@ -20,6 +20,17 @@ Work is committed on `main` in four focused commits (MVP implementation, docs, R
 - E7 application work: strict CSP/HSTS/security headers, body limits, CSRF, optional Turnstile, rate limits, six privacy pages, confirmed data deletion/anonymization, external daily/weekly SQLite backup, integrity-checked restore, semantic/keyboard-friendly markup and skip link.
 - Docs/deploy: `README.md`, `.env.example`, `docs/SECRETS.md`, `render.yaml`, backup/restore/load/smoke scripts.
 
+## Mobile pass (2026-07-28)
+
+Reported as too dark and overwhelming on a phone; both were real.
+
+- Measured 389 px of chrome above the headline at 375 px: a wrapped document nav, a three-line action bar and a six-chip language band — two of which were language controls. The document nav and the action bar now sit on one scrolling line each, the action bar is three across, and the six-script band is wide-screen only since the header already switches language. The headline moved from y=537 to y=290 and the call to action is above the fold.
+- The dark theme was near-black (`#12181d`). It is now a warm slate (`#1e2529`) with visible rules and brighter accents: body text measures 7.9:1 and the headline 13.7:1, both above AAA.
+- Ten clauses of legal text was an unreadable scroll. The commitment and why it matters stay open; how it is checked and permitted exceptions collapse into a native `<details>`. The standard page went from 11.2 screens to 6.6 on a phone, with no JavaScript involved.
+- Recipient links on `/request` were bare text below the 24 px target size; they now use the same card treatment as the rest of the site.
+
+Verified at 375 px across all six locales and eleven pages: no horizontal overflow, no undersized targets, no missing keys.
+
 ## Canonical content and redesign (2026-07-28)
 
 The placeholder campaign is replaced by the real one from `docs/Каноническийпакеттекстовиправилпроекта.docx`: «Договор заранее» / Contract in Advance, slogan "Правила должны быть известны до голосования".

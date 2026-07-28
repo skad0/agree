@@ -21,7 +21,9 @@ export function registerRequestRoutes(app: Hono, db: Db, config: Config) {
     const recipients = recipientRows(db, locale);
     return context.html(<Layout locale={locale} title={t(locale, "requestTitle")} path={context.req.path}>
       <h1>{t(locale, "chooseRecipient")}</h1>
-      <ul>{recipients.map((recipient) => <li><a href={`/${locale}/request/build?recipient=${recipient.id}`}>{recipient.name}</a></li>)}</ul>
+      {/* Same card treatment as the rest of the site: bare links here were below the 24px target. */}
+      <ul class="documents">{recipients.map((recipient) =>
+        <li><a href={`/${locale}/request/build?recipient=${recipient.id}`}><strong>{recipient.name}</strong></a></li>)}</ul>
     </Layout>);
   });
 

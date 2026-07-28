@@ -35,12 +35,14 @@ export const CSS = `
   --pico-border-radius: 4px;
   --pico-spacing: 1rem;
 }
+/* Dark mode is a lit room, not a void: the ground is a warm slate rather than near-black, rules
+   are visible, and text sits well above the 4.5:1 floor. The first attempt was far too dark. */
 @media (prefers-color-scheme: dark) {
   :root:root:root {
-    --ink: #e8ece8; --paper: #12181d; --seal: #4d9970; --seal-deep: #62b189;
-    --signal: #e2795a; --rule: #2c3740; --mute: #9aa8a1; --card: #1a2229;
-    --pico-primary-inverse: #0d1216;
-    --pico-primary-focus: rgba(77, 153, 112, .4);
+    --ink: #eef2ee; --paper: #1e2529; --seal: #5fae82; --seal-deep: #74c096;
+    --signal: #f0906d; --rule: #3a444b; --mute: #b0bcb4; --card: #283036;
+    --pico-primary-inverse: #12181b;
+    --pico-primary-focus: rgba(95, 174, 130, .45);
   }
 }
 
@@ -71,7 +73,7 @@ html:is([lang=he], [lang=ar], [lang=yi], [lang=am]) { --track: 0; --caps: none; 
 :focus-visible { outline: 3px solid var(--seal); outline-offset: 2px; }
 
 /* Header */
-header.wrap { display: flex; flex-wrap: wrap; gap: .5rem 1.5rem; align-items: baseline; padding-block: 1.25rem; border-block-end: 1px solid var(--rule); margin-block-end: 2rem; }
+header.wrap { display: flex; flex-wrap: wrap; gap: .5rem 1.5rem; align-items: baseline; padding-block: 1.25rem; border-block-end: 1px solid var(--rule); margin-block-end: 1.5rem; }
 .wordmark { font-weight: 750; letter-spacing: -.015em; color: var(--ink); text-decoration: none; font-size: 1.05rem; }
 /* Pico sets nav { justify-content: space-between }, which strands these links at the edges. */
 nav.primary { display: flex; flex-wrap: wrap; justify-content: flex-start; gap: .35rem 1.1rem; flex: 1 1 auto; }
@@ -140,7 +142,8 @@ button.ghost:hover, .actions.share button:hover { background: var(--paper); bord
 .actions-bar a:hover { border-color: var(--seal); color: var(--seal); }
 .actions-bar b {
   flex: none; inline-size: 1.6rem; block-size: 1.6rem; display: grid; place-items: center;
-  border-radius: 50%; background: var(--seal-deep); color: #fff; font-family: var(--mono); font-size: .8rem;
+  border-radius: 50%; background: var(--seal-deep); color: var(--pico-primary-inverse);
+  font-family: var(--mono); font-size: .8rem;
 }
 footer.wrap { display: flex; flex-wrap: wrap; gap: .25rem 1.5rem; }
 
@@ -192,6 +195,14 @@ footer.wrap { display: flex; flex-wrap: wrap; gap: .25rem 1.5rem; }
 .callout.why { border-inline-start-color: var(--seal); }
 .callout.how { border-inline-start-color: var(--mute); }
 .callout.except { border-inline-start-color: var(--signal); }
+.clause-detail { margin-block-start: 1rem; border: 0; padding: 0; background: none; }
+.clause-detail > summary {
+  font-size: .85rem; color: var(--mute); cursor: pointer; padding-block: .5rem;
+  min-block-size: 24px;
+}
+.clause-detail > summary:hover { color: var(--seal); }
+.clause-detail[open] > summary { color: var(--ink); margin-block-end: .25rem; }
+
 .callout ul { margin: 0; padding-inline-start: 1.1rem; list-style: none; }
 .callout li { margin-block: .2rem; line-height: 1.45; position: relative; }
 /* A tick rather than a bullet: these are the things that can actually be checked. */
@@ -242,6 +253,41 @@ footer.wrap { display: flex; flex-wrap: wrap; gap: .25rem 1.5rem; }
 @media (prefers-reduced-motion: no-preference) {
   .clause, .plan-item { animation: rise .5s ease-out both; animation-timeline: view(); animation-range: entry 0% cover 22%; }
   @keyframes rise { from { opacity: .25; transform: translateY(1rem); } to { opacity: 1; transform: none; } }
+}
+
+/* ---- Small screens ------------------------------------------------------------------------
+   On a phone the chrome was 389px tall before the headline: a wrapped document nav, a three-line
+   action bar and a six-chip language band, two of which are language controls. Rows now scroll
+   on one line instead of wrapping, and the band is desktop-only since the header already
+   switches language. */
+@media (max-width: 47.99rem) {
+  header.wrap { padding-block: .85rem; gap: .35rem 1rem; margin-block-end: 1rem; }
+  .wordmark { font-size: 1rem; }
+
+  /* One line that scrolls, rather than three lines that wrap. */
+  nav.primary {
+    flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none;
+    inline-size: 100%; order: 3; gap: 1rem; padding-block-start: .15rem;
+  }
+  nav.primary::-webkit-scrollbar { display: none; }
+  nav.primary a { white-space: nowrap; }
+  .languages { margin-inline-start: auto; }
+
+  /* Three across, one row: the numbers stay in the same place on every page. */
+  .actions-bar { gap: .4rem; padding-block: .5rem 1rem; }
+  .actions-bar a {
+    flex: 1 1 0; min-inline-size: 0; flex-direction: column; gap: .2rem;
+    padding: .55rem .3rem; text-align: center; font-size: .82rem; line-height: 1.2;
+  }
+
+  /* The six-script band is a wide-screen signature; the header control does the same job here. */
+  .scripts { display: none; }
+
+  h1 { font-size: clamp(1.75rem, 1.1rem + 3.2vw, 2.25rem); }
+  .lede { font-size: 1.05rem; }
+  .clause, .plan-item { padding-block: 1.5rem; }
+  .constraints { gap: 1.5rem; }
+  .constraints strong { font-size: 2.25rem; }
 }
 
 bdi, [dir=ltr] { unicode-bidi: isolate; }
