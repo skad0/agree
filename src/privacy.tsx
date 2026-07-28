@@ -5,6 +5,7 @@ import type { Db } from "./db.js";
 import { sendEmail } from "./email.js";
 import { isLocale, t, type Locale } from "./i18n.js";
 import { Layout } from "./layout.js";
+import { drainResponseObjectWork, queueResponseObjectDelete } from "./response-storage.js";
 import { createRateLimiter, issueCsrf, text, Turnstile, validCsrf, validTurnstile } from "./security.js";
 
 export function registerPrivacyRoutes(app: Hono, db: Db, config: Config) {
@@ -31,10 +32,10 @@ export function registerPrivacyRoutes(app: Hono, db: Db, config: Config) {
       if (!await validTurnstile(context, config, body)) return statusPage(context, locale, t(locale, "invalidForm"), 403);
       const payload = decryptToken(suppliedToken, config.sessionSecret);
       if (!payload || payload.expires < Date.now()) return statusPage(context, locale, t(locale, "invalidToken"), 400);
-      deleteData(db, payload.email); return statusPage(context, locale, t(locale, "deleted"));
+      await deleteData(db, config, payload.email); return statusPage(context, locale, t(locale, "deleted"));
     }
     if (!await validTurnstile(context, config, body)) return statusPage(context, locale, t(locale, "invalidForm"), 403);
-    const email = text(body.email).toLowerCase(); if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return statusPage(context, locale, t(locale, "invalidForm"), 422);
+    const email = text(body.email).trim().toLowerCase(); if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return statusPage(context, locale, t(locale, "invalidForm"), 422);
     const token = encryptToken({ email, expires: Date.now() + 3_600_000 }, config.sessionSecret);
     const link = `${config.appBaseUrl}/${locale}/delete-data?token=${token}`;
     const sent = await sendEmail(config, email, "Confirm civic platform data deletion", `<p><a href="${link}">Review and confirm data deletion</a></p>`);
@@ -43,9 +44,17 @@ export function registerPrivacyRoutes(app: Hono, db: Db, config: Config) {
   });
 }
 
-function deleteData(db: Db, email: string) {
+async function deleteData(db: Db, config: Config, email: string) {
+  email = email.trim().toLowerCase();
   const now = new Date().toISOString(); db.exec("BEGIN IMMEDIATE");
   try {
+    const responseIds = db.prepare("SELECT id FROM submitted_responses WHERE lower(trim(submitter_email)) = ?").all(email) as { id: number }[];
+    for (const response of responseIds) {
+      const files = db.prepare("SELECT object_key FROM submitted_response_files WHERE response_id = ?").all(response.id) as { object_key: string }[];
+      for (const file of files) queueResponseObjectDelete(db, file.object_key, now);
+      db.prepare("UPDATE response_submission_nonces SET outcome = 'erased', response_id = NULL, updated_at = ? WHERE response_id = ?").run(now, response.id);
+    }
+    db.prepare("DELETE FROM submitted_responses WHERE id IN (SELECT id FROM submitted_responses WHERE lower(trim(submitter_email)) = ?)").run(email);
     const supporters = db.prepare("SELECT id FROM supporters WHERE email_normalized = ?").all(email) as { id: number }[];
     for (const supporter of supporters) {
       db.prepare("UPDATE generated_requests SET supporter_id = NULL WHERE supporter_id = ?").run(supporter.id);
@@ -53,9 +62,9 @@ function deleteData(db: Db, email: string) {
       db.prepare("UPDATE supporters SET email_normalized = ?, name = NULL, city = NULL, profession = NULL, public_name_allowed = 0, deleted_at = ? WHERE id = ?")
         .run(`deleted-${supporter.id}@invalid.local`, now, supporter.id);
     }
-    db.prepare("UPDATE submitted_responses SET submitter_email = 'deleted@invalid.local' WHERE lower(submitter_email) = ?").run(email);
     db.exec("COMMIT");
   } catch (error) { db.exec("ROLLBACK"); throw error; }
+  await drainResponseObjectWork(db, config).catch(() => {});
 }
 
 function encryptToken(payload: { email: string; expires: number }, secret: string) {

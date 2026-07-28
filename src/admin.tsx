@@ -19,23 +19,35 @@ export function registerAdminRoutes(app: Hono, db: Db, config: Config) {
     if (config.adminEmails.includes(email)) db.prepare("INSERT INTO admins (email, role) VALUES (?, 'admin') ON CONFLICT(email) DO NOTHING").run(email);
     const admin = db.prepare("SELECT id, email, role FROM admins WHERE email = ? AND is_active = 1").get(email) as Admin | undefined;
     if (!admin) return context.text("Forbidden", 403);
+    if (!(admin.role === "admin" || admin.role === "moderator") || (admin.role === "moderator" && !moderatorPath(context.req.path))) return context.text("Forbidden", 403);
     context.set("admin", admin);
     await next();
   }
 
   app.get("/admin", (context) => {
-    const stats = db.prepare(`SELECT
-      (SELECT count(*) FROM supporters WHERE email_verified_at IS NOT NULL AND deleted_at IS NULL) supporters,
-      (SELECT count(*) FROM generated_requests) generated,
-      (SELECT count(*) FROM request_actions WHERE action_type = 'reported_sent') sent,
-      (SELECT count(*) FROM submitted_responses) responses`).get()!;
-    return adminPage(context, "Dashboard", <><h1>Dashboard</h1><pre>{JSON.stringify(stats, null, 2)}</pre>{adminNav()}</>);
+    const stats = currentAdmin(context).role === "moderator"
+      ? db.prepare("SELECT count(*) responses FROM submitted_responses").get()!
+      : db.prepare(`SELECT
+        (SELECT count(*) FROM supporters WHERE email_verified_at IS NOT NULL AND deleted_at IS NULL) supporters,
+        (SELECT count(*) FROM generated_requests) generated,
+        (SELECT count(*) FROM request_actions WHERE action_type = 'reported_sent') sent,
+        (SELECT count(*) FROM submitted_responses) responses`).get()!;
+    return adminPage(context, "Dashboard", <><h1>Dashboard</h1><pre>{JSON.stringify(stats, null, 2)}</pre></>);
   });
 
   app.get("/admin/demands", (context) => {
-    const rows = db.prepare(`SELECT d.id, d.sort_order, d.is_active, dt.locale, dt.title, dt.body FROM demands d
+    const rows = db.prepare(`SELECT d.id, d.sort_order, d.is_active, d.document, dt.locale, dt.title, dt.body, dt.rationale, dt.verification, dt.exceptions FROM demands d
       LEFT JOIN demand_translations dt ON dt.demand_id = d.id ORDER BY d.sort_order, dt.locale`).all();
-    return adminPage(context, "Demands", <><h1>Demands</h1><pre>{JSON.stringify(rows, null, 2)}</pre>{demandForm(issueCsrf(context, config))}</>);
+    return adminPage(context, "Demands", <><h1>Demands</h1><pre>{JSON.stringify(rows, null, 2)}</pre><ul>{(rows as any[]).map((row) => row.locale ? <li><a href={`/admin/demands/edit?id=${row.id}&locale=${row.locale}`}>Edit #{row.id} ({row.locale})</a></li> : null)}</ul>{demandForm(issueCsrf(context, config))}</>);
+  });
+
+  app.get("/admin/demands/edit", (context) => {
+    const id = positiveInteger(context.req.query("id")); const locale = text(context.req.query("locale"));
+    if (!id || !["he", "ar", "yi", "ru", "en", "am"].includes(locale)) return context.notFound();
+    const row = db.prepare(`SELECT d.id, d.sort_order, d.is_active, d.document, dt.locale, dt.title, dt.body, dt.rationale, dt.verification, dt.exceptions
+      FROM demands d LEFT JOIN demand_translations dt ON dt.demand_id = d.id AND dt.locale = ? WHERE d.id = ?`).get(locale, id);
+    if (!row) return context.notFound();
+    return adminPage(context, "Edit demand", <><h1>Edit demand #{id}</h1>{demandForm(issueCsrf(context, config), row as Record<string, unknown>)}</>);
   });
 
   app.post("/admin/demands", async (context) => {
@@ -43,13 +55,21 @@ export function registerAdminRoutes(app: Hono, db: Db, config: Config) {
     if (!validCsrf(context, config, body)) return context.text("Forbidden", 403);
     const action = text(body.action);
     const id = positiveInteger(body.id);
+    const existingDemand = id ? db.prepare("SELECT document, sort_order, is_active FROM demands WHERE id = ?").get(id) as { document: string; sort_order: number; is_active: number } | undefined : undefined;
+    const existingTranslation = id && text(body.locale) ? db.prepare("SELECT title, body, rationale, verification, exceptions FROM demand_translations WHERE demand_id = ? AND locale = ?").get(id, text(body.locale)) as { title: string; body: string; rationale: string | null; verification: string | null; exceptions: string | null } | undefined : undefined;
+    const document = has(body, "document") ? text(body.document) : existingDemand?.document || "standard";
+    const title = has(body, "title") ? text(body.title) : existingTranslation?.title || "";
+    const commitment = has(body, "body") ? text(body.body) : existingTranslation?.body || "";
+    const valid = action === "delete" && id || action === "save" && ["standard", "coalition"].includes(document) && ["he", "ar", "yi", "ru", "am", "en"].includes(text(body.locale)) && Boolean(title) && Boolean(commitment);
+    if (!valid) return adminPage(context, "Demands", <><h1>Demands</h1><p role="alert">Enter a document, locale, title, and body before saving.</p>{demandForm(issueCsrf(context, config), body)}</> , 422);
     mutate(db, currentAdmin(context), action, "demand", body, () => {
       if (action === "delete" && id) return void db.prepare("DELETE FROM demands WHERE id = ?").run(id);
-      if (action !== "save" || !["he", "ar", "yi", "ru", "en", "am"].includes(text(body.locale)) || !text(body.title) || !text(body.body)) throw new Error("Invalid demand");
-      const demandId = id ?? Number((db.prepare("INSERT INTO demands (campaign_id, sort_order, is_active) VALUES (1, ?, ?) RETURNING id").get(number(body.sortOrder, 1), text(body.isActive) === "yes" ? 1 : 0) as { id: number }).id);
-      if (id) db.prepare("UPDATE demands SET sort_order = ?, is_active = ? WHERE id = ?").run(number(body.sortOrder, 1), text(body.isActive) === "yes" ? 1 : 0, id);
-      db.prepare(`INSERT INTO demand_translations (demand_id, locale, title, body) VALUES (?, ?, ?, ?)
-        ON CONFLICT(demand_id, locale) DO UPDATE SET title = excluded.title, body = excluded.body`).run(demandId, text(body.locale), text(body.title), text(body.body));
+      const sortOrder = has(body, "sortOrder") ? number(body.sortOrder, existingDemand?.sort_order ?? 1) : existingDemand?.sort_order ?? 1;
+      const active = has(body, "isActive") ? text(body.isActive) === "yes" ? 1 : 0 : existingDemand?.is_active ?? 1;
+      const demandId = id ?? Number((db.prepare("INSERT INTO demands (campaign_id, sort_order, is_active, document) VALUES (1, ?, ?, ?) RETURNING id").get(sortOrder, active, document) as { id: number }).id);
+      if (id) db.prepare("UPDATE demands SET sort_order = ?, is_active = ?, document = ? WHERE id = ?").run(sortOrder, active, document, id);
+      db.prepare(`INSERT INTO demand_translations (demand_id, locale, title, body, rationale, verification, exceptions) VALUES (?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(demand_id, locale) DO UPDATE SET title = excluded.title, body = excluded.body, rationale = excluded.rationale, verification = excluded.verification, exceptions = excluded.exceptions`).run(demandId, text(body.locale), title, commitment, has(body, "rationale") ? nullable(body.rationale) : existingTranslation?.rationale ?? null, has(body, "verification") ? nullable(body.verification) : existingTranslation?.verification ?? null, has(body, "exceptions") ? nullable(body.exceptions) : existingTranslation?.exceptions ?? null);
     });
     return context.redirect("/admin/demands", 303);
   });
@@ -57,22 +77,18 @@ export function registerAdminRoutes(app: Hono, db: Db, config: Config) {
   app.get("/admin/recipients", (context) => {
     const rows = db.prepare(`SELECT r.*, rt.locale, rt.name FROM recipients r LEFT JOIN recipient_translations rt ON rt.recipient_id = r.id ORDER BY r.id, rt.locale`).all();
     const csrf = issueCsrf(context, config);
-    return adminPage(context, "Recipients", <><h1>Recipients</h1><pre>{JSON.stringify(rows, null, 2)}</pre><form method="post">
-      <input type="hidden" name="csrf" value={csrf} /><input name="id" type="number" placeholder="ID to update/delete" />
-      <label>Action<select name="action"><option value="save">Save</option><option value="delete">Delete</option></select></label>
-      <label>Type<select name="type"><option>party</option><option>politician</option></select></label><label>Locale<input name="locale" value="en" /></label>
-      <label>Name<input name="name" /></label><label>Email<input name="email" type="email" /></label><label>WhatsApp<input name="whatsapp" /></label><label>Website<input name="website" type="url" /></label>
-      <label>Social handle<input name="socialHandle" placeholder="@handle — blank falls back to the localized name" /></label>
-      <label><input name="isActive" type="checkbox" value="yes" checked /> Active</label><button>Apply</button></form></>);
+    return adminPage(context, "Recipients", <><h1>Recipients</h1><pre>{JSON.stringify(rows, null, 2)}</pre>{recipientForm(csrf)}</>);
   });
 
   app.post("/admin/recipients", async (context) => {
     const body = await context.req.parseBody();
     if (!validCsrf(context, config, body)) return context.text("Forbidden", 403);
     const action = text(body.action); const id = positiveInteger(body.id);
+    if (!(action === "delete" && id) && !(action === "save" && ["party", "politician"].includes(text(body.type)) && ["he", "ar", "yi", "ru", "en", "am"].includes(text(body.locale)) && text(body.name))) {
+      return adminPage(context, "Recipients", <><h1>Recipients</h1><p role="alert">Choose a valid type and locale, and enter a name.</p>{recipientForm(issueCsrf(context, config), body)}</>, 422);
+    }
     mutate(db, currentAdmin(context), action, "recipient", body, () => {
       if (action === "delete" && id) return void db.prepare("DELETE FROM recipients WHERE id = ?").run(id);
-      if (action !== "save" || !["party", "politician"].includes(text(body.type)) || !["he", "ar", "yi", "ru", "en", "am"].includes(text(body.locale)) || !text(body.name)) throw new Error("Invalid recipient");
       const recipientId = id ?? Number((db.prepare("INSERT INTO recipients (type, email, whatsapp, website, social_handle, is_active) VALUES (?, ?, ?, ?, ?, ?) RETURNING id")
         .get(text(body.type), nullable(body.email), nullable(body.whatsapp), nullable(body.website), nullable(body.socialHandle), text(body.isActive) === "yes" ? 1 : 0) as { id: number }).id);
       if (id) db.prepare("UPDATE recipients SET type = ?, email = ?, whatsapp = ?, website = ?, social_handle = ?, is_active = ? WHERE id = ?").run(text(body.type), nullable(body.email), nullable(body.whatsapp), nullable(body.website), nullable(body.socialHandle), text(body.isActive) === "yes" ? 1 : 0, id);
@@ -132,8 +148,8 @@ export function registerAdminRoutes(app: Hono, db: Db, config: Config) {
   app.get("/admin/settings", (context) => {
     const row = db.prepare("SELECT * FROM campaigns WHERE id = 1").get(); const csrf = issueCsrf(context, config);
     return adminPage(context, "Settings", <><h1>Kill switches</h1><pre>{JSON.stringify(row, null, 2)}</pre><form method="post"><input type="hidden" name="csrf" value={csrf} />
-      <label><input type="checkbox" name="campaign" value="yes" checked /> Campaign active</label>
-      <label><input type="checkbox" name="support" value="yes" checked /> Support</label><label><input type="checkbox" name="requests" value="yes" checked /> Requests</label><label><input type="checkbox" name="responses" value="yes" checked /> Responses</label><button>Save</button></form></>);
+      <label><input type="checkbox" name="campaign" value="yes" checked={row?.status === "active"} /> Campaign active</label>
+      <label><input type="checkbox" name="support" value="yes" checked={row?.support_enabled === 1} /> Support</label><label><input type="checkbox" name="requests" value="yes" checked={row?.requests_enabled === 1} /> Requests</label><label><input type="checkbox" name="responses" value="yes" checked={row?.responses_enabled === 1} /> Responses</label><button>Save</button></form></>);
   });
   app.post("/admin/settings", async (context) => {
     const body = await context.req.parseBody(); if (!validCsrf(context, config, body)) return context.text("Forbidden", 403);
@@ -166,12 +182,29 @@ function mutate(db: Db, admin: Admin, action: string, entity: string, payload: u
   try { operation(); db.prepare("INSERT INTO admin_audit_events (admin_id, action, entity, payload, created_at) VALUES (?, ?, ?, ?, ?)").run(admin.id, action, entity, JSON.stringify(withoutSecrets(payload)), new Date().toISOString()); db.exec("COMMIT"); }
   catch (error) { db.exec("ROLLBACK"); throw error; }
 }
-function adminPage(context: any, title: string, content: any) { context.header("Cache-Control", "private, no-store"); return context.html(<Layout locale="en" title={title} path="/en">{adminNav()}{content}</Layout>); }
-function adminNav() { return <nav aria-label="Admin"><a href="/admin">Dashboard</a> · <a href="/admin/demands">Demands</a> · <a href="/admin/recipients">Recipients</a> · <a href="/admin/templates">Templates</a> · <a href="/admin/supporters">Supporters</a> · <a href="/admin/responses">Responses</a> · <a href="/admin/audit">Audit</a> · <a href="/admin/settings">Settings</a></nav>; }
-function demandForm(csrf: string) { return <form method="post"><input type="hidden" name="csrf" value={csrf} /><input name="id" type="number" placeholder="ID to update/delete" /><label>Action<select name="action"><option value="save">Save</option><option value="delete">Delete</option></select></label><label>Order<input name="sortOrder" type="number" value="1" /></label><label><input name="isActive" type="checkbox" value="yes" checked /> Active</label><label>Locale<input name="locale" value="en" /></label><label>Title<input name="title" /></label><label>Markdown body<textarea name="body"></textarea></label><button>Apply</button></form>; }
+function adminPage(context: any, title: string, content: any, status = 200) { context.header("Cache-Control", "private, no-store"); return context.html(<Layout locale="en" title={title} path="/en">{adminNav(context)}{content}</Layout>, status); }
+function adminNav(context: any) {
+  const admin = context.get("admin") as Admin;
+  return <nav aria-label="Admin"><a href="/admin">Dashboard</a> · <a href="/admin/responses">Responses</a>{admin.role === "admin" ? <> · <a href="/admin/demands">Demands</a> · <a href="/admin/recipients">Recipients</a> · <a href="/admin/templates">Templates</a> · <a href="/admin/supporters">Supporters</a> · <a href="/admin/audit">Audit</a> · <a href="/admin/settings">Settings</a></> : null}</nav>;
+}
+function recipientForm(csrf: string, body: Record<string, unknown> = {}) { const value = (key: string) => text(body[key]); return <form method="post">
+  <input type="hidden" name="csrf" value={csrf} /><input name="id" type="number" placeholder="ID to update/delete" value={value("id")} />
+  <label>Action<select name="action"><option value="save">Save</option><option value="delete">Delete</option></select></label>
+  <label>Type<select name="type"><option value="party" selected={value("type") === "party"}>Party</option><option value="politician" selected={value("type") === "politician"}>Politician</option></select></label>
+  <label>Locale<select name="locale" required>{["he", "ar", "yi", "ru", "en", "am"].map((locale) => <option value={locale} selected={value("locale") === locale}>{locale}</option>)}</select></label>
+  <label>Name<input name="name" value={value("name")} required /></label><label>Email<input name="email" type="email" value={value("email")} /></label><label>WhatsApp<input name="whatsapp" value={value("whatsapp")} /></label><label>Website<input name="website" type="url" value={value("website")} /></label>
+  <label>Social handle<input name="socialHandle" value={value("socialHandle")} placeholder="@handle — blank falls back to the localized name" /></label>
+  <label><input name="isActive" type="checkbox" value="yes" checked={value("isActive") === "yes" || !Object.keys(body).length} /> Active</label><button>Apply</button></form>; }
+function demandForm(csrf: string, source: Record<string, unknown> = {}) { const value = (key: string) => formValue(source[key]); const editing = Boolean(value("id")); return <form method="post"><input type="hidden" name="csrf" value={csrf} /><input name="id" type="number" placeholder="ID to update/delete" value={value("id")} /><label>Action<select name="action"><option value="save">Save</option><option value="delete">Delete</option></select></label><label>Document<select name="document"><option value="standard" selected={value("document") === "standard" || !value("document")}>Standard</option><option value="coalition" selected={value("document") === "coalition"}>Coalition</option></select></label><label>Order<input name="sortOrder" type="number" value={value("sort_order") || value("sortOrder") || "1"} /></label><label>Active state<select name="isActive"><option value="yes" selected={value("is_active") === "1" || value("isActive") === "yes" || !editing}>Active</option><option value="no" selected={value("is_active") === "0" || value("isActive") === "no"}>Inactive</option></select></label><label>Locale<select name="locale" required>{["he", "ar", "yi", "ru", "en", "am"].map((locale) => <option value={locale} selected={value("locale") === locale || (!value("locale") && locale === "en")}>{locale}</option>)}</select></label><label>Title<input name="title" required value={value("title")} /></label><label>Commitment / body<textarea name="body" required>{value("body")}</textarea></label><label>Rationale<textarea name="rationale">{value("rationale")}</textarea></label><label>Verification<textarea name="verification">{value("verification")}</textarea></label><label>Exceptions<textarea name="exceptions">{value("exceptions")}</textarea></label><button>Apply</button></form>; }
 function positiveInteger(value: unknown) { const result = Number(text(value)); return Number.isInteger(result) && result > 0 ? result : undefined; }
 function number(value: unknown, fallback: number) { const result = Number(text(value)); return Number.isFinite(result) ? result : fallback; }
 function nullable(value: unknown) { return text(value) || null; }
+function formValue(value: unknown) { return typeof value === "number" && Number.isFinite(value) ? String(value) : text(value); }
+function has(body: Record<string, unknown>, key: string) { return Object.prototype.hasOwnProperty.call(body, key); }
 function csv(context: any, headers: string[], rows: any[]) { context.header("Content-Type", "text/csv; charset=utf-8"); context.header("Content-Disposition", "attachment"); return context.body([headers, ...rows.map((row) => headers.map((header) => row[header]))].map((row) => row.map(csvCell).join(",")).join("\n")); }
-function csvCell(value: unknown) { return `"${String(value ?? "").replaceAll('"', '""')}"`; }
+function csvCell(value: unknown) { const string = String(value ?? ""); const safe = /^[=+\-@\t\r]/.test(string) ? `'${string}` : string; return `"${safe.replaceAll('"', '""')}"`; }
 function withoutSecrets(payload: unknown) { if (!payload || typeof payload !== "object") return payload; return Object.fromEntries(Object.entries(payload).filter(([key]) => !["csrf", "cf-turnstile-response"].includes(key))); }
+
+function moderatorPath(path: string) {
+  return /^\/admin\/?$/.test(path) || /^\/admin\/responses\/?$/.test(path) || /^\/admin\/responses\/[^/]+\/?$/.test(path) || /^\/admin\/response-files\/[^/]+\/?$/.test(path);
+}

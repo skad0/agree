@@ -4,9 +4,9 @@ _Last updated: 2026-07-28 (+03)_
 
 ## Current state
 
-The Hono/TypeScript MVP is implemented in the working tree with SSR JSX/HTMX, Pico CSS, SQLite WAL, six locales, Render configuration, tests, and operational documentation. It starts without third-party configuration at the application layer; admin fails closed and credential-dependent actions degrade as documented.
+The Hono/TypeScript MVP is implemented in the working tree with server-rendered Hono JSX/native forms, Pico CSS, SQLite WAL, six locales, Render configuration, tests, and operational documentation. It starts without third-party configuration at the application layer; admin fails closed and credential-dependent actions degrade as documented.
 
-Work is committed on `main` in four focused commits (MVP implementation, docs, Render config, status). Orchestrator verified independently outside the build sandbox: `npm test` 10/10, `npm run typecheck` clean, and `npm run smoke` — a real keyless TCP server start serving all locale/public pages with 200 and `/admin` 403.
+Verified in the working tree: `npm test` 33/33, `npm run typecheck` clean, and both smoke suites pass; keyless startup serves the public pages and returns `/admin` 403.
 
 ## Implemented
 
@@ -15,9 +15,10 @@ Work is committed on `main` in four focused commits (MVP implementation, docs, R
 - E2: DB-seeded localized demands/recipients/templates, home/demands pages, separate aggregate counters, short public cache headers.
 - E3: support form, CSRF/Turnstile/rate checks, normalized unique email, expiring hashed verification tokens, Resend delivery, keyless development link, exactly-once verified count.
 - E4: localized recipient/demand builder and templates, preview, email/WhatsApp/copy/report-sent actions, public posting to X/Facebook/WhatsApp/Telegram, editable generated text, share result, separate action metrics, no personalized message storage.
-- E5: response form/moderation state, date/text/email validation, 10 MB limit, MIME magic-byte validation, in-memory S3/R2 streaming, DB metadata, admin-only download.
+- E5: response form/moderation state, signed submission-token idempotency, date/text/email validation, 10 MB limit, MIME magic-byte validation, durable upload/delete work with retry and bounded PUT timeout, in-memory S3/R2 streaming, DB metadata, admin-only download.
 - E6: Cloudflare Access JWKS issuer/audience JWT validation, 403 without credentials/token, demand/recipient/template management, response moderation, stats/supporter CSV, audit transaction for every mutation, form/recipient/campaign kill switches.
 - E7 application work: strict CSP/HSTS/security headers, body limits, CSRF, optional Turnstile, rate limits, six privacy pages, confirmed data deletion/anonymization, external daily/weekly SQLite backup, integrity-checked restore, semantic/keyboard-friendly markup and skip link.
+- Integration repairs: Phase 1 capability/role/CSV/demand preservation, copy telemetry, social-handle sharing, localization and private-cache behavior; Phase 2 response idempotency, attachment cleanup/retry, privacy deletion, timeout maintenance, and refresh-safe confirmation are covered by deterministic Node integration tests.
 - Docs/deploy: `README.md`, `.env.example`, `docs/SECRETS.md`, `render.yaml`, backup/restore/load/smoke scripts.
 
 ## Appearance switcher (2026-07-28)
@@ -87,19 +88,20 @@ Verified: zero horizontal overflow at 320 px on every public page in every local
 
 - Migration `003_social_share.sql`: `recipients.social_handle`; `message_templates.channel` widened to include `social`; `request_actions.action_type` widened with `shared_x`/`shared_facebook`/`shared_whatsapp`/`shared_telegram`; localized social templates seeded.
 - Fixed a seed defect: SQLite stores `\n` in a string literal verbatim, so every template body from `002_seed.sql` rendered its escape markers instead of line breaks. Migration `003` repairs existing and new rows in one `replace(body, '\n', char(10))` pass.
-- Preview is now a single native form with editable subject, email body, WhatsApp text and public-post text; the clicked submit button's value selects the action, so `hx-boost` is disabled on that form only.
+- Preview is a single native form with editable subject, email body, WhatsApp text and public-post text; the clicked submit button selects the action. The unused HTMX CDN and global boost were removed, while the copy control uses the same-origin hashed client asset.
 - Upgrade path verified on a populated database: row counts preserved, `PRAGMA foreign_key_check` clean, `integrity_check` ok, `idx_actions_type` recreated, widened CHECK still rejects unknown action types.
 - `render.yaml` targets `rafmeshutaf.org.il`; not yet deployed.
 
 ## Verification completed
 
 - Clean offline frozen install from the existing npm cache: 7 packages installed, exit 0.
-- `npm test`: 12/12 integration tests pass, exit 0.
+- `npm test`: 33/33 integration tests pass, exit 0.
 - `npm run typecheck`: exit 0.
 - `npm run build`: exit 0.
 - `npm audit --offline --omit=dev`: 0 vulnerabilities, exit 0.
-- `env -i PATH="$PATH" npm run smoke:pages`: all six locale homes and main keyless pages returned 200; `/admin` returned 403, exit 0.
-- S3 upload, Access JWT/JWKS, backup/restore, deletion, audit, dedup, and no-personal-text invariants are exercised with local deterministic fakes (no provider credentials).
+- `npm run smoke` and `npm run smoke:pages`: keyless public routes returned 200 and `/admin` returned 403, exit 0.
+- S3 upload/delete sequencing, response replay protection, attachment compensation/retry, Access JWT/JWKS, backup/restore, privacy deletion, audit, dedup, and no-personal-text invariants are exercised with local deterministic fakes (no provider credentials).
+- Regression coverage is server-side only: there is no browser-level clipboard, fallback-copy, or runtime CSP execution test. Response confirmation GET is refresh-safe and response POST replay is protected by signed submission-token tombstones.
 
 ## Remaining launch gates / environment blockers
 
@@ -111,6 +113,7 @@ Verified: zero horizontal overflow at 320 px on every public page in every local
 - `/terms`, `/accessibility` and `/corrections` from the canonical site map are not built yet.
 - The "Initiator" section was removed from the About page in all six locales on 2026-07-28, so the operator is not named anywhere on the site. Part X of the canonical package lists it among the published items; decide before launch whether to restore it with a real name or legal entity.
 - Share deep links (X, Facebook, WhatsApp, Telegram) are asserted in tests but have not been opened against the live platforms.
+- Clipboard success/fallback behavior and CSP enforcement still need an actual browser-level check; the test only verifies the copy action's server-facing endpoint where the harness permits.
 - Deploy to Render and verify the live service (Render MCP not connected in this session).
 
 ## Key deployment decisions

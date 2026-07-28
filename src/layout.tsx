@@ -2,8 +2,9 @@ import type { Child } from "hono/jsx";
 import { cssPath, jsPath, themePath } from "./assets.js";
 import { dirOf, localeNames, locales, t, type Locale } from "./i18n.js";
 
-export function Layout({ locale, title, path, children }: { locale: Locale; title: string; path: string; children: Child }) {
+export function Layout({ locale, title, path, languageQuery = "", children }: { locale: Locale; title: string; path: string; languageQuery?: string; children: Child }) {
   const suffix = path.replace(/^\/(?:he|ar|yi|ru|en|am)/, "") || "";
+  const query = languageQuery ? `&${languageQuery}` : "";
   return <html lang={locale} dir={dirOf(locale)}>
     <head>
       <meta charSet="utf-8" />
@@ -17,10 +18,9 @@ export function Layout({ locale, title, path, children }: { locale: Locale; titl
       <script src={themePath}></script>
       <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css" />
       <link rel="stylesheet" href={cssPath} />
-      <script src="https://cdn.jsdelivr.net/npm/htmx.org@2/dist/htmx.min.js" defer></script>
       <script src={jsPath} defer></script>
     </head>
-    <body {...{ "hx-boost": "true" }}>
+    <body>
       <a class="skip-link" href="#content">{t(locale, "skip")}</a>
       <header class="wrap">
         <a class="wordmark" href={`/${locale}`}>{t(locale, "siteName")}</a>
@@ -35,7 +35,7 @@ export function Layout({ locale, title, path, children }: { locale: Locale; titl
         <details class="languages">
           <summary><span class="label">{t(locale, "language")}</span> <span lang={locale}>{localeNames[locale]}</span></summary>
           <ul>{locales.map((option) => <li>
-            <a href={`/${option}${suffix}?lang=1`} hrefLang={option} lang={option} dir={dirOf(option)}
+            <a href={`/${option}${suffix}${suffix.includes("?") ? "&" : "?"}lang=1${query}`} hrefLang={option} lang={option} dir={dirOf(option)}
               aria-current={option === locale ? "true" : undefined}>{localeNames[option]}</a>
           </li>)}</ul>
         </details>

@@ -3,7 +3,7 @@ import type { Config } from "./config.js";
 import type { Db } from "./db.js";
 import { isLocale, localeNames, locales, t, type Locale } from "./i18n.js";
 import { Layout } from "./layout.js";
-import { createRateLimiter, issueCsrf, text, Turnstile, validCsrf, validTurnstile, values } from "./security.js";
+import { createRateLimiter, issueCsrf, issueRequestCapability, text, Turnstile, validCsrf, validTurnstile, values, verifyRequestCapability } from "./security.js";
 
 type Recipient = { id: number; type: "party" | "politician"; name: string; email: string | null; whatsapp: string | null; socialHandle: string | null };
 type Template = { channel: "email" | "whatsapp" | "social"; subject: string | null; body: string };
@@ -89,14 +89,16 @@ export function registerRequestRoutes(app: Hono, db: Db, config: Config) {
     const socialBody = fill(social.body, fields);
     const created = db.prepare("INSERT INTO generated_requests (recipient_id, locale, selected_demands, created_at) VALUES (?, ?, ?, ?) RETURNING id")
       .get(recipient.id, messageLocale, JSON.stringify([...new Set(demandIds)]), new Date().toISOString()) as { id: number };
+    const capability = issueRequestCapability(created.id, config);
+    context.header("Cache-Control", "private, no-store");
     return context.html(<Layout locale={pageLocale} title={t(pageLocale, "previewTitle")} path={context.req.path}>
       <h1>{t(pageLocale, "previewTitle")}</h1>
       <p role="note">{t(pageLocale, "editHint")}</p>
-      {/* ponytail: one native form; the clicked button's name/value selects the action, so hx-boost stays off here. */}
-      <form method="post" action={`/${pageLocale}/request/action`} {...{ "hx-boost": "false" }}>
-        <input type="hidden" name="csrf" value={text(body.csrf)} /><input type="hidden" name="requestId" value={created.id} />
+      <p class="note">{t(pageLocale, "requestPreparedNote")}</p>
+      <form method="post" action={`/${pageLocale}/request/action`}>
+        <input type="hidden" name="csrf" value={text(body.csrf)} /><input type="hidden" name="requestId" value={created.id} /><input type="hidden" name="capability" value={capability} />
         <label>{t(pageLocale, "emailSubject")}<input name="subject" value={subject} maxLength={200} /></label>
-        <label>{t(pageLocale, "emailBody")}<textarea name="message" rows={10} maxLength={5000}>{emailBody}</textarea></label>
+        <label>{t(pageLocale, "emailBody")}<textarea id="copy-message" name="message" rows={10} maxLength={5000}>{emailBody}</textarea></label>
         <label>{t(pageLocale, "whatsappText")}<textarea name="whatsappMessage" rows={4} maxLength={2000}>{whatsappBody}</textarea></label>
         <label>{t(pageLocale, "socialText")}<textarea name="socialMessage" rows={6} maxLength={2000}>{socialBody}</textarea></label>
         <Turnstile config={config} />
@@ -104,7 +106,7 @@ export function registerRequestRoutes(app: Hono, db: Db, config: Config) {
         <div class="actions">
           <button type="submit" name="action" value="email_opened">{t(pageLocale, "openEmail")}</button>
           <button type="submit" name="action" value="whatsapp_opened" class="ghost">{t(pageLocale, "openWhatsapp")}</button>
-          <button type="submit" name="action" value="text_copied" class="ghost">{t(pageLocale, "copyText")}</button>
+          <button type="submit" name="action" value="text_copied" class="ghost" data-copy="copy-message" data-copy-endpoint={`/${pageLocale}/request/copy`}>{t(pageLocale, "copyText")}</button>
         </div>
         <h2 class="section-label">{t(pageLocale, "shareHeading")}</h2>
         <div class="actions share">
@@ -126,15 +128,17 @@ export function registerRequestRoutes(app: Hono, db: Db, config: Config) {
     const locale = localeParam(context.req.param("locale"));
     if (!locale) return context.notFound();
     const body = await context.req.parseBody();
+    if (!campaignEnabled(db)) return statusPage(context, locale, t(locale, "formDisabled"), 503);
     if (!rateLimit(context, "action", config.rateLimitAction, 3600)) return statusPage(context, locale, "Too many requests", 429);
     if (!validCsrf(context, config, body) || !await validTurnstile(context, config, body)) return statusPage(context, locale, t(locale, "invalidForm"), 403);
     const requestId = positiveInteger(text(body.requestId));
     const action = text(body.action);
-    if (!requestId || !actionTypes.includes(action) || !requestExists(db, requestId)) return statusPage(context, locale, t(locale, "invalidForm"), 422);
+    if (!requestId || !actionTypes.includes(action) || !requestExists(db, requestId) || !verifyRequestCapability(text(body.capability), requestId, config)) return statusPage(context, locale, t(locale, "invalidForm"), 422);
     db.prepare("INSERT INTO request_actions (generated_request_id, action_type, created_at) VALUES (?, ?, ?)").run(requestId, action, new Date().toISOString());
     const message = action === "whatsapp_opened" ? text(body.whatsappMessage)
       : shareActions.includes(action) ? text(body.socialMessage) : text(body.message);
     const target = actionTarget(db, config, requestId, action, text(body.subject), message);
+    context.header("Cache-Control", "private, no-store");
     return context.html(<Layout locale={locale} title={t(locale, "actionReady")} path={context.req.path}>
       <h1>{t(locale, "actionReady")}</h1>
       {target ? <p><a role="button" href={target.href} dir="ltr" target={target.href.startsWith("https:") ? "_blank" : undefined} rel="noopener noreferrer">{target.label}</a></p> : null}
@@ -145,13 +149,26 @@ export function registerRequestRoutes(app: Hono, db: Db, config: Config) {
     </Layout>);
   });
 
+  app.post("/:locale/request/copy", async (context) => {
+    const locale = localeParam(context.req.param("locale"));
+    if (!locale) return context.notFound();
+    const body = await context.req.parseBody();
+    const keys = Object.keys(body).filter((key) => body[key] !== undefined);
+    const requestId = positiveInteger(text(body.requestId));
+    if (!campaignEnabled(db)) return statusPage(context, locale, t(locale, "formDisabled"), 503);
+    if (!rateLimit(context, "copy", config.rateLimitAction, 3600) || keys.some((key) => !["csrf", "requestId", "capability"].includes(key)) || !validCsrf(context, config, body) || !requestId || !requestExists(db, requestId) || !verifyRequestCapability(text(body.capability), requestId, config)) return statusPage(context, locale, t(locale, "invalidForm"), 422);
+    db.prepare("INSERT INTO request_actions (generated_request_id, action_type, created_at) VALUES (?, 'text_copied', ?)").run(requestId, new Date().toISOString());
+    return context.body(null, 204);
+  });
+
   app.post("/:locale/request/report-sent", async (context) => {
     const locale = localeParam(context.req.param("locale"));
     if (!locale) return context.notFound();
     const body = await context.req.parseBody();
+    if (!campaignEnabled(db)) return statusPage(context, locale, t(locale, "formDisabled"), 503);
     if (!rateLimit(context, "action", config.rateLimitAction, 3600) || !validCsrf(context, config, body) || !await validTurnstile(context, config, body)) return statusPage(context, locale, t(locale, "invalidForm"), 403);
     const requestId = positiveInteger(text(body.requestId));
-    if (!requestId || !requestExists(db, requestId)) return statusPage(context, locale, t(locale, "invalidForm"), 422);
+    if (!requestId || !requestExists(db, requestId) || !verifyRequestCapability(text(body.capability), requestId, config)) return statusPage(context, locale, t(locale, "invalidForm"), 422);
     db.prepare("INSERT INTO request_actions (generated_request_id, action_type, created_at) VALUES (?, 'reported_sent', ?)").run(requestId, new Date().toISOString());
     return context.redirect(`/${locale}/request/result?request=${requestId}`, 303);
   });
@@ -159,10 +176,22 @@ export function registerRequestRoutes(app: Hono, db: Db, config: Config) {
   app.get("/:locale/request/result", (context) => {
     const locale = localeParam(context.req.param("locale"));
     if (!locale) return context.notFound();
-    const share = encodeURIComponent(`${t(locale, "siteName")} ${config.appBaseUrl}/${locale}`);
-    return context.html(<Layout locale={locale} title={t(locale, "resultTitle")} path={context.req.path}>
-      <h1>{t(locale, "resultTitle")}</h1><p>{t(locale, "share")}</p>
-      <nav><a href={`https://wa.me/?text=${share}`}>WhatsApp</a> · <a href={`https://t.me/share/url?url=${share}`}>Telegram</a> · <a href={`https://www.facebook.com/sharer/sharer.php?u=${share}`}>Facebook</a> · <a href={`${config.appBaseUrl}/${locale}`}>Link</a></nav>
+    const requestId = positiveInteger(context.req.query("request"));
+    const request = requestId ? db.prepare(`SELECT g.id, g.locale, r.type, r.social_handle AS socialHandle, rt.name AS recipient, g.selected_demands
+      FROM generated_requests g JOIN recipients r ON r.id = g.recipient_id JOIN recipient_translations rt ON rt.recipient_id = g.recipient_id AND rt.locale = g.locale WHERE g.id = ?`).get(requestId) as { id: number; locale: string; type: "party" | "politician"; socialHandle: string | null; recipient: string; selected_demands: string } | undefined : undefined;
+    if (!request || !isLocale(request.locale)) return statusPage(context, locale, t(locale, "invalidForm"), 422);
+    const demandIds = JSON.parse(request.selected_demands) as number[];
+    const placeholders = demandIds.map(() => "?").join(",");
+    const demands = placeholders ? db.prepare(`SELECT dt.title FROM demand_translations dt WHERE dt.locale = ? AND dt.demand_id IN (${placeholders}) ORDER BY dt.demand_id`).all(request.locale, ...demandIds) as { title: string }[] : [];
+    const social = db.prepare("SELECT body FROM message_templates WHERE locale = ? AND channel = 'social'").get(request.locale) as { body: string } | undefined;
+    const recipient = { id: 0, type: request.type, name: request.recipient, email: null, whatsapp: null, socialHandle: request.socialHandle } satisfies Recipient;
+    const message = social ? fill(social.body, { recipient: request.recipient, demands: demands.map((demand) => `• ${demand.title}`).join("\n"), handle: mention(recipient, request.locale), link: `${config.appBaseUrl}/${request.locale}/request/result?request=${request.id}`, name: "", city: "", context: "" }) : `${mention(recipient, request.locale)}\n\n${demands.map((demand) => `• ${demand.title}`).join("\n")}`;
+    const share = encodeURIComponent(message);
+    const link = encodeURIComponent(`${config.appBaseUrl}/${request.locale}/request/result?request=${request.id}`);
+    context.header("Cache-Control", "private, no-store");
+    return context.html(<Layout locale={locale} title={t(locale, "resultTitle")} path={context.req.path} languageQuery={`request=${request.id}`}>
+      <h1>{t(locale, "resultTitle")}</h1><p>{t(locale, "shareForRecipient")} <strong>{request.recipient}</strong>.</p>
+      <nav><a href={`https://wa.me/?text=${share}`}>WhatsApp</a> · <a href={`https://t.me/share/url?url=${link}&text=${share}`}>Telegram</a> · <a href={`https://www.facebook.com/sharer/sharer.php?u=${link}`}>Facebook</a> · <a href={`${config.appBaseUrl}/${request.locale}/request/result?request=${request.id}`}>Link</a></nav>
     </Layout>);
   });
 }
@@ -194,4 +223,3 @@ function actionTarget(db: Db, config: Config, requestId: number, action: string,
   if (action === "shared_telegram") return { href: `https://t.me/share/url?url=${link}&text=${share}`, label: "Telegram" };
   return undefined;
 }
-

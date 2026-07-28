@@ -6,7 +6,7 @@ The platform does not recommend how to vote, does not rank parties, and never st
 
 Supporters verify their email, create a personal appeal to a recipient, send it privately or post it publicly through their own channel, and may submit any reply for moderation.
 
-The authoritative source for all site text is `docs/Каноническийпакеттекстовиправилпроекта.docx` (Russian). **Translations into Hebrew, Arabic, Yiddish, English and Amharic are machine-generated and unreviewed — see [docs/TRANSLATION-REVIEW.md](docs/TRANSLATION-REVIEW.md) before launch.** It is server-rendered with Hono JSX and progressively enhanced with HTMX, uses Pico CSS, and stores state in SQLite WAL mode.
+The authoritative source for all site text is `docs/Каноническийпакеттекстовиправилпроекта.docx` (Russian). **Translations into Hebrew, Arabic, Yiddish, English and Amharic are machine-generated and unreviewed — see [docs/TRANSLATION-REVIEW.md](docs/TRANSLATION-REVIEW.md) before launch.** It is server-rendered with Hono JSX and native HTML forms, with progressive enhancement from the same-origin client asset, uses Pico CSS, and stores state in SQLite WAL mode.
 
 ## Quick start
 
@@ -41,7 +41,7 @@ No third-party keys are needed to boot. With no keys:
 
 ## Architecture
 
-- `src/server.ts` binds `0.0.0.0:$PORT` and schedules a backup every 24 hours when backup credentials exist.
+- `src/server.ts` binds `0.0.0.0:$PORT`, schedules response-object maintenance, and schedules a backup every 24 hours when backup credentials exist.
 - `src/app.tsx` builds one Hono app and one SQLite connection.
 - `migrations/` contains the schema, localized seed content, and additive upgrades applied on boot. `004` carries the canonical campaign: 10 standard clauses, 5 coalition clauses, 11 first-100-days items and 18 portfolios.
 - `src/content.tsx` renders the political documents. A clause is a commitment plus three fixed callouts — why it matters, how it is checked, permitted exceptions — always in that order, so the page can be skimmed by position rather than read end to end.
@@ -53,7 +53,7 @@ No third-party keys are needed to boot. With no keys:
 - Public POST routes use signed CSRF cookies, optional Turnstile, body limits, validation, and per-IP limits.
 - Cloudflare Access JWTs are verified at origin through the team JWKS. There is no application password system.
 - Appeal personalization stays in the response HTML and form payload; only recipient, locale, selected demand IDs, and aggregate actions are stored. This holds for public-post text too — the text a supporter posts is never written to the database.
-- Response files are held in memory only long enough to validate and stream to S3-compatible storage; only metadata enters SQLite.
+- Response submissions use signed opaque tokens so replay creates at most one response. Files are held in memory only long enough to validate and upload after a durable intent is committed; only metadata and retryable upload/delete work enter SQLite, and object cleanup is retried outside transactions.
 
 ## Visual design
 
@@ -104,4 +104,3 @@ The restore command downloads to a temporary directory, runs `PRAGMA integrity_c
 ## Launch gates
 
 Before public launch: complete human review of political/legal translations, run Lighthouse and axe in a configured real browser at 320/768/1024/1440 px, configure Cloudflare/Render monitoring and alerts, exercise a production backup restore, and run the load command against staging. Never place secrets in `.env.example` or source control.
-

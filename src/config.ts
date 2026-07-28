@@ -6,9 +6,11 @@ const ephemeralSecret = randomBytes(32).toString("hex");
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env) {
   const port = integer(env.PORT, 3000);
+  const nodeEnv = env.NODE_ENV ?? "development";
+  if (nodeEnv === "production" && !env.SESSION_SECRET) throw new Error("SESSION_SECRET is required in production");
   return {
     port,
-    nodeEnv: env.NODE_ENV ?? "development",
+    nodeEnv,
     appBaseUrl: env.APP_BASE_URL ?? `http://localhost:${port}`,
     sqlitePath: env.SQLITE_PATH ?? "data/app.db",
     sessionSecret: env.SESSION_SECRET ?? ephemeralSecret,
@@ -36,7 +38,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env) {
     rateLimitVerify: integer(env.RATE_LIMIT_VERIFY, 10),
     rateLimitPreview: integer(env.RATE_LIMIT_PREVIEW, 30),
     rateLimitAction: integer(env.RATE_LIMIT_ACTION, 30),
-    rateLimitResponses: integer(env.RATE_LIMIT_RESPONSES, 3)
+    rateLimitResponses: integer(env.RATE_LIMIT_RESPONSES, 3),
+    responsePutTimeoutMs: Math.min(integer(env.RESPONSE_PUT_TIMEOUT_MS, 30_000), 30_000)
   };
 }
 

@@ -344,8 +344,29 @@ export const THEME_JS =
 
 export const JS = `
 document.addEventListener('click', async (e) => {
-  const copy = e.target?.dataset?.copy;
-  if (copy) await navigator.clipboard.writeText(document.getElementById(copy).value);
+  const button = e.target?.closest?.('[data-copy]');
+  const copy = button?.dataset?.copy;
+  if (copy) {
+    if (button.dataset.copyFallback === '1') { delete button.dataset.copyFallback; return; }
+    const form = button.closest('form');
+    if (button.dataset.copyEndpoint) e.preventDefault();
+    const source = document.getElementById(copy);
+    if (source) {
+      let copied = false;
+      try { await navigator.clipboard.writeText(source.value); copied = true; }
+      catch (err) { source.select(); try { copied = document.execCommand('copy'); } catch (fallbackError) { copied = false; } }
+      if (copied && button.dataset.copyEndpoint) {
+        const csrf = form?.querySelector('[name=csrf]')?.value;
+        const requestId = form?.querySelector('[name=requestId]')?.value;
+        const capability = form?.querySelector('[name=capability]')?.value;
+        const data = new URLSearchParams({ csrf: csrf || '', requestId: requestId || '', capability: capability || '' });
+        fetch(button.dataset.copyEndpoint, { method: 'POST', body: data, credentials: 'same-origin' }).catch(() => {});
+      } else if (!copied && form) {
+        button.dataset.copyFallback = '1';
+        form.requestSubmit(button);
+      }
+    }
+  }
   const theme = e.target?.closest?.('[data-theme-set]')?.dataset?.themeSet;
   if (theme) {
     try { theme === 'system' ? localStorage.removeItem('theme') : localStorage.setItem('theme', theme); } catch (err) {}
