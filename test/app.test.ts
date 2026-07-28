@@ -43,14 +43,58 @@ test("all public locales render with the correct text direction", async () => {
   }
 });
 
-test("home and demands are populated from SQLite", async () => {
+test("campaign documents render from SQLite in every locale", async () => {
   const dir = mkdtempSync(join(tmpdir(), "agree-content-"));
   try {
-    const { app, close } = createApp({ sqlitePath: join(dir, "app.db") });
+    const { app, db, close } = createApp({ sqlitePath: join(dir, "app.db") });
+    assert.equal(db.prepare("SELECT count(*) c FROM demands WHERE document = 'standard'").get()?.c, 10);
+    assert.equal(db.prepare("SELECT count(*) c FROM demands WHERE document = 'coalition'").get()?.c, 5);
+
     const home = await app.request("/en");
-    assert.match(await home.text(), /Transparent public institutions/);
-    const demands = await app.request("/en/demands");
-    assert.match(await demands.text(), /Explain decisions in plain language/);
+    assert.match(await home.text(), /Elections held on schedule/);
+
+    // The standard renders the obligation plus all three fixed callouts.
+    const standard = await app.request("/en/standard");
+    const html = await standard.text();
+    assert.match(html, /The commitment/);
+    assert.match(html, /Why this matters/);
+    assert.match(html, /How it is checked/);
+    assert.match(html, /Permitted exceptions/);
+    assert.doesNotMatch(html, /A shared candidate mechanism/, "coalition clauses must not leak into the standard");
+
+    const coalition = await app.request("/en/coalition-agreement");
+    assert.match(await coalition.text(), /A shared candidate mechanism/);
+
+    // Timeline bars use SVG geometry, because the CSP drops inline style attributes. In RTL the
+    // offset is mirrored server-side: days 1-14 sit at x=86 rather than x=0.
+    assert.match(await (await app.request("/he/first-100-days")).text(), /class="plan-bar" x="86" y="0" width="14"/);
+    assert.match(await (await app.request("/en/first-100-days")).text(), /class="plan-bar" x="0" y="0" width="14"/);
+
+    const model = await app.request("/ru/government-model");
+    const modelHtml = await model.text();
+    assert.match(modelHtml, /Оборона/);
+    assert.match(modelHtml, /Культура, спорт, туризм и наследие/);
+
+    assert.equal((await app.request("/en/demands")).status, 301);
+    close();
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("every locale has every key used by the templates", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "agree-i18n-"));
+  try {
+    const { app, close } = createApp({ sqlitePath: join(dir, "app.db") });
+    const paths = ["", "/standard", "/coalition-agreement", "/first-100-days", "/government-model", "/about", "/methodology", "/support", "/request", "/responses/new", "/privacy"];
+    for (const locale of ["he", "ar", "yi", "ru", "en", "am"]) {
+      for (const path of paths) {
+        const response = await app.request(`/${locale}${path}`);
+        assert.equal(response.status, 200, `/${locale}${path}`);
+        const html = await response.text();
+        assert.doesNotMatch(html, /translation unavailable/, `/${locale}${path}`);
+      }
+    }
     close();
   } finally {
     rmSync(dir, { recursive: true, force: true });

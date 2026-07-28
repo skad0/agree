@@ -1,6 +1,12 @@
-# Collective Civic Request Platform
+# Contract in Advance · Договор заранее
 
-A multilingual civic campaign MVP where supporters verify their email, create a personal appeal to an official recipient, send it privately or post it publicly through their own channel, and submit any reply for moderation. It is server-rendered with Hono JSX and progressively enhanced with HTMX, uses Pico CSS, and stores state in SQLite WAL mode.
+A multilingual civic transparency platform. It puts the same set of questions to every registered party before an election — which coalitions they would join, how large a government they would form, whether they will comply with final court rulings, the inquiry into 7 October, and their first 100 days — and lets a citizen support those requirements and send a party a specific question themselves.
+
+The platform does not recommend how to vote, does not rank parties, and never stores the link between a verified supporter and the party they wrote to.
+
+Supporters verify their email, create a personal appeal to a recipient, send it privately or post it publicly through their own channel, and may submit any reply for moderation.
+
+The authoritative source for all site text is `docs/Каноническийпакеттекстовиправилпроекта.docx` (Russian). **Translations into Hebrew, Arabic, Yiddish, English and Amharic are machine-generated and unreviewed — see [docs/TRANSLATION-REVIEW.md](docs/TRANSLATION-REVIEW.md) before launch.** It is server-rendered with Hono JSX and progressively enhanced with HTMX, uses Pico CSS, and stores state in SQLite WAL mode.
 
 ## Quick start
 
@@ -37,7 +43,9 @@ No third-party keys are needed to boot. With no keys:
 
 - `src/server.ts` binds `0.0.0.0:$PORT` and schedules a backup every 24 hours when backup credentials exist.
 - `src/app.tsx` builds one Hono app and one SQLite connection.
-- `migrations/` contains the 14-table schema, localized seed content, and additive upgrades applied on boot.
+- `migrations/` contains the schema, localized seed content, and additive upgrades applied on boot. `004` carries the canonical campaign: 10 standard clauses, 5 coalition clauses, 11 first-100-days items and 18 portfolios.
+- `src/content.tsx` renders the political documents. A clause is a commitment plus three fixed callouts — why it matters, how it is checked, permitted exceptions — always in that order, so the page can be skimmed by position rather than read end to end.
+- **Inline `style` attributes do not work here.** The CSP sets `style-src 'self' https://cdn.jsdelivr.net` with no `'unsafe-inline'`, so browsers discard style attributes silently. Data-driven geometry, such as the first-100-days bars, uses SVG presentation attributes instead; SVG does not mirror on its own, so RTL offsets are computed server-side from the locale.
 - The appeal preview generates email, WhatsApp and public-post text from localized templates; every field is editable before the supporter acts on it.
 - Public posting targets X, Facebook, WhatsApp and Telegram. The post mentions the recipient's `social_handle`, or falls back to `Knesset member <name>` for politicians. Facebook's sharer accepts a URL only, so that path also shows the text for manual copy.
 - `src/locales/` contains all six short-string dictionaries: Hebrew, Arabic, Yiddish, Russian, English, and Amharic. Hebrew, Arabic, and Yiddish render RTL. Languages are always offered by endonym, never by ISO code.

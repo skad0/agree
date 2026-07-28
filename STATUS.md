@@ -20,6 +20,23 @@ Work is committed on `main` in four focused commits (MVP implementation, docs, R
 - E7 application work: strict CSP/HSTS/security headers, body limits, CSRF, optional Turnstile, rate limits, six privacy pages, confirmed data deletion/anonymization, external daily/weekly SQLite backup, integrity-checked restore, semantic/keyboard-friendly markup and skip link.
 - Docs/deploy: `README.md`, `.env.example`, `docs/SECRETS.md`, `render.yaml`, backup/restore/load/smoke scripts.
 
+## Canonical content and redesign (2026-07-28)
+
+The placeholder campaign is replaced by the real one from `docs/Каноническийпакеттекстовиправилпроекта.docx`: «Договор заранее» / Contract in Advance, slogan "Правила должны быть известны до голосования".
+
+- Migration `004_campaign_content.sql`: `demands.document` separates the standard from the coalition agreement; `demand_translations` gains `rationale`, `verification`, `exceptions`; new `plan_items` and `portfolios` tables with translations. Seeded with 10 standard clauses, 5 coalition clauses, 11 first-100-days items, 18 portfolios and the canonical email/WhatsApp/social templates, in all six locales.
+- New pages: `/standard`, `/coalition-agreement`, `/first-100-days`, `/government-model`, `/about`, `/methodology`. `/demands` now redirects to `/standard`.
+- Each clause renders the commitment plus three fixed callouts — why it matters, how it is checked, permitted exceptions — always in the same order, so a reader can skim by position.
+- The first-100-days plan renders as a day-range bar chart; the government model as a portfolio grid with the 18/4 caps as the page's only large numerals.
+- Navigation is two-tier: documents in the header, and the three actions as a numbered bar (1 support, 2 write, 3 reply) in fixed order on every page.
+- The appeal builder and preview now draw questions from the standard only, never from the coalition agreement.
+
+**Found and fixed: the CSP blocks inline styles.** `style-src` has no `'unsafe-inline'`, so the browser discards `style` attributes entirely — `style.cssText` is empty even though the attribute is in the HTML. The timeline bars were silently rendering full width. They now use SVG presentation attributes, which CSP does not touch, with the RTL offset mirrored server-side. The CSP was not weakened.
+
+Also fixed: number ranges such as `1–14` reordered to `14–1` in RTL until wrapped in `<bdi dir="ltr">`; Pico's `li` list-style defeated `list-style: none` set on the list.
+
+**Translations: Russian is canonical and verbatim. Hebrew, Arabic, Yiddish, English and Amharic are machine-translated and unreviewed** — see [docs/TRANSLATION-REVIEW.md](docs/TRANSLATION-REVIEW.md). This remains a blocking launch gate.
+
 ## Frontend pass (2026-07-28)
 
 Fixed, each verified in a real browser at 320/375/768/1440 px in Hebrew, Arabic, Amharic and English:
@@ -60,7 +77,9 @@ Verified: zero horizontal overflow at 320 px on every public page in every local
 - Lighthouse ≥95 and axe zero serious/critical are still unrun. Layout, overflow, target size and RTL were checked manually in a browser at 320/375/768/1440 px on 2026-07-28; that is not a substitute for an axe pass.
 - `npm run load` (staging p95/error/load targets) has not been run against a deployed instance.
 - Real Cloudflare Turnstile/Access, R2, Resend, external backup bucket, Cloudflare cache/WAF, Render persistence across redeploy, and live restore require credentials/infrastructure and remain unverified.
-- Political/legal/privacy translations require human review before launch, including the six social-share strings and social templates added on 2026-07-27.
+- **Political, legal and privacy text in he/ar/yi/en/am is machine-translated and unreviewed.** This is the largest open gate; see [docs/TRANSLATION-REVIEW.md](docs/TRANSLATION-REVIEW.md).
+- Recipients are still the placeholder seed. Real party names and official contact addresses must be entered through `/admin/recipients`; they were deliberately not invented here.
+- `/terms`, `/accessibility` and `/corrections` from the canonical site map are not built yet.
 - Share deep links (X, Facebook, WhatsApp, Telegram) are asserted in tests but have not been opened against the live platforms.
 - Deploy to Render and verify the live service (Render MCP not connected in this session).
 

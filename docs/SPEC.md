@@ -47,9 +47,13 @@ All tables use SQLite. Binary blobs are **not** stored in DB. `PRAGMA foreign_ke
 
 **`campaigns`:** `id` PK, `slug` UNIQUE, `status` (`draft`|`active`|`archived` — DECISION)
 
-**`demands`:** `id` PK, `campaign_id` FK (DECISION: single active campaign), `sort_order`, `is_active`
+**`demands`:** `id` PK, `campaign_id` FK (DECISION: single active campaign), `sort_order`, `is_active`, `document` (`standard`|`coalition`). The appeal builder offers `standard` clauses only.
 
-**`demand_translations`:** `demand_id` FK, `locale` (`he|ar|yi|ru|en|am`), `title`, `body` (Markdown); UNIQUE (`demand_id`,`locale`)
+**`plan_items`:** `id` PK, `campaign_id` FK, `day_from`, `day_to`, `sort_order`, `is_active`; translations carry `title`, `decision`, `instrument`, `owners`, `criterion`
+
+**`portfolios`:** `id` PK, `sort_order`, `is_active`; translations carry `name`
+
+**`demand_translations`:** `demand_id` FK, `locale` (`he|ar|yi|ru|en|am`), `title`, `body` (the commitment), `rationale`, `verification`, `exceptions`; UNIQUE (`demand_id`,`locale`). The last three render as fixed callouts in a fixed order.
 
 **`message_templates`:** `id` PK (DECISION), `locale`, `channel` (`email`|`whatsapp`|`social` — DECISION), `subject` (nullable), `body` (placeholders `{recipient}`, `{demands}`, `{handle}`, `{link}`, `{name}`, `{city}`, `{context}`)
 
@@ -190,6 +194,13 @@ Phasing follows plan roadmap **E0–E7**. All items below are **Phase 1 / MVP** 
 
 | Route | Purpose |
 |-------|---------|
+| `/{locale}/standard` | The ten transparency clauses put to every party |
+| `/{locale}/coalition-agreement` | The five coalition-readiness clauses |
+| `/{locale}/first-100-days` | Day-range plan, rendered as a bar chart |
+| `/{locale}/government-model` | 18 portfolios and the 18/4 caps |
+| `/{locale}/about` | Who we are, funding, disclosures |
+| `/{locale}/methodology` | How each published figure is counted |
+| `/{locale}/demands` | 301 to `/{locale}/standard` |
 | `/assets/app-{hash}.css` | Stylesheet, URL carries a content hash, `immutable` |
 | `/assets/app-{hash}.js` | Clipboard helper, same hashing |
 | `/` | Redirect to locale from cookie or `Accept-Language` |

@@ -34,7 +34,7 @@ export function registerRequestRoutes(app: Hono, db: Db, config: Config) {
     if (!recipient) return context.redirect(`/${locale}/request`);
     const demands = db.prepare(`SELECT d.id, dt.title FROM demands d JOIN campaigns c ON c.id = d.campaign_id
       LEFT JOIN demand_translations dt ON dt.demand_id = d.id AND dt.locale = ?
-      WHERE c.status = 'active' AND d.is_active = 1 ORDER BY d.sort_order`).all(locale) as { id: number; title: string | null }[];
+      WHERE c.status = 'active' AND d.is_active = 1 AND d.document = 'standard' ORDER BY d.sort_order`).all(locale) as { id: number; title: string | null }[];
     const csrf = issueCsrf(context, config);
     context.header("Cache-Control", "private, no-store");
     return context.html(<Layout locale={locale} title={t(locale, "buildTitle")} path={context.req.path}>
@@ -68,7 +68,7 @@ export function registerRequestRoutes(app: Hono, db: Db, config: Config) {
     const placeholders = demandIds.map(() => "?").join(",");
     const demands = db.prepare(`SELECT dt.title FROM demands d JOIN campaigns c ON c.id = d.campaign_id
       JOIN demand_translations dt ON dt.demand_id = d.id AND dt.locale = ?
-      WHERE c.status = 'active' AND d.is_active = 1 AND d.id IN (${placeholders}) ORDER BY d.sort_order`).all(messageLocale, ...demandIds) as { title: string }[];
+      WHERE c.status = 'active' AND d.is_active = 1 AND d.document = 'standard' AND d.id IN (${placeholders}) ORDER BY d.sort_order`).all(messageLocale, ...demandIds) as { title: string }[];
     const templates = db.prepare("SELECT channel, subject, body FROM message_templates WHERE locale = ?").all(messageLocale) as Template[];
     const email = templates.find((template) => template.channel === "email");
     const whatsapp = templates.find((template) => template.channel === "whatsapp");
