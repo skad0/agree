@@ -1,5 +1,5 @@
 import type { Child } from "hono/jsx";
-import { cssPath, jsPath } from "./assets.js";
+import { cssPath, jsPath, themePath } from "./assets.js";
 import { dirOf, localeNames, locales, t, type Locale } from "./i18n.js";
 
 export function Layout({ locale, title, path, children }: { locale: Locale; title: string; path: string; children: Child }) {
@@ -12,6 +12,9 @@ export function Layout({ locale, title, path, children }: { locale: Locale; titl
       <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
       <meta name="theme-color" content="#0f1826" media="(prefers-color-scheme: dark)" />
       <title>{title} · {t(locale, "siteName")}</title>
+      {/* Not deferred and not inlined: it must run before first paint to avoid a flash of the
+          wrong theme, and script-src has no 'unsafe-inline'. */}
+      <script src={themePath}></script>
       <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css" />
       <link rel="stylesheet" href={cssPath} />
       <script src="https://cdn.jsdelivr.net/npm/htmx.org@2/dist/htmx.min.js" defer></script>
@@ -47,6 +50,12 @@ export function Layout({ locale, title, path, children }: { locale: Locale; titl
         <a href={`/${locale}/coalition-agreement`}>{t(locale, "navCoalition")}</a>
         <a href={`/${locale}/methodology`}>{t(locale, "navMethodology")}</a>
         <a href={`/${locale}/privacy`}>{t(locale, "navPrivacy")}</a>
+        <div class="appearance">
+          <span>{t(locale, "appearance")}</span>
+          <button type="button" data-theme-set="light" aria-pressed="false">{t(locale, "appearanceLight")}</button>
+          <button type="button" data-theme-set="dark" aria-pressed="false">{t(locale, "appearanceDark")}</button>
+          <button type="button" data-theme-set="system" aria-pressed="true">{t(locale, "appearanceSystem")}</button>
+        </div>
       </footer>
     </body>
   </html>;

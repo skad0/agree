@@ -65,6 +65,8 @@ Two hues only. Techelet carries every action, link, counter and clause number; a
 
 Measured contrast: light theme 17.4:1 body text, 9.3:1 links and button labels, 5.4:1 amber; dark theme 15.6:1, 7:1, 8:1. All above WCAG AA, most above AAA.
 
+Readers can override the system setting from the appearance switcher in the footer — light, dark, or follow the system. The choice lives in `localStorage` and is applied by a small render-blocking script served from `/assets/theme-{hash}.js`. It has to be a separate same-origin file rather than the usual inline snippet, because `script-src` carries no `'unsafe-inline'`, and the main bundle is deferred, which would paint the wrong theme first. With scripting off the control is hidden and the system preference applies, so nothing is left broken.
+
 There are deliberately **no webfonts**. Covering Hebrew, Arabic, Ge'ez, Cyrillic and Latin in a display face would cost this audience hundreds of kilobytes on the low-end phones many of them use, and every operating system already ships these scripts. Personality comes from the type scale and a small monospace utility register instead.
 
 The home page opens on the campaign name set simultaneously in all six scripts, each one a link into that language. It is both the identity of the page and the language switcher.

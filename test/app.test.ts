@@ -82,6 +82,32 @@ test("campaign documents render from SQLite in every locale", async () => {
   }
 });
 
+test("the appearance switcher is served and applied before paint", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "agree-theme-"));
+  try {
+    const { app, close } = createApp({ sqlitePath: join(dir, "app.db") });
+    const html = await (await app.request("/en")).text();
+
+    // Must be render-blocking and same-origin: script-src has no 'unsafe-inline', and a deferred
+    // script would paint the wrong theme first.
+    const tag = html.match(/<script src="(\/assets\/theme-[^"]+\.js)"><\/script>/);
+    assert.ok(tag?.[1], "theme script tag missing or deferred");
+    assert.ok(html.indexOf(tag[0]) < html.indexOf("<body"), "theme script must be in head");
+
+    const asset = await app.request(tag[1]);
+    assert.equal(asset.status, 200);
+    assert.match(asset.headers.get("cache-control") ?? "", /immutable/);
+    assert.match(await asset.text(), /localStorage\.getItem\('theme'\)/);
+
+    for (const value of ["light", "dark", "system"]) {
+      assert.match(html, new RegExp(`data-theme-set="${value}"`), value);
+    }
+    close();
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("every locale has every key used by the templates", async () => {
   const dir = mkdtempSync(join(tmpdir(), "agree-i18n-"));
   try {

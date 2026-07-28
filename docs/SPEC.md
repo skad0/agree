@@ -202,7 +202,8 @@ Phasing follows plan roadmap **E0–E7**. All items below are **Phase 1 / MVP** 
 | `/{locale}/methodology` | How each published figure is counted |
 | `/{locale}/demands` | 301 to `/{locale}/standard` |
 | `/assets/app-{hash}.css` | Stylesheet, URL carries a content hash, `immutable` |
-| `/assets/app-{hash}.js` | Clipboard helper, same hashing |
+| `/assets/app-{hash}.js` | Clipboard and appearance-switch handlers, same hashing |
+| `/assets/theme-{hash}.js` | Applies the stored appearance before first paint; render-blocking in `<head>` |
 | `/` | Redirect to locale from cookie or `Accept-Language` |
 | `/{locale}` | Home |
 | `/{locale}/demands` | Full demands |

@@ -18,6 +18,7 @@ export const CSS = `
    official government service would work against that. Amber is the one non-blue hue, reserved
    for the caveat callout, where a warning colour is the accurate signal. */
 :root:root:root {
+  color-scheme: light;
   --ink: #101a2c; --paper: #ffffff; --seal: #0038b8; --seal-deep: #002a8c;
   --caution: #9a5b00; --rule: #ccd7ea; --mute: #4d5a72; --card: #f5f8fd;
   --font: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans Hebrew", "Noto Sans Arabic",
@@ -44,14 +45,25 @@ export const CSS = `
   --pico-spacing: 1rem;
 }
 /* Dark mode is a lit room, not a void. Techelet at full strength is unreadable on a dark ground,
-   so it lifts toward sky while staying recognisably the same blue. */
+   so it lifts toward sky while staying recognisably the same blue.
+   The block is stated twice because CSS cannot share one declaration list between a media query
+   and an attribute selector: once for "system says dark and the reader has not forced light",
+   once for "the reader chose dark". Keep the two lists identical. */
 @media (prefers-color-scheme: dark) {
-  :root:root:root {
+  :root:root:root:not([data-theme=light]) {
+    color-scheme: dark;
     --ink: #eaf0fa; --paper: #0f1826; --seal: #6ea3f5; --seal-deep: #8fbaff;
     --caution: #e0a33f; --rule: #2b3a52; --mute: #a9b8d0; --card: #182338;
     --pico-primary-inverse: #08101c;
     --pico-primary-focus: rgba(110, 163, 245, .4);
   }
+}
+:root:root:root[data-theme=dark] {
+  color-scheme: dark;
+  --ink: #eaf0fa; --paper: #0f1826; --seal: #6ea3f5; --seal-deep: #8fbaff;
+  --caution: #e0a33f; --rule: #2b3a52; --mute: #a9b8d0; --card: #182338;
+  --pico-primary-inverse: #08101c;
+  --pico-primary-focus: rgba(110, 163, 245, .4);
 }
 
 body { overflow-wrap: anywhere; background: var(--paper); }
@@ -95,6 +107,21 @@ nav.primary a:hover { color: var(--seal); }
 .languages a { text-decoration: none; display: inline-block; padding-block: .35rem; min-block-size: 24px; }
 .languages [aria-current] { color: var(--seal); font-weight: 650; }
 footer.wrap a { display: inline-block; padding-block: .35rem; min-block-size: 24px; }
+
+/* Appearance switcher. Hidden when scripting is off, since the choice is stored in localStorage
+   and an unusable control is worse than no control; the system preference still applies. */
+.appearance { display: none; align-items: center; gap: .4rem; flex-wrap: wrap; }
+html.js .appearance { display: flex; }
+.appearance > span { font-size: .78rem; color: var(--mute); text-transform: var(--caps); letter-spacing: var(--track); }
+.appearance button {
+  inline-size: auto; margin: 0; padding: .3rem .7rem; min-block-size: 32px;
+  font-size: .85rem; font-weight: 500; background: var(--card); color: var(--mute);
+  border: 1px solid var(--rule); border-radius: 4px;
+}
+.appearance button:hover { color: var(--seal); border-color: var(--seal); background: var(--card); }
+.appearance button[aria-pressed=true] {
+  background: var(--seal); color: var(--pico-primary-inverse); border-color: var(--seal); font-weight: 600;
+}
 input[type=checkbox] { inline-size: 1.5rem; block-size: 1.5rem; min-inline-size: 24px; min-block-size: 24px; }
 
 /* Signature: the same campaign, set in all six scripts. Choosing a language is choosing a script. */
@@ -306,9 +333,40 @@ bdi, [dir=ltr] { unicode-bidi: isolate; }
 }
 `;
 
-export const JS = "document.addEventListener('click',async e=>{const id=e.target?.dataset?.copy;if(id){await navigator.clipboard.writeText(document.getElementById(id).value);}});";
+/**
+ * Loaded render-blocking in <head> so the stored choice is applied before first paint. It has to
+ * be a separate same-origin file rather than an inline script: script-src has no 'unsafe-inline',
+ * and the main bundle is deferred, which would flash the wrong theme.
+ */
+export const THEME_JS =
+  "document.documentElement.classList.add('js');" +
+  "try{var t=localStorage.getItem('theme');if(t==='dark'||t==='light')document.documentElement.dataset.theme=t}catch(e){}";
+
+export const JS = `
+document.addEventListener('click', async (e) => {
+  const copy = e.target?.dataset?.copy;
+  if (copy) await navigator.clipboard.writeText(document.getElementById(copy).value);
+  const theme = e.target?.closest?.('[data-theme-set]')?.dataset?.themeSet;
+  if (theme) {
+    try { theme === 'system' ? localStorage.removeItem('theme') : localStorage.setItem('theme', theme); } catch (err) {}
+    if (theme === 'system') delete document.documentElement.dataset.theme;
+    else document.documentElement.dataset.theme = theme;
+    mark();
+  }
+});
+// Without JS no button can be marked current, so the state is set here rather than server-side.
+function mark() {
+  let stored = null;
+  try { stored = localStorage.getItem('theme'); } catch (err) {}
+  for (const el of document.querySelectorAll('[data-theme-set]')) {
+    el.setAttribute('aria-pressed', String(el.dataset.themeSet === (stored || 'system')));
+  }
+}
+mark();
+`.trim();
 
 /** Content-hashed so a deploy actually reaches browsers; the old URL simply stops being referenced. */
 const fingerprint = (value: string) => createHash("sha256").update(value).digest("base64url").slice(0, 10);
 export const cssPath = `/assets/app-${fingerprint(CSS)}.css`;
 export const jsPath = `/assets/app-${fingerprint(JS)}.js`;
+export const themePath = `/assets/theme-${fingerprint(THEME_JS)}.js`;

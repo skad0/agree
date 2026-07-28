@@ -20,6 +20,14 @@ Work is committed on `main` in four focused commits (MVP implementation, docs, R
 - E7 application work: strict CSP/HSTS/security headers, body limits, CSRF, optional Turnstile, rate limits, six privacy pages, confirmed data deletion/anonymization, external daily/weekly SQLite backup, integrity-checked restore, semantic/keyboard-friendly markup and skip link.
 - Docs/deploy: `README.md`, `.env.example`, `docs/SECRETS.md`, `render.yaml`, backup/restore/load/smoke scripts.
 
+## Appearance switcher (2026-07-28)
+
+Light / dark / system, in the footer, in all six locales.
+
+The choice is stored in `localStorage` and applied by a small render-blocking script at `/assets/theme-{hash}.js`. It is a separate same-origin file rather than the usual inline snippet because `script-src` has no `'unsafe-inline'`; the main bundle is deferred and would paint the wrong theme first. Dark tokens are stated twice — once under `prefers-color-scheme: dark` scoped to `:not([data-theme=light])`, once under `[data-theme=dark]` — since CSS cannot share a declaration list between a media query and an attribute selector.
+
+With scripting off the control is hidden and the system preference applies, so nothing is left broken. Verified: preference survives navigation across locales, overrides the system setting, no console or CSP errors, 32 px buttons, no overflow at 375 px.
+
 ## Palette: national colours (2026-07-28)
 
 Recoloured to techelet and white, `#0038b8` on white. The Flag and Emblem Law describes the colour but fixes no hex; `#0038b8` is the value in common use.

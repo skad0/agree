@@ -1,5 +1,5 @@
 import type { Hono } from "hono";
-import { CSS, JS, cssPath, jsPath } from "./assets.js";
+import { CSS, JS, THEME_JS, cssPath, jsPath, themePath } from "./assets.js";
 import { registerContentRoutes } from "./content.js";
 import { markdown } from "./markdown.js";
 import { getCookie, setCookie } from "hono/cookie";
@@ -23,6 +23,7 @@ export function registerPublicRoutes(app: Hono, db: Db, config: Config) {
   });
   asset(cssPath, "text/css", CSS);
   asset(jsPath, "text/javascript", JS);
+  asset(themePath, "text/javascript", THEME_JS);
 
   registerSupportRoutes(app, db, config);
   registerRequestRoutes(app, db, config);
