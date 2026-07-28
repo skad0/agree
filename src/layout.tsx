@@ -9,8 +9,8 @@ export function Layout({ locale, title, path, children }: { locale: Locale; titl
       <meta charSet="utf-8" />
       <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
       <meta name="color-scheme" content="light dark" />
-      <meta name="theme-color" content="#f2f4f1" media="(prefers-color-scheme: light)" />
-      <meta name="theme-color" content="#12181d" media="(prefers-color-scheme: dark)" />
+      <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
+      <meta name="theme-color" content="#0f1826" media="(prefers-color-scheme: dark)" />
       <title>{title} · {t(locale, "siteName")}</title>
       <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css" />
       <link rel="stylesheet" href={cssPath} />

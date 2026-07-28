@@ -1,7 +1,9 @@
 import { createHash } from "node:crypto";
 
 /**
- * "Protocol" — stamp green for action, signal red reserved for the counts, cool paper ground.
+ * "Techelet" — the national blue and white. Two hues only: techelet carries every action,
+ * link, counter and clause number; amber appears nowhere except the caveats, where a warning
+ * colour is the accurate signal. Rank is expressed by scale and weight rather than by hue.
  * No webfonts on purpose: the six scripts (Hebrew, Arabic, Ge'ez, Cyrillic, Latin) already ship
  * with every OS, and shipping display faces for all of them would cost this audience real bytes.
  * Pico is retuned through its own custom properties rather than by overriding its selectors.
@@ -9,9 +11,15 @@ import { createHash } from "node:crypto";
 export const CSS = `
 /* Pico declares its tokens at ':root:not([data-theme=dark])', so a bare ':root' here would lose
    the specificity contest and silently leave every button Pico blue. Hence the repeated ':root'. */
+/* Palette: techelet and white, the national colours.
+   The Flag and Emblem Law describes the colour but fixes no hex; #0038b8 is the value in common
+   use. These are the *national* colours, deliberately not the gov.il service palette: the
+   canonical package states the project does not represent a state body, and looking like an
+   official government service would work against that. Amber is the one non-blue hue, reserved
+   for the caveat callout, where a warning colour is the accurate signal. */
 :root:root:root {
-  --ink: #16202b; --paper: #f2f4f1; --seal: #2f6b4f; --seal-deep: #24513c;
-  --signal: #b5442a; --rule: #c9d0c9; --mute: #5c6a64; --card: #fbfcfa;
+  --ink: #101a2c; --paper: #ffffff; --seal: #0038b8; --seal-deep: #002a8c;
+  --caution: #9a5b00; --rule: #ccd7ea; --mute: #4d5a72; --card: #f5f8fd;
   --font: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans Hebrew", "Noto Sans Arabic",
     "Noto Sans Ethiopic", "Helvetica Neue", sans-serif;
   --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
@@ -28,21 +36,21 @@ export const CSS = `
   --pico-primary-border: var(--seal);
   --pico-primary-hover-border: var(--seal-deep);
   --pico-primary-inverse: #ffffff;
-  --pico-primary-focus: rgba(47, 107, 79, .35);
+  --pico-primary-focus: rgba(0, 56, 184, .3);
   --pico-form-element-background-color: var(--card);
   --pico-form-element-border-color: var(--rule);
   --pico-form-element-active-border-color: var(--seal);
   --pico-border-radius: 4px;
   --pico-spacing: 1rem;
 }
-/* Dark mode is a lit room, not a void: the ground is a warm slate rather than near-black, rules
-   are visible, and text sits well above the 4.5:1 floor. The first attempt was far too dark. */
+/* Dark mode is a lit room, not a void. Techelet at full strength is unreadable on a dark ground,
+   so it lifts toward sky while staying recognisably the same blue. */
 @media (prefers-color-scheme: dark) {
   :root:root:root {
-    --ink: #eef2ee; --paper: #1e2529; --seal: #5fae82; --seal-deep: #74c096;
-    --signal: #f0906d; --rule: #3a444b; --mute: #b0bcb4; --card: #283036;
-    --pico-primary-inverse: #12181b;
-    --pico-primary-focus: rgba(95, 174, 130, .45);
+    --ink: #eaf0fa; --paper: #0f1826; --seal: #6ea3f5; --seal-deep: #8fbaff;
+    --caution: #e0a33f; --rule: #2b3a52; --mute: #a9b8d0; --card: #182338;
+    --pico-primary-inverse: #08101c;
+    --pico-primary-focus: rgba(110, 163, 245, .4);
   }
 }
 
@@ -99,7 +107,6 @@ input[type=checkbox] { inline-size: 1.5rem; block-size: 1.5rem; min-inline-size:
 .scripts a:hover { color: var(--ink); border-color: var(--mute); }
 .scripts [aria-current] { color: var(--paper); background: var(--seal-deep); border-color: var(--seal-deep); font-weight: 650; }
 
-/* Counts carry the campaign's whole claim, so they get the only saturated colour on the page. */
 /* Pico declares list-style on the li, so resetting it on the list alone leaves the markers. */
 .metrics, .constraints, .portfolios, .journey, .documents, .clauses, .timeline,
 .metrics li, .constraints li, .portfolios li, .journey li, .documents li, .clauses li, .timeline li {
@@ -108,7 +115,7 @@ input[type=checkbox] { inline-size: 1.5rem; block-size: 1.5rem; min-inline-size:
 
 .metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr)); gap: 1.25rem; margin-block: 2.5rem; padding: 0; }
 .metrics li { border-block-start: 2px solid var(--rule); padding-block-start: .6rem; padding-inline: 0; }
-.metrics strong { display: block; font-family: var(--mono); font-size: 2rem; font-weight: 600; color: var(--signal); font-variant-numeric: tabular-nums; line-height: 1.1; }
+.metrics strong { display: block; font-family: var(--mono); font-size: 2rem; font-weight: 600; color: var(--seal); font-variant-numeric: tabular-nums; line-height: 1.1; }
 .metrics span { display: block; margin-block-start: .2rem; }
 
 /* Forms: the generated text is the content, so give it room and let it grow with what it holds. */
@@ -163,8 +170,10 @@ footer.wrap { display: flex; flex-wrap: wrap; gap: .25rem 1.5rem; }
 }
 
 .cta { font-size: 1.05rem; padding-inline: 1.5rem; }
+/* "The platform does not recommend how to vote" is a disclaimer, so it takes the caveat colour
+   rather than the action colour. */
 .neutrality {
-  border-inline-start: 3px solid var(--signal); padding-inline-start: .9rem;
+  border-inline-start: 3px solid var(--caution); padding-inline-start: .9rem;
   color: var(--mute); font-size: .95rem; margin-block: 1.5rem;
 }
 
@@ -177,7 +186,7 @@ footer.wrap { display: flex; flex-wrap: wrap; gap: .25rem 1.5rem; }
   scroll-margin-block-start: 1rem;
 }
 .clause-number {
-  font-family: var(--mono); font-size: .85rem; color: var(--signal); letter-spacing: .06em;
+  font-family: var(--mono); font-size: .85rem; color: var(--seal); letter-spacing: .06em;
 }
 .clause h2 { margin-block: .35rem 1rem; }
 .clause-label {
@@ -194,7 +203,7 @@ footer.wrap { display: flex; flex-wrap: wrap; gap: .25rem 1.5rem; }
 }
 .callout.why { border-inline-start-color: var(--seal); }
 .callout.how { border-inline-start-color: var(--mute); }
-.callout.except { border-inline-start-color: var(--signal); }
+.callout.except { border-inline-start-color: var(--caution); }
 .clause-detail { margin-block-start: 1rem; border: 0; padding: 0; background: none; }
 .clause-detail > summary {
   font-size: .85rem; color: var(--mute); cursor: pointer; padding-block: .5rem;
@@ -217,7 +226,7 @@ footer.wrap { display: flex; flex-wrap: wrap; gap: .25rem 1.5rem; }
 .timeline { list-style: none; padding: 0; }
 .plan-item { padding-block: 1.75rem; border-block-start: 1px solid var(--rule); }
 .plan-days { margin: 0 0 .4rem; }
-.plan-days strong { font-family: var(--mono); font-size: 1.35rem; color: var(--signal); }
+.plan-days strong { font-family: var(--mono); font-size: 1.35rem; color: var(--seal); }
 .plan-days span { font-size: .8rem; color: var(--mute); text-transform: var(--caps); letter-spacing: var(--track); }
 .plan-track { display: block; inline-size: 100%; block-size: 8px; }
 .plan-track-bg { fill: var(--rule); }
@@ -237,7 +246,7 @@ footer.wrap { display: flex; flex-wrap: wrap; gap: .25rem 1.5rem; }
 /* ---- Government model -------------------------------------------------------------------- */
 
 .constraints { list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: 2.5rem; margin-block: 1.5rem 2.5rem; }
-.constraints strong { display: block; font-family: var(--mono); font-size: 3rem; line-height: 1; color: var(--signal); }
+.constraints strong { display: block; font-family: var(--mono); font-size: 3rem; line-height: 1; color: var(--seal); }
 .constraints span { color: var(--mute); font-size: .9rem; }
 .portfolios { list-style: none; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr)); gap: .5rem; }
 .portfolios li {

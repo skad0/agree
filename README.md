@@ -57,7 +57,13 @@ No third-party keys are needed to boot. With no keys:
 
 ## Visual design
 
-Pico is retuned through its own custom properties rather than by overriding its selectors. The palette is stamp green `#2f6b4f` for actions, a signal red `#b5442a` reserved exclusively for the campaign counters, and a cool paper ground; a dark counterpart follows `prefers-color-scheme`.
+Pico is retuned through its own custom properties rather than by overriding its selectors.
+
+The palette is **techelet and white**, the national colours: `#0038b8` on white. The Flag and Emblem Law describes the colour but fixes no hex; `#0038b8` is the value in common use. These are deliberately the *national* colours and not the gov.il service palette — the canonical package states the project does not represent a state body, and looking like an official government service would work against that.
+
+Two hues only. Techelet carries every action, link, counter and clause number; amber `#9a5b00` appears nowhere except caveats — the permitted-exceptions callout and the "does not recommend how to vote" disclaimer — where a warning colour is the accurate signal. Rank is expressed by scale and weight rather than by hue. A dark counterpart follows `prefers-color-scheme`, lifting techelet toward sky so it stays legible on a dark ground.
+
+Measured contrast: light theme 17.4:1 body text, 9.3:1 links and button labels, 5.4:1 amber; dark theme 15.6:1, 7:1, 8:1. All above WCAG AA, most above AAA.
 
 There are deliberately **no webfonts**. Covering Hebrew, Arabic, Ge'ez, Cyrillic and Latin in a display face would cost this audience hundreds of kilobytes on the low-end phones many of them use, and every operating system already ships these scripts. Personality comes from the type scale and a small monospace utility register instead.
 

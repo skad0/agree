@@ -20,6 +20,16 @@ Work is committed on `main` in four focused commits (MVP implementation, docs, R
 - E7 application work: strict CSP/HSTS/security headers, body limits, CSRF, optional Turnstile, rate limits, six privacy pages, confirmed data deletion/anonymization, external daily/weekly SQLite backup, integrity-checked restore, semantic/keyboard-friendly markup and skip link.
 - Docs/deploy: `README.md`, `.env.example`, `docs/SECRETS.md`, `render.yaml`, backup/restore/load/smoke scripts.
 
+## Palette: national colours (2026-07-28)
+
+Recoloured to techelet and white, `#0038b8` on white. The Flag and Emblem Law describes the colour but fixes no hex; `#0038b8` is the value in common use.
+
+Deliberately the national colours and **not** the gov.il service palette. The canonical package states in Parts X and XIV that the project does not represent a state body and is an independent civic platform; resembling an official government service would work against that posture, which Section 0 treats as load-bearing for the legal-risk analysis. Flag colours are ordinary civic identity and carry no such implication.
+
+Two hues: techelet for every action, link, counter and clause number; amber `#9a5b00` only for caveats — the permitted-exceptions callout and the neutrality disclaimer. Rank comes from scale and weight rather than hue.
+
+Contrast measured in both themes: light 17.4:1 body / 9.3:1 links and button labels / 5.4:1 amber; dark 15.6:1 / 7:1 / 8:1. All above AA, most above AAA.
+
 ## Mobile pass (2026-07-28)
 
 Reported as too dark and overwhelming on a phone; both were real.
