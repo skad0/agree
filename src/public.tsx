@@ -1,9 +1,10 @@
 import { marked } from "marked";
 import type { Hono } from "hono";
+import { CSS, JS, cssPath, jsPath } from "./assets.js";
 import { getCookie, setCookie } from "hono/cookie";
 import type { Config } from "./config.js";
 import type { Db } from "./db.js";
-import { isLocale, localeFromRequest, t, type Locale } from "./i18n.js";
+import { dirOf, isLocale, localeFromRequest, localeNames, locales, t, type Locale } from "./i18n.js";
 import { Layout } from "./layout.js";
 import { registerRequestRoutes } from "./requests.js";
 import { registerResponseRoutes } from "./responses.js";
@@ -13,16 +14,14 @@ import { registerSupportRoutes } from "./support.js";
 type Demand = { id: number; title: string | null; body: string | null };
 
 export function registerPublicRoutes(app: Hono, db: Db, config: Config) {
-  app.get("/assets/app.css", (context) => {
-    context.header("Content-Type", "text/css; charset=utf-8");
-    context.header("Cache-Control", "public, max-age=86400");
-    return context.body(CSS);
+  // The URL carries the content hash, so these may be cached forever without stranding a deploy.
+  const asset = (path: string, type: string, body: string) => app.get(path, (context) => {
+    context.header("Content-Type", `${type}; charset=utf-8`);
+    context.header("Cache-Control", "public, max-age=31536000, immutable");
+    return context.body(body);
   });
-  app.get("/assets/app.js", (context) => {
-    context.header("Content-Type", "text/javascript; charset=utf-8");
-    context.header("Cache-Control", "public, max-age=86400");
-    return context.body("document.addEventListener('click',async e=>{const id=e.target?.dataset?.copy;if(id){await navigator.clipboard.writeText(document.getElementById(id).value);}});");
-  });
+  asset(cssPath, "text/css", CSS);
+  asset(jsPath, "text/javascript", JS);
 
   registerSupportRoutes(app, db, config);
   registerRequestRoutes(app, db, config);
@@ -44,16 +43,20 @@ export function registerPublicRoutes(app: Hono, db: Db, config: Config) {
     };
     publicCache(context);
     return context.html(<Layout locale={locale} title={t(locale, "homeTitle")} path={context.req.path}>
+      <nav class="scripts" aria-label={t(locale, "language")}>
+        {locales.map((option) => <a href={`/${option}?lang=1`} hrefLang={option} lang={option} dir={dirOf(option)}
+          aria-current={option === locale ? "true" : undefined}>{localeNames[option]}</a>)}
+      </nav>
       <h1>{t(locale, "homeTitle")}</h1>
-      <p>{t(locale, "problem")}</p>
+      <p class="lede">{t(locale, "problem")}</p>
       <p>{t(locale, "solution")}</p>
-      <section class="metrics" aria-label={t(locale, "siteName")}>
-        <p><strong>{counts.supporters}</strong><span>{t(locale, "supporters")}</span></p>
-        <p><strong>{counts.generated}</strong><span>{t(locale, "generated")}</span></p>
-        <p><strong>{counts.sent}</strong><span>{t(locale, "sent")}</span></p>
-        <p><strong>{counts.responses}</strong><span>{t(locale, "responses")}</span></p>
-      </section>
-      <section><h2>{t(locale, "demandsTitle")}</h2>{demandList(locale, demands)}</section>
+      <ul class="metrics">
+        <li><strong>{counts.supporters}</strong><span>{t(locale, "supporters")}</span></li>
+        <li><strong>{counts.generated}</strong><span>{t(locale, "generated")}</span></li>
+        <li><strong>{counts.sent}</strong><span>{t(locale, "sent")}</span></li>
+        <li><strong>{counts.responses}</strong><span>{t(locale, "responses")}</span></li>
+      </ul>
+      <section><h2 class="section-label">{t(locale, "demandsTitle")}</h2>{demandList(locale, demands)}</section>
       <p><a role="button" href={`/${locale}/support`}>{t(locale, "cta")}</a></p>
     </Layout>);
   });
@@ -107,18 +110,3 @@ function rememberLocale(context: any, locale: Locale, config: Config) {
 function publicCache(context: any) {
   if (!context.res.headers.has("Cache-Control")) context.header("Cache-Control", "public, max-age=0, s-maxage=60");
 }
-
-const CSS = `
-body { overflow-wrap: anywhere; }
-.skip-link { position: absolute; inset-inline-start: -9999px; }
-.skip-link:focus { inset-inline-start: 1rem; inset-block-start: 1rem; z-index: 2; background: var(--pico-background-color); padding: .5rem; }
-header nav { flex-wrap: wrap; }
-header nav ul { flex-wrap: wrap; }
-.languages { max-inline-size: 12rem; margin-block-end: 1rem; }
-.languages ul { display: grid; grid-template-columns: repeat(3, 1fr); }
-.metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); gap: 1rem; margin-block: 2rem; }
-.metrics p { border-inline-start: .25rem solid var(--pico-primary); padding-inline-start: .75rem; }
-.metrics strong, .metrics span { display: block; }
-bdi, [dir=ltr] { unicode-bidi: isolate; }
-@media (max-width: 600px) { header nav { display: block; } header nav ul { padding-inline-start: 0; } }
-`;

@@ -1,7 +1,7 @@
 import type { Hono } from "hono";
 import type { Config } from "./config.js";
 import type { Db } from "./db.js";
-import { isLocale, locales, t, type Locale } from "./i18n.js";
+import { isLocale, localeNames, locales, t, type Locale } from "./i18n.js";
 import { Layout } from "./layout.js";
 import { createRateLimiter, issueCsrf, text, Turnstile, validCsrf, validTurnstile, values } from "./security.js";
 
@@ -44,7 +44,7 @@ export function registerRequestRoutes(app: Hono, db: Db, config: Config) {
         <fieldset><legend>{t(locale, "selectDemand")}</legend>{demands.map((demand) => demand.title
           ? <label><input type="checkbox" name="demandId" value={demand.id} /> {demand.title}</label>
           : <p role="status">{t(locale, "unavailable")}</p>)}</fieldset>
-        <label>{t(locale, "messageLanguage")}<select name="messageLocale">{locales.map((option) => <option value={option} selected={option === locale}>{option.toUpperCase()}</option>)}</select></label>
+        <label>{t(locale, "messageLanguage")}<select name="messageLocale">{locales.map((option) => <option value={option} selected={option === locale} lang={option}>{localeNames[option]}</option>)}</select></label>
         <label>{t(locale, "name")}<input name="name" maxLength={100} /></label>
         <label>{t(locale, "city")}<input name="city" maxLength={100} /></label>
         <label>{t(locale, "personalContext")}<textarea name="context" maxLength={500}></textarea></label>
@@ -98,20 +98,24 @@ export function registerRequestRoutes(app: Hono, db: Db, config: Config) {
         <label>{t(pageLocale, "whatsappText")}<textarea name="whatsappMessage" rows={4} maxLength={2000}>{whatsappBody}</textarea></label>
         <label>{t(pageLocale, "socialText")}<textarea name="socialMessage" rows={6} maxLength={2000}>{socialBody}</textarea></label>
         <Turnstile config={config} />
+        {/* Reaching the official is the substantive act, so it is the only filled button here. */}
         <div class="actions">
           <button type="submit" name="action" value="email_opened">{t(pageLocale, "openEmail")}</button>
-          <button type="submit" name="action" value="whatsapp_opened">{t(pageLocale, "openWhatsapp")}</button>
-          <button type="submit" name="action" value="text_copied">{t(pageLocale, "copyText")}</button>
+          <button type="submit" name="action" value="whatsapp_opened" class="ghost">{t(pageLocale, "openWhatsapp")}</button>
+          <button type="submit" name="action" value="text_copied" class="ghost">{t(pageLocale, "copyText")}</button>
         </div>
-        <h2>{t(pageLocale, "shareHeading")}</h2>
-        <div class="actions">
+        <h2 class="section-label">{t(pageLocale, "shareHeading")}</h2>
+        <div class="actions share">
           <button type="submit" name="action" value="shared_x">X</button>
           <button type="submit" name="action" value="shared_facebook">Facebook</button>
           <button type="submit" name="action" value="shared_whatsapp">WhatsApp</button>
           <button type="submit" name="action" value="shared_telegram">Telegram</button>
         </div>
-        <p><small>{t(pageLocale, "facebookNote")}</small></p>
-        <button type="submit" formaction={`/${pageLocale}/request/report-sent`}>{t(pageLocale, "reportSent")}</button>
+        <p class="note">{t(pageLocale, "facebookNote")}</p>
+        <div class="confirm">
+          <p class="eyebrow">{t(pageLocale, "reportSentHint")}</p>
+          <button type="submit" formaction={`/${pageLocale}/request/report-sent`}>{t(pageLocale, "reportSent")}</button>
+        </div>
       </form>
     </Layout>);
   });

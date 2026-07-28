@@ -40,11 +40,22 @@ No third-party keys are needed to boot. With no keys:
 - `migrations/` contains the 14-table schema, localized seed content, and additive upgrades applied on boot.
 - The appeal preview generates email, WhatsApp and public-post text from localized templates; every field is editable before the supporter acts on it.
 - Public posting targets X, Facebook, WhatsApp and Telegram. The post mentions the recipient's `social_handle`, or falls back to `Knesset member <name>` for politicians. Facebook's sharer accepts a URL only, so that path also shows the text for manual copy.
-- `src/locales/` contains all six short-string dictionaries: Hebrew, Arabic, Yiddish, Russian, English, and Amharic. Hebrew, Arabic, and Yiddish render RTL.
+- `src/locales/` contains all six short-string dictionaries: Hebrew, Arabic, Yiddish, Russian, English, and Amharic. Hebrew, Arabic, and Yiddish render RTL. Languages are always offered by endonym, never by ISO code.
+- `src/assets.ts` holds the stylesheet and the clipboard helper, and derives a content hash for each. The served URL contains that hash, so assets are cached `immutable` and a deploy still reaches browsers immediately.
 - Public POST routes use signed CSRF cookies, optional Turnstile, body limits, validation, and per-IP limits.
 - Cloudflare Access JWTs are verified at origin through the team JWKS. There is no application password system.
 - Appeal personalization stays in the response HTML and form payload; only recipient, locale, selected demand IDs, and aggregate actions are stored. This holds for public-post text too — the text a supporter posts is never written to the database.
 - Response files are held in memory only long enough to validate and stream to S3-compatible storage; only metadata enters SQLite.
+
+## Visual design
+
+Pico is retuned through its own custom properties rather than by overriding its selectors. The palette is stamp green `#2f6b4f` for actions, a signal red `#b5442a` reserved exclusively for the campaign counters, and a cool paper ground; a dark counterpart follows `prefers-color-scheme`.
+
+There are deliberately **no webfonts**. Covering Hebrew, Arabic, Ge'ez, Cyrillic and Latin in a display face would cost this audience hundreds of kilobytes on the low-end phones many of them use, and every operating system already ships these scripts. Personality comes from the type scale and a small monospace utility register instead.
+
+The home page opens on the campaign name set simultaneously in all six scripts, each one a link into that language. It is both the identity of the page and the language switcher.
+
+Two Pico behaviours are worth knowing before editing `src/assets.ts`: Pico declares its tokens at `:root:not([data-theme=dark])`, so plain `:root` overrides silently lose; and Pico scales the root font-size with the viewport, so `rem` widths hold a constant line length in characters rather than a constant pixel width.
 
 The product contract and route inventory are in [docs/SPEC.md](docs/SPEC.md). Credential setup is in [docs/SECRETS.md](docs/SECRETS.md).
 

@@ -9,6 +9,13 @@ export const locales = ["he", "ar", "yi", "ru", "en", "am"] as const;
 export type Locale = (typeof locales)[number];
 export const rtlLocales: readonly Locale[] = ["he", "ar", "yi"];
 
+/** Endonyms. A reader must be able to find their language without knowing its ISO code. */
+export const localeNames: Record<Locale, string> = {
+  he: "עברית", ar: "العربية", yi: "ייִדיש", ru: "Русский", en: "English", am: "አማርኛ"
+};
+
+export function dirOf(locale: Locale) { return rtlLocales.includes(locale) ? "rtl" : "ltr"; }
+
 const dictionaries: Record<Locale, Record<string, string>> = { am, ar, en, he, ru, yi };
 
 export function isLocale(value: string): value is Locale {

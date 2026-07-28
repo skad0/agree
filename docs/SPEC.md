@@ -120,7 +120,9 @@ Phasing follows plan roadmap **E0–E7**. All items below are **Phase 1 / MVP** 
 - Routes `/{locale}/…` for `he`, `ar`, `yi`, `ru`, `en`, `am`
 - UI strings in JSON dictionaries; long campaign text in Markdown
 - Cookie for locale; language switcher preserves equivalent page
+- Languages are offered by endonym (עברית, العربية, ייִדיש, Русский, English, አማርኛ), never by ISO code — a reader must find their language without knowing what `am` stands for
 - `<html lang dir>` per page; RTL/LTR via logical CSS properties
+- Letter-spacing and uppercasing are applied only to Latin and Cyrillic: tracking severs the cursive joins in Arabic, and Hebrew, Yiddish and Ge'ez have no case distinction
 - No silent fallback if translation missing — show explicit unavailable state
 - **Acceptance:** All 6 locales render; RTL/LTR correct at 320–1440px
 
@@ -188,6 +190,8 @@ Phasing follows plan roadmap **E0–E7**. All items below are **Phase 1 / MVP** 
 
 | Route | Purpose |
 |-------|---------|
+| `/assets/app-{hash}.css` | Stylesheet, URL carries a content hash, `immutable` |
+| `/assets/app-{hash}.js` | Clipboard helper, same hashing |
 | `/` | Redirect to locale from cookie or `Accept-Language` |
 | `/{locale}` | Home |
 | `/{locale}/demands` | Full demands |

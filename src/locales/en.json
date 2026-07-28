@@ -60,5 +60,6 @@
   "socialText": "Public post text",
   "shareHeading": "Or post it publicly",
   "facebookNote": "Facebook cannot receive prefilled text. Copy the post text and paste it into Facebook.",
-  "knesset": "Knesset member"
+  "knesset": "Knesset member",
+  "reportSentHint": "After you have actually sent or posted it"
 }

@@ -1,6 +1,6 @@
 # Project Status — Civic Platform (agree)
 
-_Last updated: 2026-07-27 (+03)_
+_Last updated: 2026-07-28 (+03)_
 
 ## Current state
 
@@ -19,6 +19,23 @@ Work is committed on `main` in four focused commits (MVP implementation, docs, R
 - E6: Cloudflare Access JWKS issuer/audience JWT validation, 403 without credentials/token, demand/recipient/template management, response moderation, stats/supporter CSV, audit transaction for every mutation, form/recipient/campaign kill switches.
 - E7 application work: strict CSP/HSTS/security headers, body limits, CSRF, optional Turnstile, rate limits, six privacy pages, confirmed data deletion/anonymization, external daily/weekly SQLite backup, integrity-checked restore, semantic/keyboard-friendly markup and skip link.
 - Docs/deploy: `README.md`, `.env.example`, `docs/SECRETS.md`, `render.yaml`, backup/restore/load/smoke scripts.
+
+## Frontend pass (2026-07-28)
+
+Fixed, each verified in a real browser at 320/375/768/1440 px in Hebrew, Arabic, Amharic and English:
+
+- `/assets/app.css` and `app.js` were served at a stable URL with `max-age=86400`, so any deployed style change stayed invisible for 24 hours. They now live in `src/assets.ts` and are served at a content-hashed URL with `immutable`.
+- The language switcher and the message-language select offered ISO codes (`HE`, `AM`). They now offer endonyms.
+- `letter-spacing` and `text-transform: uppercase` were applied to every locale. Tracking severs the cursive joins in Arabic and neither Hebrew, Yiddish nor Ge'ez has case, so both are now gated to Latin and Cyrillic.
+- The generated public-post textarea clipped its own content on mobile; `field-sizing: content` sizes all generated text to what it holds.
+- The preview page presented seven identical buttons. Reaching the official is now the only filled button, the share targets are a secondary grid, and "I sent it" sits below a rule as a distinct confirmation.
+- Header nav inherited Pico's `justify-content: space-between` and stranded its links at opposite edges.
+- Language links, the disclosure summary, footer links and checkboxes were below the 24x24 px target size in WCAG 2.5.8.
+- Home metrics carried a meaningless `aria-label` duplicating the site name.
+- Added `color-scheme` and `theme-color` meta, a `prefers-reduced-motion` guard, and a visible `:focus-visible` ring.
+- Design: palette, type scale, and a six-script masthead that doubles as the language switcher. No webfonts.
+
+Verified: zero horizontal overflow at 320 px on every public page in every locale; no duplicate ids; no unlabelled form controls.
 
 ## Recent changes (2026-07-27)
 
@@ -40,7 +57,7 @@ Work is committed on `main` in four focused commits (MVP implementation, docs, R
 
 ## Remaining launch gates / environment blockers
 
-- Chrome DevTools MCP is not configured, so Lighthouse ≥95, axe zero serious/critical, console, focus order, and 320/768/1024/1440 visual checks are unverified.
+- Lighthouse ≥95 and axe zero serious/critical are still unrun. Layout, overflow, target size and RTL were checked manually in a browser at 320/375/768/1440 px on 2026-07-28; that is not a substitute for an axe pass.
 - `npm run load` (staging p95/error/load targets) has not been run against a deployed instance.
 - Real Cloudflare Turnstile/Access, R2, Resend, external backup bucket, Cloudflare cache/WAF, Render persistence across redeploy, and live restore require credentials/infrastructure and remain unverified.
 - Political/legal/privacy translations require human review before launch, including the six social-share strings and social templates added on 2026-07-27.

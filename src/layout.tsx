@@ -1,37 +1,42 @@
 import type { Child } from "hono/jsx";
-import { locales, rtlLocales, t, type Locale } from "./i18n.js";
+import { cssPath, jsPath } from "./assets.js";
+import { dirOf, localeNames, locales, t, type Locale } from "./i18n.js";
 
 export function Layout({ locale, title, path, children }: { locale: Locale; title: string; path: string; children: Child }) {
   const suffix = path.replace(/^\/(?:he|ar|yi|ru|en|am)/, "") || "";
-  return <html lang={locale} dir={rtlLocales.includes(locale) ? "rtl" : "ltr"}>
+  return <html lang={locale} dir={dirOf(locale)}>
     <head>
       <meta charSet="utf-8" />
-      <meta name="viewport" content="width=device-width, initial-scale=1" />
+      <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+      <meta name="color-scheme" content="light dark" />
+      <meta name="theme-color" content="#f2f4f1" media="(prefers-color-scheme: light)" />
+      <meta name="theme-color" content="#12181d" media="(prefers-color-scheme: dark)" />
       <title>{title} · {t(locale, "siteName")}</title>
       <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css" />
-      <link rel="stylesheet" href="/assets/app.css" />
+      <link rel="stylesheet" href={cssPath} />
       <script src="https://cdn.jsdelivr.net/npm/htmx.org@2/dist/htmx.min.js" defer></script>
-      <script src="/assets/app.js" defer></script>
+      <script src={jsPath} defer></script>
     </head>
     <body {...{ "hx-boost": "true" }}>
       <a class="skip-link" href="#content">{t(locale, "skip")}</a>
-      <header class="container">
-        <nav aria-label={t(locale, "siteName")}>
-          <ul><li><a href={`/${locale}`}><strong>{t(locale, "siteName")}</strong></a></li></ul>
-          <ul>
-            <li><a href={`/${locale}/demands`}>{t(locale, "navDemands")}</a></li>
-            <li><a href={`/${locale}/support`}>{t(locale, "navSupport")}</a></li>
-            <li><a href={`/${locale}/request`}>{t(locale, "navRequest")}</a></li>
-            <li><a href={`/${locale}/responses/new`}>{t(locale, "navResponse")}</a></li>
-          </ul>
+      <header class="wrap">
+        <a class="wordmark" href={`/${locale}`}>{t(locale, "siteName")}</a>
+        <nav class="primary" aria-label={t(locale, "siteName")}>
+          <a href={`/${locale}/demands`}>{t(locale, "navDemands")}</a>
+          <a href={`/${locale}/support`}>{t(locale, "navSupport")}</a>
+          <a href={`/${locale}/request`}>{t(locale, "navRequest")}</a>
+          <a href={`/${locale}/responses/new`}>{t(locale, "navResponse")}</a>
         </nav>
         <details class="languages">
-          <summary>{t(locale, "language")}</summary>
-          <ul>{locales.map((option) => <li><a href={`/${option}${suffix}?lang=1`} hrefLang={option}>{option.toUpperCase()}</a></li>)}</ul>
+          <summary><span class="label">{t(locale, "language")}</span> <span lang={locale}>{localeNames[locale]}</span></summary>
+          <ul>{locales.map((option) => <li>
+            <a href={`/${option}${suffix}?lang=1`} hrefLang={option} lang={option} dir={dirOf(option)}
+              aria-current={option === locale ? "true" : undefined}>{localeNames[option]}</a>
+          </li>)}</ul>
         </details>
       </header>
-      <main id="content" class="container" aria-live="polite">{children}</main>
-      <footer class="container"><a href={`/${locale}/privacy`}>{t(locale, "navPrivacy")}</a></footer>
+      <main id="content" class="wrap" aria-live="polite">{children}</main>
+      <footer class="wrap"><a href={`/${locale}/privacy`}>{t(locale, "navPrivacy")}</a></footer>
     </body>
   </html>;
 }
