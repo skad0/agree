@@ -2,9 +2,12 @@ import type { Child } from "hono/jsx";
 import { cssPath, jsPath, themePath } from "./assets.js";
 import { dirOf, localeNames, locales, t, type Locale } from "./i18n.js";
 
-export function Layout({ locale, title, path, languageQuery = "", children }: { locale: Locale; title: string; path: string; languageQuery?: string; children: Child }) {
-  const suffix = path.replace(/^\/(?:he|ar|yi|ru|en|am)/, "") || "";
-  const query = languageQuery ? `&${languageQuery}` : "";
+/**
+ * The document itself — head, assets, theme bootstrap — with no opinion about what goes in the
+ * body. The public site and the admin console share the stylesheet and the theme script but not
+ * the chrome: a supporter's wayfinding is the wrong furniture for someone editing the campaign.
+ */
+export function Shell({ locale, title, bodyClass, children }: { locale: Locale; title: string; bodyClass?: string; children: Child }) {
   return <html lang={locale} dir={dirOf(locale)}>
     <head>
       <meta charSet="utf-8" />
@@ -20,7 +23,14 @@ export function Layout({ locale, title, path, languageQuery = "", children }: { 
       <link rel="stylesheet" href={cssPath} />
       <script src={jsPath} defer></script>
     </head>
-    <body>
+    <body class={bodyClass}>{children}</body>
+  </html>;
+}
+
+export function Layout({ locale, title, path, languageQuery = "", children }: { locale: Locale; title: string; path: string; languageQuery?: string; children: Child }) {
+  const suffix = path.replace(/^\/(?:he|ar|yi|ru|en|am)/, "") || "";
+  const query = languageQuery ? `&${languageQuery}` : "";
+  return <Shell locale={locale} title={title}>
       <a class="skip-link" href="#content">{t(locale, "skip")}</a>
       <header class="wrap">
         <a class="wordmark" href={`/${locale}`}>{t(locale, "siteName")}</a>
@@ -50,13 +60,18 @@ export function Layout({ locale, title, path, languageQuery = "", children }: { 
         <a href={`/${locale}/coalition-agreement`}>{t(locale, "navCoalition")}</a>
         <a href={`/${locale}/methodology`}>{t(locale, "navMethodology")}</a>
         <a href={`/${locale}/privacy`}>{t(locale, "navPrivacy")}</a>
-        <div class="appearance">
-          <span>{t(locale, "appearance")}</span>
-          <button type="button" data-theme-set="light" aria-pressed="false">{t(locale, "appearanceLight")}</button>
-          <button type="button" data-theme-set="dark" aria-pressed="false">{t(locale, "appearanceDark")}</button>
-          <button type="button" data-theme-set="system" aria-pressed="true">{t(locale, "appearanceSystem")}</button>
-        </div>
+        <AppearanceSwitcher locale={locale} />
       </footer>
-    </body>
-  </html>;
+  </Shell>;
+}
+
+/** The same three-button control the public footer carries, so the admin console honours the
+    reader's stored light/dark choice instead of ignoring it. */
+export function AppearanceSwitcher({ locale }: { locale: Locale }) {
+  return <div class="appearance">
+    <span>{t(locale, "appearance")}</span>
+    <button type="button" data-theme-set="light" aria-pressed="false">{t(locale, "appearanceLight")}</button>
+    <button type="button" data-theme-set="dark" aria-pressed="false">{t(locale, "appearanceDark")}</button>
+    <button type="button" data-theme-set="system" aria-pressed="true">{t(locale, "appearanceSystem")}</button>
+  </div>;
 }

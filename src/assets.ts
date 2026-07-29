@@ -354,6 +354,114 @@ footer.wrap { display: flex; flex-wrap: wrap; gap: .25rem 1.5rem; }
   .constraints strong { font-size: 2.25rem; }
 }
 
+/* ---- Admin console ------------------------------------------------------------------------
+   Same palette, same type scale, different job. A supporter is being guided through three
+   actions; an operator is reading tables and needs the width to do it, so the measure widens,
+   the chrome collapses to one bar, and rank is carried by badges rather than by more colour. */
+body.admin .wrap { max-inline-size: 76rem; }
+body.admin main.wrap { padding-block-end: 4rem; }
+/* Two rows on purpose, at every width: who you are, then where you can go. Eight sections plus
+   an email address never fit on one line honestly, and a nav that reflows as the address grows
+   is a nav whose items move. */
+.admin-bar { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem 1rem; padding-block: .8rem .6rem; border-block-end: 1px solid var(--rule); margin-block-end: 1.5rem; }
+.admin-bar .wordmark { display: inline-flex; align-items: center; gap: .5rem; }
+nav.admin-nav { display: flex; flex-wrap: wrap; justify-content: flex-start; gap: .2rem; flex: 1 0 100%; margin-inline-start: -.6rem; }
+nav.admin-nav a { text-decoration: none; color: var(--mute); font-size: .92rem; padding: .35rem .6rem; border-radius: 4px; min-block-size: 24px; }
+nav.admin-nav a:hover { color: var(--seal); background: var(--card); }
+nav.admin-nav [aria-current] { color: var(--paper); background: var(--seal-deep); font-weight: 600; }
+.admin-who { font-size: .8rem; color: var(--mute); display: inline-flex; align-items: center; gap: .4rem; margin-inline-start: auto; }
+footer.admin-foot { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 1rem; }
+body.admin h1 { font-size: clamp(1.6rem, 1.3rem + 1.2vw, 2.1rem); margin-block-end: .35rem; }
+body.admin h2 { font-size: 1.15rem; }
+body.admin .lede { font-size: 1rem; margin-block-end: 1.25rem; }
+.admin-back { font-size: .9rem; margin-block-end: .5rem; }
+.admin-links { display: flex; flex-wrap: wrap; gap: 1.25rem; }
+
+/* Tables scroll inside their own box; the page itself never scrolls sideways. */
+.admin-table { overflow-x: auto; margin-block: 1rem 2rem; border: 1px solid var(--rule); border-radius: 4px; }
+.admin-table table { margin: 0; font-size: .9rem; }
+.admin-table th { white-space: nowrap; font-size: .7rem; text-transform: var(--caps); letter-spacing: var(--track); color: var(--mute); font-weight: 600; }
+.admin-table td { vertical-align: top; max-inline-size: 24rem; }
+/* Template bodies are paragraphs. Three lines is enough to recognise one; the editor below
+   holds the whole thing. */
+.admin-excerpt { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.admin-num { font-family: var(--mono); font-size: .85em; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.admin-nil { color: var(--mute); }
+.admin-payload { inline-size: 7rem; }
+.admin-payload summary { cursor: pointer; color: var(--mute); font-size: .85rem; min-block-size: 24px; }
+.admin-payload pre { font-size: .75rem; margin: .35rem 0 0; max-block-size: 14rem; overflow: auto; }
+
+/* One badge shape for every categorical value, so type, channel, state and status all read as
+   the same kind of fact. Colour is a second signal only where a state is actionable. */
+.badge {
+  display: inline-block; padding: .05rem .5rem; margin-inline-end: .25rem; border-radius: 999px;
+  border: 1px solid var(--rule); background: var(--card); color: var(--mute);
+  font-size: .72rem; font-weight: 600; white-space: nowrap; text-decoration: none;
+}
+a.badge:hover { color: var(--seal); border-color: var(--seal); }
+.badge.on { color: var(--seal); border-color: var(--seal); }
+.badge.off { color: var(--caution); border-color: var(--caution); }
+
+/* Translation coverage. Solid chip: this language exists. Dashed: a gap, and the link fills it. */
+.locale-chips { display: inline-flex; gap: .25rem; }
+.locale-chips a {
+  display: inline-flex; align-items: center; flex: none; white-space: nowrap;
+  min-block-size: 24px; padding: .1rem .4rem;
+  border: 1px solid var(--rule); border-radius: 3px; background: var(--card);
+  font-family: var(--mono); font-size: .72rem; text-decoration: none; color: var(--seal);
+}
+.locale-chips a.missing { color: var(--mute); background: none; border-style: dashed; }
+.locale-chips a:hover { border-color: var(--seal); color: var(--seal); }
+
+.admin-filters { display: flex; flex-wrap: wrap; justify-content: flex-start; gap: .35rem; margin-block: 1.25rem; }
+.admin-filters a {
+  display: inline-flex; align-items: center; gap: .4rem; min-block-size: 32px; padding: .25rem .7rem;
+  border: 1px solid var(--rule); border-radius: 4px; background: var(--card);
+  text-decoration: none; color: var(--mute); font-size: .85rem;
+}
+.admin-filters a:hover { border-color: var(--seal); color: var(--seal); }
+.admin-filters [aria-current] { background: var(--seal-deep); border-color: var(--seal-deep); color: var(--paper); font-weight: 600; }
+.admin-filters b { font-family: var(--mono); font-size: .8rem; }
+
+.admin-callout { border-inline-start: 3px solid var(--seal); padding-inline-start: .9rem; font-size: .95rem; }
+.admin-error { border-inline-start: 3px solid var(--caution); padding-inline-start: .9rem; color: var(--caution); font-weight: 550; }
+.admin-quote { border-inline-start: 3px solid var(--rule); padding: .25rem 0 .25rem 1rem; padding-inline: 1rem 0; margin: 0; white-space: pre-wrap; }
+.admin-fields { display: grid; grid-template-columns: minmax(8rem, auto) 1fr; gap: .3rem 1rem; margin: 0; }
+.admin-fields dt { font-size: .72rem; text-transform: var(--caps); letter-spacing: var(--track); color: var(--mute); font-weight: 600; padding-block-start: .15rem; }
+.admin-fields dd { margin: 0; }
+.admin-files, .admin-files li { list-style: none; padding-inline-start: 0; }
+
+/* Admin forms are long. Two or three columns keep a whole record on one screen; the wide fields
+   opt back out to the full width. */
+.admin-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: 0 1.25rem; align-items: start; }
+.admin-form .full, .admin-form > p { grid-column: 1 / -1; }
+.admin-form button { inline-size: auto; }
+.admin-form label:has(> input[type=checkbox]) { display: flex; align-items: center; gap: .5rem; }
+
+.admin-switches { display: grid; grid-template-columns: 1fr; gap: .5rem; max-inline-size: 40rem; }
+.admin-switch { display: flex; align-items: flex-start; gap: .75rem; padding: .75rem .9rem; border: 1px solid var(--rule); border-radius: 4px; background: var(--card); margin: 0; }
+.admin-switch input { margin: 0; flex: none; }
+.admin-switch small { display: block; color: var(--mute); font-weight: 400; font-size: .85rem; }
+.admin-switches button { inline-size: auto; }
+
+/* Delete is its own form and carries the warning colour, so it can never be reached by
+   mis-reading a dropdown in the save form. */
+.admin-delete { margin: 0; }
+button.danger {
+  inline-size: auto; margin: 0; padding: .2rem .6rem; font-size: .78rem; font-weight: 550;
+  background: none; color: var(--caution); border: 1px solid var(--caution); white-space: nowrap;
+}
+button.danger:hover { background: var(--caution); color: var(--paper); border-color: var(--caution); }
+
+@media (max-width: 47.99rem) {
+  .admin-bar { padding-block: .7rem; }
+  nav.admin-nav { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+  nav.admin-nav::-webkit-scrollbar { display: none; }
+  nav.admin-nav a { white-space: nowrap; }
+  .admin-fields { grid-template-columns: 1fr; gap: 0; }
+  .admin-fields dd { margin-block-end: .6rem; }
+}
+
 bdi, [dir=ltr] { unicode-bidi: isolate; }
 
 @media (prefers-reduced-motion: reduce) {
@@ -402,6 +510,13 @@ document.addEventListener('click', async (e) => {
     else document.documentElement.dataset.theme = theme;
     mark();
   }
+});
+// Destructive admin forms declare their warning as data, because script-src has no
+// 'unsafe-inline' and an onsubmit attribute would be blocked. Without JS the delete still works:
+// it is a separate, plainly-labelled form rather than an option hidden in the save dropdown.
+document.addEventListener('submit', (e) => {
+  const message = e.target?.dataset?.confirm;
+  if (message && !confirm(message)) e.preventDefault();
 });
 // Without JS no button can be marked current, so the state is set here rather than server-side.
 function mark() {
