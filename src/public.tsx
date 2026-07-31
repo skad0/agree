@@ -58,16 +58,16 @@ export function registerPublicRoutes(app: Hono, db: Db, config: Config) {
           aria-current={option === locale ? "true" : undefined}>{localeNames[option]}</a>)}
       </nav>
       <p class="eyebrow">{t(locale, "slogan")}</p>
-      <h1>{t(locale, "homeTitle")}</h1>
+      <h1 id="home-heading">{t(locale, "homeTitle")}</h1>
       <p class="lede">{t(locale, "subtitle")}</p>
       <p><a role="button" class="cta" href={`/${locale}/support`}>{t(locale, "cta")}</a></p>
       <p class="neutrality" role="note">{t(locale, "neutrality")}</p>
 
-      <ul class="metrics">
-        <li><strong>{counts.supporters}</strong><span>{t(locale, "supporters")}</span></li>
-        <li><strong>{counts.generated}</strong><span>{t(locale, "generated")}</span></li>
-        <li><strong>{counts.sent}</strong><span>{t(locale, "sent")}</span></li>
-        <li><strong>{counts.responses}</strong><span>{t(locale, "responses")}</span></li>
+      <ul class="metrics" aria-label={t(locale, "supporters")}>
+        {counts.supporters > 0 ? <li><strong>{counts.supporters}</strong><span>{t(locale, "supporters")}</span></li> : null}
+        {counts.generated > 0 ? <li><strong>{counts.generated}</strong><span>{t(locale, "generated")}</span></li> : null}
+        {counts.sent > 0 ? <li><strong>{counts.sent}</strong><span>{t(locale, "sent")}</span></li> : null}
+        {counts.responses > 0 ? <li><strong>{counts.responses}</strong><span>{t(locale, "responses")}</span></li> : null}
       </ul>
 
       <p>{t(locale, "problem")}</p>

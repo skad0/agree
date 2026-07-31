@@ -123,7 +123,7 @@ header.wrap { display: flex; flex-wrap: wrap; gap: .5rem 1.5rem; align-items: ba
 .wordmark { font-weight: 750; letter-spacing: -.015em; color: var(--ink); text-decoration: none; font-size: 1.05rem; }
 /* Pico sets nav { justify-content: space-between }, which strands these links at the edges. */
 nav.primary { display: flex; flex-wrap: wrap; justify-content: flex-start; gap: .35rem 1.1rem; flex: 1 1 auto; }
-nav.primary a { text-decoration: none; color: var(--mute); font-size: .95rem; padding-block: .35rem; }
+nav.primary a { text-decoration: none; color: var(--mute); font-size: .95rem; padding-block: .35rem; min-block-size: 2.75rem; display: inline-flex; align-items: center; }
 nav.primary a:hover { color: var(--seal); }
 .languages { margin: 0; }
 /* Controls stay at or above the 24x24 CSS px target size in WCAG 2.5.8. */
@@ -166,9 +166,9 @@ input[type=checkbox] { inline-size: 1.5rem; block-size: 1.5rem; min-inline-size:
   list-style: none;
 }
 
-.metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr)); gap: 1.25rem; margin-block: 2.5rem; padding: 0; }
+.metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr)); gap: 1rem; margin-block: 1.5rem; padding: 0; color: var(--mute); }
 .metrics li { border-block-start: 2px solid var(--rule); padding-block-start: .6rem; padding-inline: 0; }
-.metrics strong { display: block; font-family: var(--mono); font-size: 2rem; font-weight: 600; color: var(--seal); font-variant-numeric: tabular-nums; line-height: 1.1; }
+.metrics strong { display: block; font-family: var(--mono); font-size: 1.35rem; font-weight: 600; color: var(--seal); font-variant-numeric: tabular-nums; line-height: 1.1; }
 .metrics span { display: block; margin-block-start: .2rem; }
 
 /* Forms: the generated text is the content, so give it room and let it grow with what it holds. */
@@ -177,7 +177,7 @@ html[lang=am] h1 { line-height: 1.14; }
 html[lang=am] textarea { line-height: 1.65; }
 label { font-weight: 550; }
 .actions { display: flex; flex-wrap: wrap; gap: .6rem; margin-block: .5rem 1.25rem; }
-.actions button { inline-size: auto; flex: 1 1 12rem; margin: 0; }
+.actions button { inline-size: auto; flex: 1 1 12rem; margin: 0; min-block-size: 2.9rem; }
 .actions.share button { flex: 1 1 7rem; }
 button.ghost, .actions.share button {
   background: var(--card); color: var(--ink); border-color: var(--rule); font-weight: 550;

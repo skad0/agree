@@ -20,7 +20,8 @@ export function registerRequestRoutes(app: Hono, db: Db, config: Config) {
     if (!campaignEnabled(db)) return statusPage(context, locale, t(locale, "formDisabled"), 503);
     const recipients = recipientRows(db, locale);
     return context.html(<Layout locale={locale} title={t(locale, "requestTitle")} path={context.req.path}>
-      <h1>{t(locale, "chooseRecipient")}</h1>
+      <p class="eyebrow">{t(locale, "stepChoose")} · 1/3</p>
+      <h1 id="recipient-heading">{t(locale, "chooseRecipient")}</h1>
       {/* Same card treatment as the rest of the site: bare links here were below the 24px target. */}
       <ul class="documents">{recipients.map((recipient) =>
         <li><a href={`/${locale}/request/build?recipient=${recipient.id}`}><strong>{recipient.name}</strong></a></li>)}</ul>
@@ -40,8 +41,9 @@ export function registerRequestRoutes(app: Hono, db: Db, config: Config) {
     const csrf = issueCsrf(context, config);
     context.header("Cache-Control", "private, no-store");
     return context.html(<Layout locale={locale} title={t(locale, "buildTitle")} path={context.req.path}>
-      <h1>{t(locale, "buildTitle")}</h1><p>{t(locale, "recipient")}: <strong>{recipient.name}</strong></p>
-      <form method="post" action={`/${locale}/request/preview`}>
+      <p class="eyebrow">{t(locale, "stepBuild")} · 2/3</p>
+      <h1 id="build-heading">{t(locale, "buildTitle")}</h1><p>{t(locale, "recipient")}: <strong>{recipient.name}</strong></p>
+      <form method="post" action={`/${locale}/request/preview`} aria-labelledby="build-heading">
         <input type="hidden" name="csrf" value={csrf} /><input type="hidden" name="recipientId" value={recipient.id} />
         <fieldset><legend>{t(locale, "selectDemand")}</legend>{demands.map((demand) => demand.title
           ? <label><input type="checkbox" name="demandId" value={demand.id} /> {demand.title}</label>
@@ -92,10 +94,11 @@ export function registerRequestRoutes(app: Hono, db: Db, config: Config) {
     const capability = issueRequestCapability(created.id, config);
     context.header("Cache-Control", "private, no-store");
     return context.html(<Layout locale={pageLocale} title={t(pageLocale, "previewTitle")} path={context.req.path}>
-      <h1>{t(pageLocale, "previewTitle")}</h1>
+      <p class="eyebrow">{t(pageLocale, "stepSend")} · 3/3</p>
+      <h1 id="preview-heading">{t(pageLocale, "previewTitle")}</h1>
       <p role="note">{t(pageLocale, "editHint")}</p>
       <p class="note">{t(pageLocale, "requestPreparedNote")}</p>
-      <form method="post" action={`/${pageLocale}/request/action`}>
+      <form method="post" action={`/${pageLocale}/request/action`} aria-labelledby="preview-heading">
         <input type="hidden" name="csrf" value={text(body.csrf)} /><input type="hidden" name="requestId" value={created.id} /><input type="hidden" name="capability" value={capability} />
         <label>{t(pageLocale, "emailSubject")}<input name="subject" value={subject} maxLength={200} /></label>
         <label>{t(pageLocale, "emailBody")}<textarea id="copy-message" name="message" rows={10} maxLength={5000}>{emailBody}</textarea></label>
@@ -103,12 +106,17 @@ export function registerRequestRoutes(app: Hono, db: Db, config: Config) {
         <label>{t(pageLocale, "socialText")}<textarea name="socialMessage" rows={6} maxLength={2000}>{socialBody}</textarea></label>
         <Turnstile config={config} />
         {/* Reaching the official is the substantive act, so it is the only filled button here. */}
-        <div class="actions">
+        <h2 id="send-heading" class="section-label">{t(pageLocale, "stepSend")}</h2>
+        <div class="actions" role="group" aria-labelledby="send-heading">
           <button type="submit" name="action" value="email_opened">{t(pageLocale, "openEmail")}</button>
           <button type="submit" name="action" value="whatsapp_opened" class="ghost">{t(pageLocale, "openWhatsapp")}</button>
           <button type="submit" name="action" value="text_copied" class="ghost" data-copy="copy-message" data-copy-endpoint={`/${pageLocale}/request/copy`}>{t(pageLocale, "copyText")}</button>
         </div>
-        <h2 class="section-label">{t(pageLocale, "shareHeading")}</h2>
+        <div class="confirm">
+          <p class="eyebrow">{t(pageLocale, "reportSentHint")}</p>
+          <button type="submit" formaction={`/${pageLocale}/request/report-sent`}>{t(pageLocale, "reportSent")}</button>
+        </div>
+        <h2 class="section-label" id="share-heading">{t(pageLocale, "shareHeading")}</h2>
         <div class="actions share">
           <button type="submit" name="action" value="shared_x">X</button>
           <button type="submit" name="action" value="shared_facebook">Facebook</button>
@@ -116,10 +124,6 @@ export function registerRequestRoutes(app: Hono, db: Db, config: Config) {
           <button type="submit" name="action" value="shared_telegram">Telegram</button>
         </div>
         <p class="note">{t(pageLocale, "facebookNote")}</p>
-        <div class="confirm">
-          <p class="eyebrow">{t(pageLocale, "reportSentHint")}</p>
-          <button type="submit" formaction={`/${pageLocale}/request/report-sent`}>{t(pageLocale, "reportSent")}</button>
-        </div>
       </form>
     </Layout>);
   });

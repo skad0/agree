@@ -55,7 +55,7 @@ export function Layout({ locale, title, path, languageQuery = "", children }: { 
         <a href={`/${locale}/request`}><b>2</b>{t(locale, "navRequest")}</a>
         <a href={`/${locale}/responses/new`}><b>3</b>{t(locale, "navResponse")}</a>
       </nav>
-      <main id="content" class="wrap" aria-live="polite">{children}</main>
+      <main id="content" class="wrap">{children}</main>
       <footer class="wrap">
         <a href={`/${locale}/coalition-agreement`}>{t(locale, "navCoalition")}</a>
         <a href={`/${locale}/methodology`}>{t(locale, "navMethodology")}</a>

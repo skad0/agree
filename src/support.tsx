@@ -17,14 +17,15 @@ export function registerSupportRoutes(app: Hono, db: Db, config: Config) {
     const csrf = issueCsrf(context, config);
     context.header("Cache-Control", "private, no-store");
     return context.html(<Layout locale={locale} title={t(locale, "supportTitle")} path={context.req.path}>
-      <h1>{t(locale, "supportTitle")}</h1>
-      <form method="post">
+      <p class="eyebrow">{t(locale, "navSupport")}</p>
+      <h1 id="support-heading">{t(locale, "supportTitle")}</h1>
+      <form method="post" aria-labelledby="support-heading">
         <input type="hidden" name="csrf" value={csrf} />
-        <label>{t(locale, "email")}<input name="email" type="email" required autoComplete="email" maxLength={254} /></label>
-        <label>{t(locale, "name")}<input name="name" autoComplete="name" maxLength={100} /></label>
-        <label>{t(locale, "city")}<input name="city" autoComplete="address-level2" maxLength={100} /></label>
+        <label for="support-email">{t(locale, "email")}<input id="support-email" name="email" type="email" required autoComplete="email" maxLength={254} /></label>
+        <label for="support-name">{t(locale, "name")}<input id="support-name" name="name" autoComplete="name" maxLength={100} /></label>
+        <label for="support-city">{t(locale, "city")}<input id="support-city" name="city" autoComplete="address-level2" maxLength={100} /></label>
         <label><input name="publicName" type="checkbox" value="yes" /> {t(locale, "publicName")}</label>
-        <label><input name="consent" type="checkbox" value="yes" required /> {t(locale, "consent")}</label>
+        <label for="support-consent"><input id="support-consent" name="consent" type="checkbox" value="yes" required /> {t(locale, "consent")}</label>
         <Turnstile config={config} />
         <button type="submit">{t(locale, "submit")}</button>
       </form>
