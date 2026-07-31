@@ -28,7 +28,10 @@ export function Shell({ locale, title, bodyClass, children }: { locale: Locale; 
 }
 
 export function Layout({ locale, title, path, languageQuery = "", children }: { locale: Locale; title: string; path: string; languageQuery?: string; children: Child }) {
-  const suffix = path.replace(/^\/(?:he|ar|yi|ru|en|am)/, "") || "";
+  // Strip only a complete registered locale segment. Keeping this derived from `locales` means
+  // newly registered locales (and paths such as /uk/...) retain their route when switching.
+  const localePrefix = locales.find((option) => path === `/${option}` || path.startsWith(`/${option}/`) || path.startsWith(`/${option}?`));
+  const suffix = localePrefix ? path.slice(localePrefix.length + 1) : path;
   const query = languageQuery ? `&${languageQuery}` : "";
   return <Shell locale={locale} title={title}>
       <a class="skip-link" href="#content">{t(locale, "skip")}</a>

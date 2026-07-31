@@ -1,6 +1,6 @@
 # Project Status — Civic Platform (agree)
 
-_Last updated: 2026-07-28 (+03)_
+_Last updated: 2026-07-31 (+03)_
 
 ## Current state
 
@@ -65,7 +65,7 @@ The placeholder campaign is replaced by the real one from `docs/Канониче
 
 Also fixed: number ranges such as `1–14` reordered to `14–1` in RTL until wrapped in `<bdi dir="ltr">`; Pico's `li` list-style defeated `list-style: none` set on the list.
 
-**Translations: Russian is canonical and verbatim. Hebrew, Arabic, Yiddish, English and Amharic are machine-translated and unreviewed** — see [docs/TRANSLATION-REVIEW.md](docs/TRANSLATION-REVIEW.md). This remains a blocking launch gate.
+**Translations: Russian is canonical and verbatim. Hebrew, Arabic, Yiddish, English and Amharic are machine-translated and unreviewed. Ukrainian is a high-quality implementation draft, not human-reviewed or launch-cleared; a named native Ukrainian legal/political reviewer must approve it before public launch** — see [docs/TRANSLATION-REVIEW.md](docs/TRANSLATION-REVIEW.md). This remains a blocking launch gate.
 
 ## Frontend pass (2026-07-28)
 
@@ -108,7 +108,7 @@ Verified: zero horizontal overflow at 320 px on every public page in every local
 - Lighthouse ≥95 and axe zero serious/critical are still unrun. Layout, overflow, target size and RTL were checked manually in a browser at 320/375/768/1440 px on 2026-07-28; that is not a substitute for an axe pass.
 - `npm run load` (staging p95/error/load targets) has not been run against a deployed instance.
 - Real Cloudflare Turnstile/Access, R2, Resend, external backup bucket, Cloudflare cache/WAF, Render persistence across redeploy, and live restore require credentials/infrastructure and remain unverified.
-- **Political, legal and privacy text in he/ar/yi/en/am is machine-translated and unreviewed.** This is the largest open gate; see [docs/TRANSLATION-REVIEW.md](docs/TRANSLATION-REVIEW.md).
+- **Political, legal and privacy text in he/ar/yi/en/am is machine-translated and unreviewed; Ukrainian is a high-quality implementation draft requiring named native/legal reviewer approval.** No human review is claimed for Ukrainian. This is the largest open gate; see [docs/TRANSLATION-REVIEW.md](docs/TRANSLATION-REVIEW.md).
 - Recipients are still the placeholder seed. Real party names and official contact addresses must be entered through `/admin/recipients`; they were deliberately not invented here.
 - `/terms`, `/accessibility` and `/corrections` from the canonical site map are not built yet.
 - The "Initiator" section was removed from the About page in all six locales on 2026-07-28, so the operator is not named anywhere on the site. Part X of the canonical package lists it among the published items; decide before launch whether to restore it with a real name or legal entity.

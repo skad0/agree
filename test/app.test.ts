@@ -33,11 +33,12 @@ test("all public locales render with the correct text direction", async () => {
   const dir = mkdtempSync(join(tmpdir(), "agree-locales-"));
   try {
     const { app, close } = createApp({ sqlitePath: join(dir, "app.db") });
-    for (const locale of ["he", "ar", "yi", "ru", "en", "am"]) {
+    for (const locale of ["he", "ar", "yi", "ru", "uk", "en", "am"]) {
       const response = await app.request(`/${locale}`);
       assert.equal(response.status, 200, locale);
       const html = await response.text();
       assert.match(html, new RegExp(`<html lang="${locale}" dir="${["he", "ar", "yi"].includes(locale) ? "rtl" : "ltr"}"`));
+      assert.match(html, /href="\/uk(?:\?[^\"]*)?"[^>]*>Українська</, `Ukrainian selector missing from /${locale}`);
     }
     close();
   } finally {
@@ -62,6 +63,7 @@ test("campaign documents render from SQLite in every locale", async () => {
     assert.match(html, /Why this matters/);
     assert.match(html, /How it is checked/);
     assert.match(html, /Permitted exceptions/);
+    assert.match(html, /href="\/uk\/standard\?lang=1"/);
     assert.doesNotMatch(html, /A shared candidate mechanism/, "coalition clauses must not leak into the standard");
 
     const coalition = await app.request("/en/coalition-agreement");
@@ -76,6 +78,8 @@ test("campaign documents render from SQLite in every locale", async () => {
     const modelHtml = await model.text();
     assert.match(modelHtml, /Оборона/);
     assert.match(modelHtml, /Культура, спорт, туризм и наследие/);
+    assert.match(await (await app.request("/uk/standard")).text(), /Стандарт прозорості для кожної партії/);
+    assert.doesNotMatch(await (await app.request("/uk/government-model")).text(), /translation unavailable/);
 
     assert.equal((await app.request("/en/demands")).status, 301);
     close();
@@ -147,7 +151,7 @@ test("every locale has every key used by the templates", async () => {
   try {
     const { app, close } = createApp({ sqlitePath: join(dir, "app.db") });
     const paths = ["", "/standard", "/coalition-agreement", "/first-100-days", "/government-model", "/about", "/methodology", "/support", "/request", "/responses/new", "/privacy"];
-    for (const locale of ["he", "ar", "yi", "ru", "en", "am"]) {
+    for (const locale of ["he", "ar", "yi", "ru", "uk", "en", "am"]) {
       for (const path of paths) {
         const response = await app.request(`/${locale}${path}`);
         assert.equal(response.status, 200, `/${locale}${path}`);
@@ -177,11 +181,27 @@ test("support verification increments the counter once for a normalized email", 
   }
 });
 
-test("appeals render in six locales, count every action, and do not store personal text", async () => {
+test("locale negotiation and Ukrainian selectors resolve correctly", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "agree-uk-locale-"));
+  try {
+    const { app, close } = createApp({ sqlitePath: join(dir, "app.db") });
+    const root = await app.request("/", { headers: { "Accept-Language": "uk-UA,uk;q=0.9,en;q=0.8" } });
+    assert.equal(root.status, 302);
+    assert.equal(root.headers.get("location"), "/uk");
+    const form = await getForm(app, "/uk/request/build?recipient=1");
+    assert.match(form.html, /<option value="uk"[^>]*selected[^>]*>Українська<\/option>/);
+    assert.match(form.html, /<html lang="uk" dir="ltr"/);
+    close();
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("appeals render in seven locales, count every action, and do not store personal text", async () => {
   const dir = mkdtempSync(join(tmpdir(), "agree-request-"));
   try {
     const runtime = createApp({ sqlitePath: join(dir, "app.db"), env: { NODE_ENV: "test", SESSION_SECRET: "test-secret" } });
-    for (const locale of ["he", "ar", "yi", "ru", "en", "am"]) {
+    for (const locale of ["he", "ar", "yi", "ru", "uk", "en", "am"]) {
       const form = await getForm(runtime.app, `/${locale}/request/build?recipient=1`);
       const response = await postForm(runtime.app, `/${locale}/request/preview`, {
         csrf: form.csrf, recipientId: "1", demandId: "1", messageLocale: locale,
@@ -190,6 +210,7 @@ test("appeals render in six locales, count every action, and do not store person
       assert.equal(response.status, 200, locale);
       const html = await response.text();
       assert.match(html, /PRIVATE-CONTEXT/);
+      assert.doesNotMatch(html, /translation unavailable/, locale);
       // Templates must carry real line breaks, not the literal backslash-n that SQLite stores verbatim.
       assert.doesNotMatch(html, /\\n/, locale);
     }
@@ -663,7 +684,7 @@ test("request preview, action, and result are private; result shares the handle 
   const dir = mkdtempSync(join(tmpdir(), "agree-request-route-headers-"));
   try {
     const runtime = createApp({ sqlitePath: join(dir, "app.db"), env: { NODE_ENV: "test", SESSION_SECRET: "test-secret", APP_BASE_URL: "https://campaign.test" } });
-    runtime.db.prepare("INSERT INTO recipients (id, type, social_handle, is_active) VALUES (7, 'politician', '@oracle_handle', 1)").run();
+    runtime.db.prepare("INSERT INTO recipients (id, type, email, social_handle, is_active) VALUES (7, 'politician', 'oracle@example.org', '@oracle_handle', 1)").run();
     runtime.db.prepare("INSERT INTO recipient_translations (recipient_id, locale, name) VALUES (7, 'en', 'Oracle Recipient')").run();
     const form = await getForm(runtime.app, "/en/request/build?recipient=7");
     const preview = await postForm(runtime.app, "/en/request/preview", { csrf: form.csrf, recipientId: "7", demandId: "1", messageLocale: "en" }, form.cookie);
@@ -686,6 +707,43 @@ test("request preview, action, and result are private; result shares the handle 
     assert.match(resultHtml, /%40oracle_handle|@oracle_handle/);
     assert.match(resultHtml, new RegExp(`/he/request/result\\?lang=1&amp;request=${requestId}`));
     assert.match(resultHtml, new RegExp(`/ar/request/result\\?lang=1&amp;request=${requestId}`));
+    assert.match(resultHtml, new RegExp(`/uk/request/result\\?lang=1&amp;request=${requestId}`));
+    runtime.close();
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("contactless recipients are excluded and unavailable direct actions are not persisted", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "agree-contactless-recipient-"));
+  try {
+    const runtime = createApp({ sqlitePath: join(dir, "app.db"), env: { NODE_ENV: "test", SESSION_SECRET: "test-secret" } });
+    runtime.db.prepare("INSERT INTO recipients (id, type, is_active) VALUES (7, 'politician', 1), (8, 'politician', 1)").run();
+    runtime.db.prepare("INSERT INTO recipient_translations (recipient_id, locale, name) VALUES (7, 'en', 'No Contact Recipient'), (8, 'en', 'Email Recipient')").run();
+    runtime.db.prepare("UPDATE recipients SET email = 'email@example.org' WHERE id = 8").run();
+
+    const list = await runtime.app.request("/en/request");
+    const listHtml = await list.text();
+    assert.doesNotMatch(listHtml, /No Contact Recipient/);
+    assert.match(listHtml, /Email Recipient/);
+    assert.equal((await runtime.app.request("/en/request/build?recipient=7")).headers.get("location"), "/en/request");
+
+    const emailForm = await getForm(runtime.app, "/en/request/build?recipient=8");
+    const preview = await postForm(runtime.app, "/en/request/preview", {
+      csrf: emailForm.csrf, recipientId: "8", demandId: "1", messageLocale: "en"
+    }, emailForm.cookie);
+    const previewHtml = await preview.text();
+    assert.match(previewHtml, /name="action" value="email_opened"/);
+    assert.doesNotMatch(previewHtml, /name="action" value="whatsapp_opened"/);
+
+    const csrf = emailForm.csrf;
+    const requestId = Number(runtime.db.prepare("INSERT INTO generated_requests (recipient_id, locale, selected_demands, created_at) VALUES (7, 'en', '[1]', 'now') RETURNING id").get()?.id);
+    const capability = issueRequestCapability(requestId, runtime.config);
+    const rejected = await postForm(runtime.app, "/en/request/action", {
+      csrf, requestId: String(requestId), capability, action: "email_opened", subject: "S", message: "M"
+    }, emailForm.cookie);
+    assert.equal(rejected.status, 422);
+    assert.equal(runtime.db.prepare("SELECT count(*) AS count FROM request_actions WHERE generated_request_id = ?").get(requestId)?.count, 0);
     runtime.close();
   } finally {
     rmSync(dir, { recursive: true, force: true });

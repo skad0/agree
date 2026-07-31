@@ -9,7 +9,7 @@ const exited = new Promise((resolve) => child.once("exit", resolve));
 child.stdout.pipe(process.stdout); child.stderr.pipe(process.stderr);
 try {
   await waitFor(`http://127.0.0.1:${port}/health`);
-  for (const path of ["/health", "/en", "/he", "/ar", "/yi", "/ru", "/am", "/en/demands", "/en/support", "/en/request", "/en/responses/new", "/en/privacy", "/en/delete-data", "/admin"]) {
+  for (const path of ["/health", "/en", "/he", "/ar", "/yi", "/ru", "/uk", "/am", "/en/demands", "/uk/demands", "/en/support", "/uk/support", "/en/request", "/uk/request", "/en/responses/new", "/uk/responses/new", "/en/privacy", "/uk/privacy", "/en/delete-data", "/uk/delete-data", "/admin"]) {
     const response = await fetch(`http://127.0.0.1:${port}${path}`); console.log(`${response.status} ${path}`);
     const expected = path === "/admin" ? 403 : 200; if (response.status !== expected) throw new Error(`Expected ${expected} for ${path}`);
   }

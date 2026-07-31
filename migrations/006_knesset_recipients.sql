@@ -182,3 +182,7 @@ INSERT INTO recipient_translations (recipient_id, locale, name) VALUES
   (30873, 'he', 'ארז מלול'),
   (30916, 'he', 'עוז חיים'),
   (30917, 'he', 'מוחמד אבו אל היג''א');
+
+-- This snapshot has no verified direct contact channel for this member. Keep
+-- the historical record, but do not expose it as a selectable recipient.
+UPDATE recipients SET is_active = 0 WHERE id = 30867;

@@ -126,13 +126,19 @@ nav.primary { display: flex; flex-wrap: wrap; justify-content: flex-start; gap: 
 nav.primary a { text-decoration: none; color: var(--mute); font-size: .95rem; padding-block: .35rem; min-block-size: 2.75rem; display: inline-flex; align-items: center; }
 nav.primary a:hover { color: var(--seal); }
 .languages { margin: 0; }
-/* Controls stay at or above the 24x24 CSS px target size in WCAG 2.5.8. */
-.languages summary { font-size: .9rem; color: var(--mute); cursor: pointer; padding-block: .45rem; }
+/* Language controls stay at a comfortable 44px touch target, including long translated labels. */
+.languages summary {
+  display: inline-flex; align-items: center; min-block-size: 44px;
+  font-size: .9rem; color: var(--mute); cursor: pointer; padding-block: .45rem;
+}
 .languages ul { margin: .25rem 0 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 .75rem; }
 .languages li { list-style: none; }
-.languages a { text-decoration: none; display: inline-block; padding-block: .35rem; min-block-size: 24px; }
+.languages a {
+  text-decoration: none; display: inline-flex; align-items: center;
+  padding-block: .35rem; min-block-size: 44px;
+}
 .languages [aria-current] { color: var(--seal); font-weight: 650; }
-footer.wrap a { display: inline-block; padding-block: .35rem; min-block-size: 24px; }
+footer.wrap a { display: inline-flex; align-items: center; padding-block: .35rem; min-block-size: 44px; }
 
 /* Appearance switcher. Hidden when scripting is off, since the choice is stored in localStorage
    and an unusable control is worse than no control; the system preference still applies. */
@@ -176,6 +182,8 @@ textarea { font-size: .95rem; line-height: 1.55; min-block-size: 6lh; max-block-
 html[lang=am] h1 { line-height: 1.14; }
 html[lang=am] textarea { line-height: 1.65; }
 label { font-weight: 550; }
+label:has(input[type=checkbox]) { display: flex; align-items: flex-start; gap: .55rem; }
+label:has(input[type=checkbox]) input { flex: none; margin-block-start: .2rem; }
 .actions { display: flex; flex-wrap: wrap; gap: .6rem; margin-block: .5rem 1.25rem; }
 .actions button { inline-size: auto; flex: 1 1 12rem; margin: 0; min-block-size: 2.9rem; }
 .actions.share button { flex: 1 1 7rem; }
@@ -340,8 +348,9 @@ footer.wrap { display: flex; flex-wrap: wrap; gap: .25rem 1.5rem; }
   /* Three across, one row: the numbers stay in the same place on every page. */
   .actions-bar { gap: .4rem; padding-block: .5rem 1rem; }
   .actions-bar a {
-    flex: 1 1 0; min-inline-size: 0; flex-direction: column; gap: .2rem;
-    padding: .55rem .3rem; text-align: center; font-size: .82rem; line-height: 1.2;
+    flex: 1 1 0; min-inline-size: 0; min-block-size: 3.25rem;
+    flex-direction: column; gap: .2rem; padding: .55rem .3rem;
+    text-align: center; font-size: .82rem; line-height: 1.2;
   }
 
   /* The six-script band is a wide-screen signature; the header control does the same job here. */

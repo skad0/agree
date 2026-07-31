@@ -108,8 +108,8 @@ export function registerRequestRoutes(app: Hono, db: Db, config: Config) {
         {/* Reaching the official is the substantive act, so it is the only filled button here. */}
         <h2 id="send-heading" class="section-label">{t(pageLocale, "stepSend")}</h2>
         <div class="actions" role="group" aria-labelledby="send-heading">
-          <button type="submit" name="action" value="email_opened">{t(pageLocale, "openEmail")}</button>
-          <button type="submit" name="action" value="whatsapp_opened" class="ghost">{t(pageLocale, "openWhatsapp")}</button>
+          {recipient.email?.trim() ? <button type="submit" name="action" value="email_opened">{t(pageLocale, "openEmail")}</button> : null}
+          {recipient.whatsapp?.trim() ? <button type="submit" name="action" value="whatsapp_opened" class="ghost">{t(pageLocale, "openWhatsapp")}</button> : null}
           <button type="submit" name="action" value="text_copied" class="ghost" data-copy="copy-message" data-copy-endpoint={`/${pageLocale}/request/copy`}>{t(pageLocale, "copyText")}</button>
         </div>
         <div class="confirm">
@@ -138,10 +138,13 @@ export function registerRequestRoutes(app: Hono, db: Db, config: Config) {
     const requestId = positiveInteger(text(body.requestId));
     const action = text(body.action);
     if (!requestId || !actionTypes.includes(action) || !requestExists(db, requestId) || !verifyRequestCapability(text(body.capability), requestId, config)) return statusPage(context, locale, t(locale, "invalidForm"), 422);
-    db.prepare("INSERT INTO request_actions (generated_request_id, action_type, created_at) VALUES (?, ?, ?)").run(requestId, action, new Date().toISOString());
     const message = action === "whatsapp_opened" ? text(body.whatsappMessage)
       : shareActions.includes(action) ? text(body.socialMessage) : text(body.message);
     const target = actionTarget(db, config, requestId, action, text(body.subject), message);
+    // Do not record an attempted direct contact when the recipient has no destination. Copy and
+    // share actions intentionally remain valid without a direct-contact target.
+    if ((action === "email_opened" || action === "whatsapp_opened") && !target) return statusPage(context, locale, t(locale, "unavailable"), 422);
+    db.prepare("INSERT INTO request_actions (generated_request_id, action_type, created_at) VALUES (?, ?, ?)").run(requestId, action, new Date().toISOString());
     context.header("Cache-Control", "private, no-store");
     return context.html(<Layout locale={locale} title={t(locale, "actionReady")} path={context.req.path}>
       <h1>{t(locale, "actionReady")}</h1>
@@ -202,7 +205,8 @@ export function registerRequestRoutes(app: Hono, db: Db, config: Config) {
 
 function recipientRows(db: Db, locale: Locale) {
   return db.prepare(`SELECT r.id, r.type, rt.name, r.email, r.whatsapp, r.social_handle AS socialHandle FROM recipients r
-    JOIN recipient_translations rt ON rt.recipient_id = r.id AND rt.locale = ? WHERE r.is_active = 1 ORDER BY rt.name`).all(locale) as Recipient[];
+    JOIN recipient_translations rt ON rt.recipient_id = r.id AND rt.locale = ?
+    WHERE r.is_active = 1 AND (NULLIF(TRIM(r.email), '') IS NOT NULL OR NULLIF(TRIM(r.whatsapp), '') IS NOT NULL) ORDER BY rt.name`).all(locale) as Recipient[];
 }
 function mention(recipient: Recipient, locale: Locale) {
   if (recipient.socialHandle) return recipient.socialHandle;
@@ -216,11 +220,14 @@ function fill(template: string, fields: Record<string, string>) { return templat
 function statusPage(context: any, locale: Locale, message: string, status = 200) { return context.html(<Layout locale={locale} title={t(locale, "siteName")} path={`/${locale}`}><p role="status">{message}</p></Layout>, status); }
 function actionTarget(db: Db, config: Config, requestId: number, action: string, subject: string, message: string) {
   const row = db.prepare(`SELECT r.email, r.whatsapp, g.locale FROM generated_requests g JOIN recipients r ON r.id = g.recipient_id WHERE g.id = ?`)
-    .get(requestId) as { email: string | null; whatsapp: string | null; locale: string };
+    .get(requestId) as { email: string | null; whatsapp: string | null; locale: string } | undefined;
+  if (!row) return undefined;
   const share = encodeURIComponent(message);
   const link = encodeURIComponent(`${config.appBaseUrl}/${row.locale}`);
-  if (action === "email_opened" && row.email) return { href: `mailto:${row.email}?${new URLSearchParams({ subject, body: message })}`, label: row.email };
-  if (action === "whatsapp_opened" && row.whatsapp) return { href: `https://wa.me/${row.whatsapp}?text=${share}`, label: "WhatsApp" };
+  const email = row.email?.trim();
+  const whatsapp = row.whatsapp?.trim();
+  if (action === "email_opened" && email) return { href: `mailto:${email}?${new URLSearchParams({ subject, body: message })}`, label: email };
+  if (action === "whatsapp_opened" && whatsapp) return { href: `https://wa.me/${whatsapp}?text=${share}`, label: "WhatsApp" };
   if (action === "shared_x") return { href: `https://x.com/intent/post?text=${share}`, label: "X" };
   if (action === "shared_facebook") return { href: `https://www.facebook.com/sharer/sharer.php?u=${link}`, label: "Facebook" };
   if (action === "shared_whatsapp") return { href: `https://wa.me/?text=${share}`, label: "WhatsApp" };
