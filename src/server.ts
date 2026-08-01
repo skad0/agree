@@ -1,7 +1,7 @@
 import { serve } from "@hono/node-server";
 import { createApp } from "./app.js";
 import { backupDatabase, hasBackupStorage } from "./backup.js";
-import { drainResponseObjectWork } from "./response-storage.js";
+import { drainResponseObjectWork, enforceRetention } from "./response-storage.js";
 
 const runtime = createApp();
 if (runtime.config.isEphemeralSessionSecret) console.warn("SESSION_SECRET is absent; using an ephemeral non-production secret");
@@ -22,7 +22,7 @@ let maintenanceRunning = false;
 const runResponseMaintenance = async () => {
   if (maintenanceRunning) return;
   maintenanceRunning = true;
-  try { await drainResponseObjectWork(runtime.db, runtime.config); }
+  try { enforceRetention(runtime.db); await drainResponseObjectWork(runtime.db, runtime.config); }
   catch (error) { console.error("Response object maintenance failed", error); }
   finally { maintenanceRunning = false; }
 };

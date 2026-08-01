@@ -4,15 +4,18 @@ import { loadConfig } from "./config.js";
 import { openDatabase } from "./db.js";
 import { registerPublicRoutes } from "./public.js";
 import { registerAdminRoutes } from "./admin.js";
+import { configureSecurity } from "./security.js";
 
 export function createApp(options: { sqlitePath?: string; env?: NodeJS.ProcessEnv } = {}) {
   const config = loadConfig(options.env);
+  configureSecurity(config);
   const db = openDatabase(options.sqlitePath ?? config.sqlitePath);
   const app = new Hono();
 
   app.use("*", async (context, next) => {
+    (context as any).set("config", config);
     await next();
-    context.header("Content-Security-Policy", "default-src 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; style-src 'self' https://cdn.jsdelivr.net; script-src 'self' https://cdn.jsdelivr.net https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com; img-src 'self' data:; connect-src 'self' https://challenges.cloudflare.com");
+    if (!(context as any).get("downloadResponseFile")) context.header("Content-Security-Policy", "default-src 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; style-src 'self' https://cdn.jsdelivr.net; script-src 'self' https://cdn.jsdelivr.net https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com; img-src 'self' data:; connect-src 'self' https://challenges.cloudflare.com");
     context.header("Referrer-Policy", "strict-origin-when-cross-origin");
     context.header("X-Content-Type-Options", "nosniff");
     context.header("X-Frame-Options", "DENY");

@@ -305,7 +305,7 @@ export function registerAdminRoutes(app: Hono, db: Db, config: Config) {
   app.get("/admin/response-files/:id", async (context) => {
     const file = db.prepare("SELECT object_key, mime FROM submitted_response_files WHERE id = ?").get(context.req.param("id")) as { object_key: string; mime: string } | undefined;
     if (!file) return context.notFound();
-    try { const data = await getStoreObject(responseStore(config), file.object_key); context.header("Content-Type", file.mime); context.header("Cache-Control", "private, no-store"); return context.body(new Uint8Array(data)); }
+    try { const data = await getStoreObject(responseStore(config), file.object_key); const downloadId = positiveInteger(context.req.param("id")) ?? 0; (context as any).set("downloadResponseFile", true); context.header("Content-Disposition", `attachment; filename="response-attachment-${downloadId}.bin"`); context.header("Content-Type", "application/octet-stream"); context.header("X-Content-Type-Options", "nosniff"); context.header("Content-Security-Policy", "default-src 'none'; sandbox"); context.header("Cache-Control", "private, no-store"); return context.body(new Uint8Array(data)); }
     catch { return context.text("File storage unavailable", 503); }
   });
   app.post("/admin/responses/:id", async (context) => {
@@ -504,7 +504,8 @@ function formValue(value: unknown) { return typeof value === "number" && Number.
 function has(body: Record<string, unknown>, key: string) { return Object.prototype.hasOwnProperty.call(body, key); }
 function csv(context: any, headers: string[], rows: any[]) { context.header("Content-Type", "text/csv; charset=utf-8"); context.header("Content-Disposition", "attachment"); return context.body([headers, ...rows.map((row) => headers.map((header) => row[header]))].map((row) => row.map(csvCell).join(",")).join("\n")); }
 function csvCell(value: unknown) { const string = String(value ?? ""); const safe = /^[=+\-@\t\r]/.test(string) ? `'${string}` : string; return `"${safe.replaceAll('"', '""')}"`; }
-function withoutSecrets(payload: unknown) { if (!payload || typeof payload !== "object") return payload; return Object.fromEntries(Object.entries(payload).filter(([key]) => !["csrf", "cf-turnstile-response"].includes(key))); }
+const auditKeys = new Set(["id", "locale", "channel", "action", "document", "sortOrder", "isActive", "type", "status", "campaign", "support", "requests", "responses"]);
+function withoutSecrets(payload: unknown) { if (!payload || typeof payload !== "object" || Array.isArray(payload)) return {}; return Object.fromEntries(Object.entries(payload).filter(([key, value]) => auditKeys.has(key) && typeof value !== "object" && String(value).length <= 120)); }
 
 function moderatorPath(path: string) {
   return /^\/admin\/?$/.test(path) || /^\/admin\/responses\/?$/.test(path) || /^\/admin\/responses\/[^/]+\/?$/.test(path) || /^\/admin\/response-files\/[^/]+\/?$/.test(path);

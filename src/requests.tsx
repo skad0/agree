@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import type { Hono } from "hono";
 import type { Config } from "./config.js";
 import type { Db } from "./db.js";
@@ -89,8 +90,7 @@ export function registerRequestRoutes(app: Hono, db: Db, config: Config) {
     const emailBody = fill(email.body, fields);
     const whatsappBody = fill(whatsapp.body, fields);
     const socialBody = fill(social.body, fields);
-    const created = db.prepare("INSERT INTO generated_requests (recipient_id, locale, selected_demands, created_at) VALUES (?, ?, ?, ?) RETURNING id")
-      .get(recipient.id, messageLocale, JSON.stringify([...new Set(demandIds)]), new Date().toISOString()) as { id: number };
+    const created = createGeneratedRequest(db, recipient.id, messageLocale, JSON.stringify([...new Set(demandIds)]));
     const capability = issueRequestCapability(created.id, config);
     context.header("Cache-Control", "private, no-store");
     return context.html(<Layout locale={pageLocale} title={t(pageLocale, "previewTitle")} path={context.req.path}>
@@ -144,6 +144,8 @@ export function registerRequestRoutes(app: Hono, db: Db, config: Config) {
     // Do not record an attempted direct contact when the recipient has no destination. Copy and
     // share actions intentionally remain valid without a direct-contact target.
     if ((action === "email_opened" || action === "whatsapp_opened") && !target) return statusPage(context, locale, t(locale, "unavailable"), 422);
+    const publicId = publicRequestId(db, requestId);
+    if (!publicId) return statusPage(context, locale, t(locale, "invalidForm"), 422);
     db.prepare("INSERT INTO request_actions (generated_request_id, action_type, created_at) VALUES (?, ?, ?)").run(requestId, action, new Date().toISOString());
     context.header("Cache-Control", "private, no-store");
     return context.html(<Layout locale={locale} title={t(locale, "actionReady")} path={context.req.path}>
@@ -152,7 +154,7 @@ export function registerRequestRoutes(app: Hono, db: Db, config: Config) {
       {/* Facebook's sharer accepts a URL only, so the post text has to be pasted by hand. */}
       {action === "shared_facebook" ? <p role="note">{t(locale, "facebookNote")}</p> : null}
       {action === "text_copied" || action === "shared_facebook" ? <><textarea id="copy-message" readOnly>{message}</textarea><button type="button" data-copy="copy-message">{t(locale, "copyText")}</button></> : null}
-      <p><a href={`/${locale}/request/result?request=${requestId}`}>{t(locale, "next")}</a></p>
+      <p><a href={`/${locale}/request/result?request=${publicId}`}>{t(locale, "next")}</a></p>
     </Layout>);
   });
 
@@ -176,29 +178,31 @@ export function registerRequestRoutes(app: Hono, db: Db, config: Config) {
     if (!rateLimit(context, "action", config.rateLimitAction, 3600) || !validCsrf(context, config, body) || !await validTurnstile(context, config, body)) return statusPage(context, locale, t(locale, "invalidForm"), 403);
     const requestId = positiveInteger(text(body.requestId));
     if (!requestId || !requestExists(db, requestId) || !verifyRequestCapability(text(body.capability), requestId, config)) return statusPage(context, locale, t(locale, "invalidForm"), 422);
+    const publicId = publicRequestId(db, requestId);
+    if (!publicId) return statusPage(context, locale, t(locale, "invalidForm"), 422);
     db.prepare("INSERT INTO request_actions (generated_request_id, action_type, created_at) VALUES (?, 'reported_sent', ?)").run(requestId, new Date().toISOString());
-    return context.redirect(`/${locale}/request/result?request=${requestId}`, 303);
+    return context.redirect(`/${locale}/request/result?request=${publicId}`, 303);
   });
 
   app.get("/:locale/request/result", (context) => {
     const locale = localeParam(context.req.param("locale"));
     if (!locale) return context.notFound();
-    const requestId = positiveInteger(context.req.query("request"));
-    const request = requestId ? db.prepare(`SELECT g.id, g.locale, r.type, r.social_handle AS socialHandle, rt.name AS recipient, g.selected_demands
-      FROM generated_requests g JOIN recipients r ON r.id = g.recipient_id JOIN recipient_translations rt ON rt.recipient_id = g.recipient_id AND rt.locale = g.locale WHERE g.id = ?`).get(requestId) as { id: number; locale: string; type: "party" | "politician"; socialHandle: string | null; recipient: string; selected_demands: string } | undefined : undefined;
+    const publicId = context.req.query("request") ?? "";
+    const request = publicId ? db.prepare(`SELECT g.id, g.public_id AS publicId, g.locale, r.type, r.social_handle AS socialHandle, rt.name AS recipient, g.selected_demands
+      FROM generated_requests g JOIN recipients r ON r.id = g.recipient_id JOIN recipient_translations rt ON rt.recipient_id = g.recipient_id AND rt.locale = g.locale WHERE g.public_id = ?`).get(publicId) as { id: number; publicId: string; locale: string; type: "party" | "politician"; socialHandle: string | null; recipient: string; selected_demands: string } | undefined : undefined;
     if (!request || !isLocale(request.locale)) return statusPage(context, locale, t(locale, "invalidForm"), 422);
     const demandIds = JSON.parse(request.selected_demands) as number[];
     const placeholders = demandIds.map(() => "?").join(",");
     const demands = placeholders ? db.prepare(`SELECT dt.title FROM demand_translations dt WHERE dt.locale = ? AND dt.demand_id IN (${placeholders}) ORDER BY dt.demand_id`).all(request.locale, ...demandIds) as { title: string }[] : [];
     const social = db.prepare("SELECT body FROM message_templates WHERE locale = ? AND channel = 'social'").get(request.locale) as { body: string } | undefined;
     const recipient = { id: 0, type: request.type, name: request.recipient, email: null, whatsapp: null, socialHandle: request.socialHandle } satisfies Recipient;
-    const message = social ? fill(social.body, { recipient: request.recipient, demands: demands.map((demand) => `• ${demand.title}`).join("\n"), handle: mention(recipient, request.locale), link: `${config.appBaseUrl}/${request.locale}/request/result?request=${request.id}`, name: "", city: "", context: "" }) : `${mention(recipient, request.locale)}\n\n${demands.map((demand) => `• ${demand.title}`).join("\n")}`;
+    const message = social ? fill(social.body, { recipient: request.recipient, demands: demands.map((demand) => `• ${demand.title}`).join("\n"), handle: mention(recipient, request.locale), link: `${config.appBaseUrl}/${request.locale}/request/result?request=${request.publicId}`, name: "", city: "", context: "" }) : `${mention(recipient, request.locale)}\n\n${demands.map((demand) => `• ${demand.title}`).join("\n")}`;
     const share = encodeURIComponent(message);
-    const link = encodeURIComponent(`${config.appBaseUrl}/${request.locale}/request/result?request=${request.id}`);
+    const link = encodeURIComponent(`${config.appBaseUrl}/${request.locale}/request/result?request=${request.publicId}`);
     context.header("Cache-Control", "private, no-store");
-    return context.html(<Layout locale={locale} title={t(locale, "resultTitle")} path={context.req.path} languageQuery={`request=${request.id}`}>
+    return context.html(<Layout locale={locale} title={t(locale, "resultTitle")} path={context.req.path} languageQuery={`request=${request.publicId}`}>
       <h1>{t(locale, "resultTitle")}</h1><p>{t(locale, "shareForRecipient")} <strong>{request.recipient}</strong>.</p>
-      <nav><a href={`https://wa.me/?text=${share}`}>WhatsApp</a> · <a href={`https://t.me/share/url?url=${link}&text=${share}`}>Telegram</a> · <a href={`https://www.facebook.com/sharer/sharer.php?u=${link}`}>Facebook</a> · <a href={`${config.appBaseUrl}/${request.locale}/request/result?request=${request.id}`}>Link</a></nav>
+      <nav><a href={`https://wa.me/?text=${share}`}>WhatsApp</a> · <a href={`https://t.me/share/url?url=${link}&text=${share}`}>Telegram</a> · <a href={`https://www.facebook.com/sharer/sharer.php?u=${link}`}>Facebook</a> · <a href={`${config.appBaseUrl}/${request.locale}/request/result?request=${request.publicId}`}>Link</a></nav>
     </Layout>);
   });
 }
@@ -212,6 +216,18 @@ function mention(recipient: Recipient, locale: Locale) {
   if (recipient.socialHandle) return recipient.socialHandle;
   return recipient.type === "politician" ? `${t(locale, "knesset")} ${recipient.name}` : recipient.name;
 }
+function createGeneratedRequest(db: Db, recipientId: number, locale: Locale, selectedDemands: string) {
+  for (;;) {
+    const publicId = randomBytes(32).toString("base64url");
+    try {
+      return db.prepare("INSERT INTO generated_requests (public_id, recipient_id, locale, selected_demands, created_at) VALUES (?, ?, ?, ?, ?) RETURNING id, public_id")
+        .get(publicId, recipientId, locale, selectedDemands, new Date().toISOString()) as { id: number; public_id: string };
+    } catch (error) {
+      if (!(error instanceof Error) || !error.message.includes("generated_requests.public_id")) throw error;
+    }
+  }
+}
+function publicRequestId(db: Db, id: number) { return (db.prepare("SELECT public_id FROM generated_requests WHERE id = ?").get(id) as { public_id: string } | undefined)?.public_id ?? ""; }
 function requestExists(db: Db, id: number) { return Boolean(db.prepare("SELECT 1 FROM generated_requests WHERE id = ?").get(id)); }
 function campaignEnabled(db: Db) { return db.prepare("SELECT requests_enabled AS enabled FROM campaigns WHERE status = 'active' LIMIT 1").get()?.enabled === 1; }
 function localeParam(value: string) { return isLocale(value) ? value : undefined; }

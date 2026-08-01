@@ -1,4 +1,5 @@
 import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { isIP } from "node:net";
 import type { Context } from "hono";
 import { getCookie, setCookie } from "hono/cookie";
 import type { Config } from "./config.js";
@@ -7,6 +8,9 @@ const REQUEST_CAPABILITY_TTL_SECONDS = 24 * 60 * 60;
 const REQUEST_CAPABILITY_DOMAIN = "agree/request-capability/v1\0";
 const RESPONSE_TOKEN_TTL_SECONDS = 24 * 60 * 60;
 const RESPONSE_TOKEN_DOMAIN = "agree/response-submission/v1\0";
+let processConfig: Config | undefined;
+
+export function configureSecurity(config: Config) { processConfig = config; }
 
 export function issueCsrf(context: Context, config: Config) {
   const nonce = randomBytes(18).toString("base64url");
@@ -78,7 +82,7 @@ export async function validTurnstile(context: Context, config: Config, body: Rec
   try {
     const response = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
       method: "POST",
-      body: new URLSearchParams({ secret: config.turnstileSecretKey, response: token, remoteip: clientIp(context) })
+      body: new URLSearchParams({ secret: config.turnstileSecretKey, response: token, remoteip: clientIp(context, config) })
     });
     if (!response.ok) return false;
     const result = await response.json() as { success?: unknown };
@@ -91,10 +95,10 @@ export function Turnstile({ config }: { config: Config }) {
   return <><div class="cf-turnstile" data-sitekey={config.turnstileSiteKey}></div><script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script></>;
 }
 
-export function createRateLimiter() {
+export function createRateLimiter(config?: Config) {
   const buckets = new Map<string, { count: number; resetsAt: number }>();
   return (context: Context, route: string, limit: number, windowSeconds: number) => {
-    const key = `${route}:${clientIp(context)}`;
+    const key = `${route}:${clientIp(context, config ?? processConfig)}`;
     const now = Date.now();
     // ponytail: in-memory limits fit the mandated single instance; move to edge storage if multi-instance is introduced.
     if (buckets.size > 10_000) for (const [bucketKey, bucket] of buckets) if (bucket.resetsAt <= now) buckets.delete(bucketKey);
@@ -117,8 +121,15 @@ export function values(value: unknown) {
   return (Array.isArray(value) ? value : [value]).map(text).filter(Boolean);
 }
 
-function clientIp(context: Context) {
-  return context.req.header("CF-Connecting-IP") ?? context.req.header("X-Forwarded-For")?.split(",")[0]?.trim() ?? "local";
+export function clientIp(context: Context, suppliedConfig?: Config) {
+  const config = suppliedConfig ?? processConfig ?? context.get("config") as Config | undefined;
+  if (config?.trustedProxy !== "cloudflare") return "local";
+  const proof = context.req.header("X-Edge-Proxy-Proof") ?? "";
+  const secret = config.trustedProxySecret ?? "";
+  const proofBytes = Buffer.from(proof, "utf8"); const secretBytes = Buffer.from(secret, "utf8");
+  if (!secret || proofBytes.length !== secretBytes.length || !timingSafeEqual(proofBytes, secretBytes)) return "local";
+  const candidate = context.req.header("CF-Connecting-IP")?.trim();
+  return candidate && !candidate.includes(",") && isIP(candidate) ? candidate : "local";
 }
 
 function signature(value: string, secret: string) {

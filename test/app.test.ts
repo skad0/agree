@@ -9,6 +9,7 @@ import { backupDatabase, restoreDatabase } from "../src/backup.js";
 import { openDatabase } from "../src/db.js";
 import { hashResponseSubmissionToken, issueRequestCapability, issueResponseSubmissionToken, verifyRequestCapability } from "../src/security.js";
 import { drainResponseObjectWork } from "../src/response-storage.js";
+import { ERASURE_LEDGER_MANIFEST_KEY, createErasureLedgerManifest, serializeErasureLedgerManifest } from "../src/erasure-ledger.js";
 
 test("health reports a usable SQLite database", async () => {
   const dir = mkdtempSync(join(tmpdir(), "agree-health-"));
@@ -165,14 +166,15 @@ test("every locale has every key used by the templates", async () => {
   }
 });
 
-test("support verification increments the counter once for a normalized email", async () => {
+test("support verification invalidates pending tokens and counts once for a normalized email", async () => {
   const dir = mkdtempSync(join(tmpdir(), "agree-support-"));
   try {
     const runtime = createApp({ sqlitePath: join(dir, "app.db"), env: { NODE_ENV: "test", SESSION_SECRET: "test-secret" } });
     const first = await submitSupport(runtime.app, " Citizen@Example.org ");
     const second = await submitSupport(runtime.app, "citizen@example.org");
-    await verifySupport(runtime.app, first.token);
+    await verifySupport(runtime.app, first.token, 400);
     await verifySupport(runtime.app, second.token);
+    await verifySupport(runtime.app, second.token, 400);
     const count = runtime.db.prepare("SELECT count(*) AS count FROM supporters WHERE email_verified_at IS NOT NULL").get()?.count;
     assert.equal(count, 1);
     runtime.close();
@@ -487,13 +489,13 @@ test("privacy deletion queues response objects, erases nonce links, and preserve
   const dir = mkdtempSync(join(tmpdir(), "agree-response-delete-"));
   const originalFetch = globalThis.fetch; const deleted: string[] = []; let responseCountAtDelete = -1;
   let runtime: ReturnType<typeof createApp> | undefined;
-  globalThis.fetch = async (input, init) => { if (String(input).startsWith("http://storage.test") && init?.method === "DELETE") { deleted.push(new URL(String(input)).pathname); responseCountAtDelete = Number(runtime?.db.prepare("SELECT count(*) count FROM submitted_responses").get()?.count ?? -1); return new Response(null, { status: 204 }); } return originalFetch(input, init); };
+  globalThis.fetch = async (input, init) => { if (String(input).startsWith("http://ledger.test")) return new Response(null, { status: 200 }); if (String(input).startsWith("http://storage.test") && init?.method === "DELETE") { deleted.push(new URL(String(input)).pathname); responseCountAtDelete = Number(runtime?.db.prepare("SELECT count(*) count FROM submitted_responses").get()?.count ?? -1); return new Response(null, { status: 204 }); } return originalFetch(input, init); };
   try {
-    runtime = createApp({ sqlitePath: join(dir, "app.db"), env: { NODE_ENV: "test", SESSION_SECRET: "test-secret", R2_ACCOUNT_ID: "test", R2_ACCESS_KEY_ID: "key", R2_SECRET_ACCESS_KEY: "secret", R2_BUCKET: "bucket", R2_ENDPOINT: "http://storage.test" } });
+    runtime = createApp({ sqlitePath: join(dir, "app.db"), env: { NODE_ENV: "test", SESSION_SECRET: "test-secret", R2_ACCOUNT_ID: "test", R2_ACCESS_KEY_ID: "key", R2_SECRET_ACCESS_KEY: "secret", R2_BUCKET: "bucket", R2_ENDPOINT: "http://storage.test", ERASURE_LEDGER_S3_ENDPOINT: "http://ledger.test", ERASURE_LEDGER_S3_ACCESS_KEY: "ledger-key", ERASURE_LEDGER_S3_SECRET_KEY: "ledger-secret", ERASURE_LEDGER_S3_BUCKET: "ledger", ERASURE_LEDGER_HMAC_KEYS: `v1:${Buffer.alloc(32, 7).toString("base64url")}`, ERASURE_LEDGER_ACTIVE_KEY_VERSION: "v1" } });
     const support = await submitSupport(runtime.app, "delete-response@example.org");
     await verifySupport(runtime.app, support.token);
     const matching = Number(runtime.db.prepare(`INSERT INTO submitted_responses (recipient_id, received_at, channel, response_text, submitter_email, consent_at, status, created_at)
-      VALUES (1, '2026-01-01', 'email', 'private', ' Delete-Response@Example.org ', 'now', 'new', 'now')`).run().lastInsertRowid);
+      VALUES (1, '2026-01-01', 'email', 'private', ' Delete-Response@Example.org ', 'now', 'new', '2020-01-01T00:00:00.000Z')`).run().lastInsertRowid);
     const unrelated = Number(runtime.db.prepare(`INSERT INTO submitted_responses (recipient_id, received_at, channel, response_text, submitter_email, consent_at, status, created_at)
       VALUES (1, '2026-01-01', 'email', 'keep', 'other@example.org', 'now', 'new', 'now')`).run().lastInsertRowid);
     runtime.db.prepare("INSERT INTO submitted_response_files (response_id, object_key, mime, size, uploaded_at) VALUES (?, 'responses/delete-me.png', 'image/png', 8, 'now')").run(matching);
@@ -695,19 +697,23 @@ test("request preview, action, and result are private; result shares the handle 
     const requestId = html.match(/name="requestId" value="(\d+)"/)?.[1];
     const capability = html.match(/name="capability" value="([^"]+)"/)?.[1];
     assert.ok(requestId); assert.ok(capability);
+    const publicId = (runtime.db.prepare("SELECT public_id FROM generated_requests WHERE id = ?").get(Number(requestId)) as { public_id: string }).public_id;
+    assert.notEqual(publicId, requestId);
     const action = await postForm(runtime.app, "/en/request/action", { csrf: form.csrf, requestId, capability, action: "shared_x", socialMessage: "Oracle" }, form.cookie);
     assert.equal(action.status, 200);
     assert.match(action.headers.get("cache-control") ?? "", /private/);
     assert.match(action.headers.get("cache-control") ?? "", /no-store/);
-    const result = await runtime.app.request(`/en/request/result?request=${requestId}`);
+    assert.equal((await runtime.app.request(`/en/request/result?request=${requestId}`)).status, 422);
+    const result = await runtime.app.request(`/en/request/result?request=${publicId}`);
     assert.equal(result.status, 200);
     assert.match(result.headers.get("cache-control") ?? "", /private/);
     assert.match(result.headers.get("cache-control") ?? "", /no-store/);
     const resultHtml = await result.text();
     assert.match(resultHtml, /%40oracle_handle|@oracle_handle/);
-    assert.match(resultHtml, new RegExp(`/he/request/result\\?lang=1&amp;request=${requestId}`));
-    assert.match(resultHtml, new RegExp(`/ar/request/result\\?lang=1&amp;request=${requestId}`));
-    assert.match(resultHtml, new RegExp(`/uk/request/result\\?lang=1&amp;request=${requestId}`));
+    assert.match(resultHtml, new RegExp(`/he/request/result\\?lang=1&amp;request=${publicId}`));
+    assert.match(resultHtml, new RegExp(`/ar/request/result\\?lang=1&amp;request=${publicId}`));
+    assert.match(resultHtml, new RegExp(`/uk/request/result\\?lang=1&amp;request=${publicId}`));
+    assert.doesNotMatch(resultHtml, new RegExp(`request=${requestId}(?:&|\\"|$)`));
     runtime.close();
   } finally {
     rmSync(dir, { recursive: true, force: true });
@@ -737,7 +743,7 @@ test("contactless recipients are excluded and unavailable direct actions are not
     assert.doesNotMatch(previewHtml, /name="action" value="whatsapp_opened"/);
 
     const csrf = emailForm.csrf;
-    const requestId = Number(runtime.db.prepare("INSERT INTO generated_requests (recipient_id, locale, selected_demands, created_at) VALUES (7, 'en', '[1]', 'now') RETURNING id").get()?.id);
+    const requestId = Number(runtime.db.prepare("INSERT INTO generated_requests (public_id, recipient_id, locale, selected_demands, created_at) VALUES ('test-public-id-abcdefghijklmnopqrstuvwxyz0123456789_-', 7, 'en', '[1]', 'now') RETURNING id").get()?.id);
     const capability = issueRequestCapability(requestId, runtime.config);
     const rejected = await postForm(runtime.app, "/en/request/action", {
       csrf, requestId: String(requestId), capability, action: "email_opened", subject: "S", message: "M"
@@ -939,11 +945,22 @@ test("request result rejects missing IDs and builds a request-specific recipient
     assert.equal(preview.status, 200);
     const requestId = (await preview.text()).match(/name="requestId" value="(\d+)"/)?.[1];
     assert.ok(requestId);
-    const result = await runtime.app.request(`/en/request/result?request=${requestId}`);
+    const publicId = (runtime.db.prepare("SELECT public_id FROM generated_requests WHERE id = ?").get(Number(requestId)) as { public_id: string }).public_id;
+    assert.notEqual(publicId, requestId);
+    const secondPreview = await postForm(runtime.app, "/en/request/preview", {
+      csrf: form.csrf, recipientId: "1", demandId: "1", messageLocale: "en"
+    }, form.cookie);
+    assert.equal(secondPreview.status, 200);
+    const secondRequestId = (await secondPreview.text()).match(/name="requestId" value="(\d+)"/)?.[1];
+    assert.ok(secondRequestId);
+    const secondPublicId = (runtime.db.prepare("SELECT public_id FROM generated_requests WHERE id = ?").get(Number(secondRequestId)) as { public_id: string }).public_id;
+    assert.notEqual(publicId, secondPublicId);
+    assert.equal((await runtime.app.request(`/en/request/result?request=${requestId}`)).status, 422);
+    const result = await runtime.app.request(`/en/request/result?request=${publicId}`);
     assert.equal(result.status, 200);
     const html = await result.text();
     assert.match(html, /Public Service Office/);
-    assert.match(html, new RegExp(`request=${requestId}`));
+    assert.match(html, new RegExp(`request=${publicId}`));
     assert.match(html, /after(?:%20|&#x20;)the(?:%20|&#x20;)election/);
     runtime.close();
   } finally {
@@ -954,19 +971,22 @@ test("request result rejects missing IDs and builds a request-specific recipient
 test("SQLite backup uploads daily and weekly copies that pass restore integrity", async () => {
   const dir = mkdtempSync(join(tmpdir(), "agree-backup-test-")); const objects = new Map<string, Buffer>();
   const originalFetch = globalThis.fetch;
-  globalThis.fetch = async (input, init) => { const path = new URL(String(input)).pathname; if (init?.method === "PUT") { objects.set(path, Buffer.from(init.body as Uint8Array)); return new Response(); } const data = objects.get(path); return new Response(data ? new Uint8Array(data) : null, { status: data ? 200 : 404 }); };
+  globalThis.fetch = async (input, init) => { const url = new URL(String(input)); if (url.searchParams.has("list-type")) return new Response("<ListBucketResult><IsTruncated>false</IsTruncated></ListBucketResult>"); const path = url.pathname; if (init?.method === "PUT") { objects.set(path, Buffer.from(init.body as Uint8Array)); return new Response(); } const data = objects.get(path); return new Response(data ? new Uint8Array(data) : null, { status: data ? 200 : 404 }); };
   try {
-    const runtime = createApp({ sqlitePath: join(dir, "source.db"), env: { NODE_ENV: "test", SESSION_SECRET: "test-secret", BACKUP_S3_ENDPOINT: "http://backup.test", BACKUP_S3_ACCESS_KEY: "key", BACKUP_S3_SECRET_KEY: "secret", BACKUP_S3_BUCKET: "backups" } });
-    const keys = await backupDatabase(runtime.db, runtime.config); assert.equal(keys.length, 2); assert.equal(objects.size, 2);
-    const restoredPath = join(dir, "restored.db"); await restoreDatabase(runtime.config, keys[0]!, restoredPath);
+    const runtime = createApp({ sqlitePath: join(dir, "source.db"), env: { NODE_ENV: "test", SESSION_SECRET: "test-secret", BACKUP_S3_ENDPOINT: "http://backup.test", BACKUP_S3_ACCESS_KEY: "key", BACKUP_S3_SECRET_KEY: "secret", BACKUP_S3_BUCKET: "backups", ERASURE_LEDGER_S3_ENDPOINT: "http://ledger.test", ERASURE_LEDGER_S3_ACCESS_KEY: "ledger-key", ERASURE_LEDGER_S3_SECRET_KEY: "ledger-secret", ERASURE_LEDGER_S3_BUCKET: "ledger", ERASURE_LEDGER_HMAC_KEYS: `v1:${Buffer.alloc(32, 7).toString("base64url")}`, ERASURE_LEDGER_ACTIVE_KEY_VERSION: "v1" } });
+    objects.set(`/ledger/${ERASURE_LEDGER_MANIFEST_KEY}`, Buffer.from(serializeErasureLedgerManifest(createErasureLedgerManifest(runtime.config))));
+    const keys = await backupDatabase(runtime.db, runtime.config); assert.equal(keys.length, 2); assert.equal(objects.size, 3);
+    const restoredPath = join(dir, "restored.db"); await restoreDatabase(runtime.config, keys[0]!, restoredPath, { operatorConfirmed: true, serviceStopped: true });
     const restored = openDatabase(restoredPath); assert.equal(restored.prepare("SELECT slug FROM campaigns WHERE id = 1").get()?.slug, "civic-request"); restored.close(); runtime.close();
   } finally { globalThis.fetch = originalFetch; rmSync(dir, { recursive: true, force: true }); }
 });
 
 test("data deletion requires email-link confirmation and anonymizes matching records", async () => {
   const dir = mkdtempSync(join(tmpdir(), "agree-delete-"));
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (input, init) => String(input).startsWith("http://ledger.test") ? new Response(null, { status: 200 }) : originalFetch(input, init);
   try {
-    const runtime = createApp({ sqlitePath: join(dir, "app.db"), env: { NODE_ENV: "test", SESSION_SECRET: "test-secret" } });
+    const runtime = createApp({ sqlitePath: join(dir, "app.db"), env: { NODE_ENV: "test", SESSION_SECRET: "test-secret", ERASURE_LEDGER_S3_ENDPOINT: "http://ledger.test", ERASURE_LEDGER_S3_ACCESS_KEY: "ledger-key", ERASURE_LEDGER_S3_SECRET_KEY: "ledger-secret", ERASURE_LEDGER_S3_BUCKET: "ledger", ERASURE_LEDGER_HMAC_KEYS: `v1:${Buffer.alloc(32, 7).toString("base64url")}`, ERASURE_LEDGER_ACTIVE_KEY_VERSION: "v1" } });
     const support = await submitSupport(runtime.app, "delete@example.org"); await verifySupport(runtime.app, support.token);
     const request = await getForm(runtime.app, "/en/delete-data");
     const response = await postForm(runtime.app, "/en/delete-data", { csrf: request.csrf, email: "delete@example.org" }, request.cookie);
@@ -976,7 +996,7 @@ test("data deletion requires email-link confirmation and anonymizes matching rec
     const row = runtime.db.prepare("SELECT email_normalized, name, deleted_at FROM supporters").get() as { email_normalized: string; name: string | null; deleted_at: string | null };
     assert.notEqual(row.email_normalized, "delete@example.org"); assert.equal(row.name, null); assert.ok(row.deleted_at);
     runtime.close();
-  } finally { rmSync(dir, { recursive: true, force: true }); }
+  } finally { globalThis.fetch = originalFetch; rmSync(dir, { recursive: true, force: true }); }
 });
 
 async function submitSupport(app: ReturnType<typeof createApp>["app"], email: string) {
@@ -1017,10 +1037,10 @@ test("demand body markdown cannot inject scripts or javascript: links", async ()
   }
 });
 
-async function verifySupport(app: ReturnType<typeof createApp>["app"], token: string) {
+async function verifySupport(app: ReturnType<typeof createApp>["app"], token: string, expectedStatus = 200) {
   const form = await getForm(app, `/verify-email?token=${token}&locale=en`);
   const response = await postForm(app, "/verify-email", { csrf: form.csrf, token, locale: "en" }, form.cookie);
-  assert.equal(response.status, 200);
+  assert.equal(response.status, expectedStatus);
 }
 
 async function getForm(app: ReturnType<typeof createApp>["app"], path: string, headers: Record<string, string> = {}) {

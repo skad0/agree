@@ -43,19 +43,37 @@ export function registerSupportRoutes(app: Hono, db: Db, config: Config) {
     const email = normalizeEmail(text(body.email));
     if (!validEmail(email) || text(body.consent) !== "yes") return page(context, locale, t(locale, "invalidForm"), config, 422);
 
-    const now = new Date().toISOString();
-    db.prepare(`INSERT INTO supporters (email_normalized, name, city, locale, public_name_allowed, privacy_consent_at, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT(email_normalized) DO UPDATE SET name = excluded.name, city = excluded.city, locale = excluded.locale,
-        public_name_allowed = excluded.public_name_allowed, privacy_consent_at = excluded.privacy_consent_at`).run(
-      email, limited(body.name, 100), limited(body.city, 100), locale, text(body.publicName) === "yes" ? 1 : 0, now, now
-    );
-    const supporter = db.prepare("SELECT id, email_verified_at FROM supporters WHERE email_normalized = ?").get(email) as { id: number; email_verified_at: string | null };
-    if (supporter.email_verified_at) return page(context, locale, t(locale, "verificationSent"), config);
     const token = randomBytes(32).toString("base64url");
-    db.prepare("INSERT INTO email_verifications (supporter_id, token_hash, expires_at) VALUES (?, ?, ?)").run(
-      supporter.id, tokenHash(token), new Date(Date.now() + 86_400_000).toISOString()
-    );
+    const now = new Date().toISOString();
+    let supporter: { id: number; email_verified_at: string | null };
+    db.exec("BEGIN IMMEDIATE");
+    try {
+      // Keep the ownership check and replacement of a pending profile in one
+      // write transaction, so an old token cannot race a new submission.
+      const existing = db.prepare("SELECT id, email_verified_at FROM supporters WHERE email_normalized = ?").get(email) as { id: number; email_verified_at: string | null } | undefined;
+      if (existing?.email_verified_at) {
+        // A verified re-submission is a renewal request: it may issue a new
+        // mailbox token, but it must not overwrite the verified profile.
+        supporter = existing;
+      } else {
+        db.prepare(`INSERT INTO supporters (email_normalized, name, city, locale, public_name_allowed, privacy_consent_at, last_active_at, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(email_normalized) DO UPDATE SET name = excluded.name, city = excluded.city, locale = excluded.locale,
+          public_name_allowed = excluded.public_name_allowed, privacy_consent_at = excluded.privacy_consent_at,
+          last_active_at = excluded.last_active_at`).run(
+          email, limited(body.name, 100), limited(body.city, 100), locale, text(body.publicName) === "yes" ? 1 : 0, now, now, now
+        );
+        supporter = db.prepare("SELECT id, email_verified_at FROM supporters WHERE email_normalized = ?").get(email) as { id: number; email_verified_at: string | null };
+      }
+      db.prepare("DELETE FROM email_verifications WHERE supporter_id = ? AND used_at IS NULL").run(supporter.id);
+      db.prepare("INSERT INTO email_verifications (supporter_id, token_hash, expires_at) VALUES (?, ?, ?)").run(
+        supporter.id, tokenHash(token), new Date(Date.now() + 86_400_000).toISOString()
+      );
+      db.exec("COMMIT");
+    } catch (error) {
+      db.exec("ROLLBACK");
+      throw error;
+    }
     const link = `${config.appBaseUrl}/verify-email?token=${token}&locale=${locale}`;
     const safeLink = link.replaceAll("&", "&amp;").replaceAll('"', "&quot;");
     const sent = await sendEmail(config, email, "Verify your civic campaign support", `<p><a href="${safeLink}">Verify your support</a></p>`);
@@ -91,6 +109,11 @@ export function registerSupportRoutes(app: Hono, db: Db, config: Config) {
     db.exec("BEGIN IMMEDIATE");
     try {
       db.prepare("UPDATE supporters SET email_verified_at = COALESCE(email_verified_at, ?) WHERE id = ?").run(now, verification.supporter_id);
+      // The activity column is supplied by the accompanying schema migration;
+      // tolerate databases opened before that migration for local upgrades.
+      if (db.prepare("PRAGMA table_info(supporters)").all().some((column) => column.name === "last_active_at")) {
+        db.prepare("UPDATE supporters SET last_active_at = ? WHERE id = ?").run(now, verification.supporter_id);
+      }
       db.prepare("UPDATE email_verifications SET used_at = ? WHERE id = ?").run(now, verification.id);
       db.exec("COMMIT");
     } catch (error) {
