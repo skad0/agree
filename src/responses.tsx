@@ -4,6 +4,8 @@ import type { Config } from "./config.js";
 import type { Db } from "./db.js";
 import { isLocale, t, type Locale } from "./i18n.js";
 import { Layout } from "./layout.js";
+import { privateNoStore, rememberLocale } from "./public-state.js";
+import { Callout, JourneyIntro, Surface } from "./components/public-ui.js";
 import { hasObjectStorage, putObject, RESPONSE_PUT_TIMEOUT_MS } from "./s3.js";
 import { drainResponseObjectWork, queueResponseObjectDelete } from "./response-storage.js";
 import { createRateLimiter, hashResponseSubmissionToken, issueCsrf, issueResponseSubmissionToken, text, Turnstile, validCsrf, validTurnstile, verifyResponseSubmissionToken } from "./security.js";
@@ -16,14 +18,15 @@ export function registerResponseRoutes(app: Hono, db: Db, config: Config) {
   app.get("/:locale/responses/new", (context) => {
     const locale = localeParam(context.req.param("locale"));
     if (!locale) return context.notFound();
+    rememberLocale(context, locale, config);
     if (!campaignEnabled(db)) return statusPage(context, locale, t(locale, "formDisabled"), 503);
     const csrf = issueCsrf(context, config);
     const submissionToken = issueResponseSubmissionToken(config);
     const recipients = db.prepare(`SELECT r.id, rt.name FROM recipients r JOIN recipient_translations rt ON rt.recipient_id = r.id AND rt.locale = ? WHERE r.is_active = 1 ORDER BY rt.name`).all(locale) as { id: number; name: string }[];
-    context.header("Cache-Control", "private, no-store");
+    privateNoStore(context);
     return context.html(<Layout locale={locale} title={t(locale, "responseTitle")} path={context.req.path}>
-      <h1>{t(locale, "responseTitle")}</h1>
-      <form method="post" action={`/${locale}/responses`} encType="multipart/form-data">
+      <div class="response-page"><JourneyIntro eyebrow={t(locale, "navResponse")} title={t(locale, "responseTitle")} headingId="response-heading" />
+      <Surface class="response-form-surface"><form class="public-form" method="post" action={`/${locale}/responses`} encType="multipart/form-data" aria-labelledby="response-heading">
         <input type="hidden" name="csrf" value={csrf} /><input type="hidden" name="submissionToken" value={submissionToken} />
         <label>{t(locale, "recipient")}<select name="recipientId" required>{recipients.map((recipient) => <option value={recipient.id}>{recipient.name}</option>)}</select></label>
         <label>{t(locale, "receivedDate")}<input type="date" name="receivedAt" required max={new Date().toISOString().slice(0, 10)} /></label>
@@ -33,7 +36,7 @@ export function registerResponseRoutes(app: Hono, db: Db, config: Config) {
         <label>{t(locale, "email")}<input type="email" name="email" required maxLength={254} /></label>
         <label><input type="checkbox" name="consent" value="yes" required /> {t(locale, "consent")}</label>
         <Turnstile config={config} /><button type="submit">{t(locale, "submit")}</button>
-      </form>
+      </form></Surface></div>
     </Layout>);
   });
 
@@ -104,12 +107,13 @@ export function registerResponseRoutes(app: Hono, db: Db, config: Config) {
   app.get("/:locale/responses/thanks", (context) => {
     const locale = localeParam(context.req.param("locale"));
     if (!locale) return context.notFound();
-    context.header("Cache-Control", "private, no-store");
-    return context.html(<Layout locale={locale} title={t(locale, "thanksTitle")} path={context.req.path}><h1>{t(locale, "thanksTitle")}</h1><p role="status">{t(locale, "thanksBody")}</p><p class="note">{t(locale, "thanksRefresh")}</p></Layout>);
+    rememberLocale(context, locale, config);
+    privateNoStore(context);
+    return context.html(<Layout locale={locale} title={t(locale, "thanksTitle")} path={context.req.path}><div class="response-page"><JourneyIntro title={t(locale, "thanksTitle")} /><Surface class="status-surface"><p role="status">{t(locale, "thanksBody")}</p><Callout tone="muted"><p class="note">{t(locale, "thanksRefresh")}</p></Callout></Surface></div></Layout>);
   });
 }
 
-function confirmation(context: any, locale: Locale) { context.header("Cache-Control", "private, no-store"); return context.redirect(`/${locale}/responses/thanks`, 303); }
+function confirmation(context: any, locale: Locale) { privateNoStore(context); return context.redirect(`/${locale}/responses/thanks`, 303); }
 function insertResponse(db: Db, recipientId: number, receivedAt: string, channel: string, responseText: string, email: string, now: string) {
   return db.prepare(`INSERT INTO submitted_responses
     (recipient_id, received_at, channel, response_text, submitter_email, consent_at, status, created_at)
@@ -130,7 +134,7 @@ async function markUploadForDeletion(db: Db, objectKey: string, delayMs = 0) {
 
 function localeParam(value: string) { return isLocale(value) ? value : undefined; }
 function campaignEnabled(db: Db) { return db.prepare("SELECT responses_enabled AS enabled FROM campaigns WHERE status = 'active' LIMIT 1").get()?.enabled === 1; }
-function statusPage(context: any, locale: Locale, message: string, status = 200) { return context.html(<Layout locale={locale} title={t(locale, "siteName")} path={`/${locale}`}><p role="status">{message}</p></Layout>, status); }
+function statusPage(context: any, locale: Locale, message: string, status = 200) { privateNoStore(context); return context.html(<Layout locale={locale} title={t(locale, "siteName")} path={`/${locale}`}><div class="status-page"><h1>{t(locale, "siteName")}</h1><Callout tone="muted"><p role="status">{message}</p></Callout></div></Layout>, status); }
 function validDate(value: string) { const date = new Date(`${value}T00:00:00.000Z`); return /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value; }
 function matchesMime(bytes: Uint8Array, mime: string) {
   if (mime === "image/jpeg") return bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;

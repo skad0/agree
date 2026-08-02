@@ -92,6 +92,9 @@ export const CSS = `
 }
 
 body { overflow-wrap: anywhere; background: var(--paper); }
+.public-site { min-block-size: 100vh; }
+.public-site .public-rule { display: flex; gap: 3px; block-size: 8px; }
+.public-site .public-rule span { flex: 1; background: var(--seal); }
 /* Our own spine rather than Pico's .container, so header, main and footer align on one measure.
    Sized in rem on purpose: Pico scales the root font-size with the viewport, so this holds a
    constant line length in characters rather than a constant pixel width. */
@@ -120,7 +123,9 @@ html[lang=am] { --font: var(--amharic-font); }
 
 /* Header */
 header.wrap { display: flex; flex-wrap: wrap; gap: .5rem 1.5rem; align-items: baseline; padding-block: 1.25rem; border-block-end: 1px solid var(--rule); margin-block-end: 1.5rem; }
+.public-site .site-header { border-block-end: 0; margin-block-end: .5rem; }
 .wordmark { font-weight: 750; letter-spacing: -.015em; color: var(--ink); text-decoration: none; font-size: 1.05rem; }
+.public-site .wordmark { display: inline-flex; align-items: center; min-block-size: 44px; }
 /* Pico sets nav { justify-content: space-between }, which strands these links at the edges. */
 nav.primary { display: flex; flex-wrap: wrap; justify-content: flex-start; gap: .35rem 1.1rem; flex: 1 1 auto; }
 nav.primary a { text-decoration: none; color: var(--mute); font-size: .95rem; padding-block: .35rem; min-block-size: 2.75rem; display: inline-flex; align-items: center; }
@@ -150,6 +155,7 @@ html.js .appearance { display: flex; }
   font-size: .85rem; font-weight: 500; background: var(--card); color: var(--mute);
   border: 1px solid var(--rule); border-radius: 4px;
 }
+.public-site .appearance button { min-block-size: 44px; }
 .appearance button:hover { color: var(--seal); border-color: var(--seal); background: var(--card); }
 .appearance button[aria-pressed=true] {
   background: var(--seal); color: var(--pico-primary-inverse); border-color: var(--seal); font-weight: 600;
@@ -167,10 +173,11 @@ input[type=checkbox] { inline-size: 1.5rem; block-size: 1.5rem; min-inline-size:
 .scripts [aria-current] { color: var(--paper); background: var(--seal-deep); border-color: var(--seal-deep); font-weight: 650; }
 
 /* Pico declares list-style on the li, so resetting it on the list alone leaves the markers. */
-.metrics, .constraints, .portfolios, .journey, .documents, .clauses, .timeline,
-.metrics li, .constraints li, .portfolios li, .journey li, .documents li, .clauses li, .timeline li {
+.public-site .metrics, .public-site .constraints, .public-site .portfolios, .public-site .journey, .public-site .documents, .public-site .clauses, .public-site .timeline,
+.public-site .metrics li, .public-site .constraints li, .public-site .portfolios li, .public-site .journey li, .public-site .documents li, .public-site .clauses li, .public-site .timeline li {
   list-style: none;
 }
+body.admin .metrics, body.admin .metrics li { list-style: none; }
 
 .metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr)); gap: 1rem; margin-block: 1.5rem; padding: 0; color: var(--mute); }
 .metrics li { border-block-start: 2px solid var(--rule); padding-block-start: .6rem; padding-inline: 0; }
@@ -240,90 +247,202 @@ footer.wrap { display: flex; flex-wrap: wrap; gap: .25rem 1.5rem; }
   color: var(--mute); font-size: .95rem; margin-block: 1.5rem;
 }
 
+/* ---- Ask-first home ----------------------------------------------------------------------- */
+.public-site .home-hero { max-inline-size: 58.75rem; padding-block: 2rem 3rem; }
+.public-site .home-hero h1 { font-size: clamp(2.5rem, 1.7rem + 3.5vw, 4.5rem); line-height: 1; letter-spacing: -.035em; font-weight: 900; max-inline-size: 14ch; margin-block: .5rem 1.75rem; }
+.public-site .recipient-proof { display: flex; align-items: center; gap: 1.1rem; margin-block-end: 1.75rem; }
+.public-site .recipient-proof a { display: inline-flex; align-items: center; min-block-size: 44px; margin-inline-start: .5rem; }
+.public-site .recipient-count { color: var(--seal); font: 500 1.5rem/1 var(--mono); }
+.public-site .portrait-stack { display: flex; flex: none; min-inline-size: 7rem; }
+.public-site .portrait-slot, .public-site .portrait-overflow { inline-size: 3.25rem; block-size: 3.25rem; flex: none; border: 2px solid var(--paper); box-shadow: 0 0 0 1px var(--rule); border-radius: 50%; background: repeating-linear-gradient(135deg, var(--card) 0 5px, var(--paper) 5px 10px); }
+.public-site .portrait-slot + .portrait-slot, .public-site .portrait-overflow { margin-inline-start: -.875rem; }
+.public-site .portrait-overflow { display: grid; place-items: center; direction: ltr; unicode-bidi: isolate; background: var(--card); color: var(--seal-deep); font-family: var(--mono); font-size: .8rem; }
+.public-site .ask-action-row { display: flex; align-items: center; gap: 1.25rem; margin-block-end: 1.75rem; }
+.public-site .primary-action, .public-site button.primary-action { display: inline-flex; align-items: center; justify-content: center; min-block-size: 5.5rem; padding-inline: 3.5rem; border: 0; border-radius: 3px; background: var(--seal); color: var(--paper); font: 700 1.875rem/1 var(--font); text-decoration: none; cursor: pointer; }
+.public-site .primary-action:hover, .public-site button.primary-action:hover { background: var(--seal-deep); color: var(--paper); }
+.public-site .secondary-action { display: inline-flex; align-items: center; min-block-size: 3.5rem; padding-inline: 1.5rem; border: 1px solid var(--ink); border-radius: 3px; color: var(--ink); text-decoration: none; }
+.public-site .secondary-action:hover { background: var(--card); border-color: var(--seal); color: var(--seal-deep); }
+.public-site .suggestions { display: flex; align-items: center; flex-wrap: wrap; gap: .6rem; margin-block-end: 1.25rem; }
+.public-site .suggestions > span { color: var(--mute); font-size: 1rem; }
+.public-site .suggestions a { display: inline-flex; align-items: center; min-block-size: 2.875rem; padding-inline: 1rem; border: 1px solid var(--rule); border-radius: 3px; color: var(--ink); text-decoration: none; }
+.public-site .suggestions a:hover { border-color: var(--seal); background: var(--card); color: var(--seal-deep); }
+.public-site .proof-count { color: var(--mute); font-size: .95rem; margin: 0; }
+.public-site .surface { border: 1px solid var(--rule); border-radius: 3px; padding: 1.5rem 2rem; margin-block: 1.5rem 2.5rem; }
+.public-site .surface p:first-child { margin-block-start: 0; }
+.public-site .surface p:last-child { margin-block-end: 0; }
+.public-site .callout-blue { border-inline-start-color: var(--seal); }
+.public-site .callout-muted { border-inline-start-color: var(--mute); }
+.public-site .callout-caution { border-inline-start-color: var(--caution); }
+
+/* ---- Single-recipient request journey ---------------------------------------------------- */
+.public-site .request-page { max-inline-size: 58.75rem; }
+.public-site .journey-intro { max-inline-size: 52rem; padding-block: 2rem 2.25rem; }
+.public-site .journey-intro h1 { margin-block: 0; }
+.public-site .journey-intro .eyebrow { margin-block-end: .6rem; }
+.public-site .request-recipient-page .surface { max-inline-size: 58.75rem; }
+.public-site .recipient-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem; list-style: none; padding: 0; margin: 0; }
+.public-site .recipient-list li { list-style: none; }
+.public-site .recipient-list a { display: flex; align-items: center; min-block-size: 5.5rem; padding-inline: 1.25rem; border: 1px solid var(--rule); border-radius: 3px; background: var(--card); color: var(--ink); text-decoration: none; font-size: 1.15rem; }
+.public-site .recipient-list a:hover { border-color: var(--seal); color: var(--seal-deep); }
+.public-site .request-recipient-line { margin-block: 0 1.5rem; font-size: 1.1rem; }
+.public-site .request-form { max-inline-size: 48rem; }
+.public-site .request-form fieldset { border: 0; padding: 0; }
+.public-site .request-form label, .public-site .request-form legend { font-weight: 700; }
+.public-site .request-form label { display: block; margin-block: 1rem; }
+.public-site .request-form input:not([type=checkbox]), .public-site .request-form select, .public-site .request-form textarea { margin-block-start: .5rem; }
+.public-site .request-form input:not([type=checkbox]), .public-site .request-form select { min-block-size: 3.75rem; }
+.public-site .demand-fieldset { display: grid; gap: .5rem; margin-block-end: 1.5rem; }
+.public-site .demand-fieldset legend { margin-block-end: .25rem; }
+.public-site .demand-fieldset label { display: flex; align-items: flex-start; gap: .75rem; min-block-size: 2.75rem; margin: 0; padding-block: .4rem; font-weight: 500; }
+.public-site .demand-fieldset input[type=checkbox] { flex: none; margin-block-start: .2rem; }
+.public-site .letter-ready-form { max-inline-size: 58.75rem; }
+.public-site .letter-ready-form > label { max-inline-size: 58.75rem; }
+.public-site .request-actions { margin-block: 1rem 1.5rem; }
+.public-site .request-actions button { min-block-size: 3.75rem; }
+.public-site .report-sent-action { margin-block-start: 2rem; }
+.public-site .action-ready-surface, .public-site .result-surface { max-inline-size: 48rem; }
+.public-site .action-ready-surface textarea { inline-size: 100%; }
+.public-site .action-ready-surface .primary-action { min-block-size: 4rem; padding-inline: 1.5rem; font-size: 1.15rem; }
+.public-site .result-actions { display: flex; flex-wrap: wrap; gap: .75rem; align-items: center; margin-block: 1rem 1.5rem; }
+.public-site .result-actions a { display: inline-flex; align-items: center; min-block-size: 2.75rem; }
+
+/* ---- Support, reply, privacy, and status surfaces ---------------------------------------- */
+.public-site .support-page, .public-site .response-page, .public-site .privacy-page, .public-site .status-page { max-inline-size: 52rem; }
+.public-site .support-form-surface, .public-site .verify-form-surface, .public-site .response-form-surface, .public-site .privacy-surface, .public-site .delete-form-surface, .public-site .status-surface { max-inline-size: 48rem; }
+.public-site .public-form label { display: block; margin-block: 1rem; font-weight: 700; }
+.public-site .public-form input:not([type=checkbox]), .public-site .public-form select, .public-site .public-form textarea { display: block; inline-size: 100%; box-sizing: border-box; margin-block-start: .5rem; min-block-size: 3.75rem; }
+.public-site .public-form textarea { min-block-size: 9rem; }
+.public-site .public-form input[type=checkbox] { min-inline-size: 1.75rem; min-block-size: 1.75rem; }
+.public-site .public-form button { min-block-size: 3.75rem; }
+.public-site .response-form-surface .public-form textarea { min-block-size: 10rem; }
+.public-site .privacy-copy { max-inline-size: 76ch; }
+.public-site .privacy-copy h2 { margin-block: 2rem .75rem; }
+.public-site .privacy-copy p { line-height: 1.7; }
+.public-site .status-page .journey-intro { padding-block-end: 1.25rem; }
+
+/* ---- Read-only document surfaces ---------------------------------------------------------- */
+.public-site .document-intro { max-inline-size: 56rem; padding-block: 2rem 2.25rem; }
+.public-site .document-intro h1 { margin-block: 0 1rem; }
+.public-site .document-surface { max-inline-size: 56rem; }
+.public-site .document-clause-list, .public-site .document-stages, .public-site .document-portfolios { list-style: none; padding: 0; margin-block: 0 2rem; }
+.public-site .document-clause-list > li, .public-site .document-stages > li, .public-site .document-portfolios > li { list-style: none; }
+.public-site .document-clause { position: relative; padding-block: 1.75rem; border-block-start: 1px solid var(--rule); scroll-margin-block-start: 1rem; }
+.public-site .document-clause:last-child { border-block-end: 1px solid var(--rule); }
+.public-site .document-clause-number { display: block; color: var(--seal); font: 400 .9rem/1 var(--mono); margin-block-end: .5rem; }
+.public-site .document-clause h2 { margin-block: 0 .9rem; }
+.public-site .document-clause .clause-body { max-inline-size: 76ch; font-size: 1.05rem; line-height: 1.7; }
+.public-site .document-stages { display: grid; gap: 1.5rem; }
+.public-site .document-stage { border: 2px solid var(--ink); border-radius: 3px; padding: 1.5rem 2rem 1.75rem; }
+.public-site .stage-meta { display: flex; align-items: baseline; gap: .6rem; color: var(--mute); margin: 0 0 .7rem; }
+.public-site .stage-days { color: var(--seal); font: 500 1.05rem/1 var(--mono); }
+.public-site .stage-track { display: block; inline-size: 100%; block-size: 8px; margin-block-end: 1.25rem; }
+.public-site .stage-track-bg, .public-site .plan-track-bg { fill: var(--rule); }
+.public-site .stage-bar, .public-site .plan-bar { fill: var(--seal); }
+.public-site .document-stage h2 { margin-block: 0 .75rem; }
+.public-site .stage-fields { display: grid; grid-template-columns: minmax(7rem, auto) 1fr; gap: .4rem 1rem; margin: 0; }
+.public-site .stage-fields dt { color: var(--mute); font-size: .75rem; font-weight: 700; text-transform: var(--caps); letter-spacing: var(--track); }
+.public-site .stage-fields dd { margin: 0; line-height: 1.6; }
+.public-site .document-constraints { display: grid; grid-template-columns: repeat(2, minmax(0, 18rem)); gap: 1rem; list-style: none; padding: 0; margin-block: 0 2.5rem; }
+.public-site .document-constraints li { border: 2px solid var(--ink); border-radius: 3px; padding: 1.5rem 1.75rem; }
+.public-site .document-constraints strong { display: block; color: var(--seal); font: 500 3.5rem/1 var(--mono); }
+.public-site .document-constraints span { color: var(--mute); }
+.public-site .document-portfolios { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem; }
+.public-site .document-portfolios li { display: flex; gap: .75rem; align-items: baseline; border: 1px solid var(--rule); border-radius: 3px; padding: 1rem 1.1rem; min-block-size: 3.5rem; background: var(--card); }
+.public-site .document-portfolios .portfolio-number { color: var(--seal); font: 400 .8rem/1 var(--mono); flex: none; }
+.public-site .document-prose { max-inline-size: 76ch; }
+.public-site .document-prose h2 { margin-block: 2.25rem .75rem; }
+.public-site .document-prose h3 { margin-block: 1.75rem .5rem; }
+.public-site .document-prose p { margin-block: .85rem; line-height: 1.7; }
+.public-site .document-ask { display: flex; align-items: center; gap: 2rem; border: 2px solid var(--ink); border-radius: 3px; padding: 1.5rem 2rem; margin-block: 2.5rem; max-inline-size: 56rem; }
+.public-site .document-ask > div { flex: 1; }
+.public-site .document-ask h2 { margin: 0 0 .5rem; }
+.public-site .document-ask p { color: var(--mute); margin: 0; }
+html:is([lang=he], [lang=ar], [lang=yi], [lang=am]) body.public-site :is(h1, h2, h3) { letter-spacing: 0; }
+
 /* ---- Political documents ----------------------------------------------------------------- */
 
 /* Numbering is real here: the canonical package refers to these clauses by number. */
-.clauses { list-style: none; padding: 0; counter-reset: clause; }
-.clause {
+.public-site .clauses { list-style: none; padding: 0; counter-reset: clause; }
+.public-site .clause {
   position: relative; padding-block: 2rem; border-block-start: 1px solid var(--rule);
   scroll-margin-block-start: 1rem;
 }
-.clause-number {
+.public-site .clause-number {
   font-family: var(--mono); font-size: .85rem; color: var(--seal); letter-spacing: .06em;
 }
-.clause h2 { margin-block: .35rem 1rem; }
-.clause-label {
+.public-site .clause h2 { margin-block: .35rem 1rem; }
+.public-site .clause-label {
   font-size: .72rem; text-transform: var(--caps); letter-spacing: var(--track);
   color: var(--mute); margin-block-end: .25rem; font-weight: 600;
 }
-.clause-body { font-size: 1.05rem; }
+.public-site .clause-body { font-size: 1.05rem; }
 
 /* Three fixed callouts in a fixed order. Colour and label together carry the meaning, so the
    distinction survives both colour blindness and a monochrome print. */
-.callout {
+.public-site .callout {
   border-inline-start: 3px solid var(--rule); padding: .1rem 0 .1rem 1rem;
   padding-inline: 1rem 0; margin-block: 1rem; background: none;
 }
-.callout.why { border-inline-start-color: var(--seal); }
-.callout.how { border-inline-start-color: var(--mute); }
-.callout.except { border-inline-start-color: var(--caution); }
-.clause-detail { margin-block-start: 1rem; border: 0; padding: 0; background: none; }
-.clause-detail > summary {
+.public-site .callout.why { border-inline-start-color: var(--seal); }
+.public-site .callout.how { border-inline-start-color: var(--mute); }
+.public-site .callout.except { border-inline-start-color: var(--caution); }
+.public-site .clause-detail { margin-block-start: 1rem; border: 0; padding: 0; background: none; }
+.public-site .clause-detail > summary {
   font-size: .85rem; color: var(--mute); cursor: pointer; padding-block: .5rem;
-  min-block-size: 24px;
+  min-block-size: 44px; display: flex; align-items: center;
 }
-.clause-detail > summary:hover { color: var(--seal); }
-.clause-detail[open] > summary { color: var(--ink); margin-block-end: .25rem; }
+.public-site .clause-detail > summary:hover { color: var(--seal); }
+.public-site .clause-detail[open] > summary { color: var(--ink); margin-block-end: .25rem; }
 
-.callout ul { margin: 0; padding-inline-start: 1.1rem; list-style: none; }
-.callout li { margin-block: .2rem; line-height: 1.45; position: relative; }
+.public-site .callout ul { margin: 0; padding-inline-start: 0; list-style: none; }
+.public-site .callout li { margin-block: .2rem; line-height: 1.45; position: relative; list-style: none; }
 /* A tick rather than a bullet: these are the things that can actually be checked. */
-.callout.how li::before {
+.public-site .callout.how li::before {
   content: "✓"; position: absolute; inset-inline-start: -1.1rem;
   color: var(--seal); font-size: .85em;
 }
-.callout p:last-child, .callout ul:last-child { margin-block-end: 0; }
+.public-site .callout p:last-child, .public-site .callout ul:last-child { margin-block-end: 0; }
 
 /* ---- First 100 days ---------------------------------------------------------------------- */
 
-.timeline { list-style: none; padding: 0; }
-.plan-item { padding-block: 1.75rem; border-block-start: 1px solid var(--rule); }
-.plan-days { margin: 0 0 .4rem; }
-.plan-days strong { font-family: var(--mono); font-size: 1.35rem; color: var(--seal); }
-.plan-days span { font-size: .8rem; color: var(--mute); text-transform: var(--caps); letter-spacing: var(--track); }
-.plan-track { display: block; inline-size: 100%; block-size: 8px; }
-.plan-track-bg { fill: var(--rule); }
-.plan-bar { fill: var(--seal); }
-.plan-item h2 { margin-block: 1rem .75rem; }
-.plan-fields { display: grid; grid-template-columns: minmax(6rem, auto) 1fr; gap: .35rem 1rem; margin: 0; }
-.plan-fields dt {
+.public-site .timeline { list-style: none; padding: 0; }
+.public-site .plan-item { padding-block: 1.75rem; border-block-start: 1px solid var(--rule); }
+.public-site .plan-days { margin: 0 0 .4rem; }
+.public-site .plan-days strong { font-family: var(--mono); font-size: 1.35rem; color: var(--seal); }
+.public-site .plan-days span { font-size: .8rem; color: var(--mute); text-transform: var(--caps); letter-spacing: var(--track); }
+.public-site .plan-track { display: block; inline-size: 100%; block-size: 8px; }
+.public-site .plan-track-bg { fill: var(--rule); }
+.public-site .plan-bar { fill: var(--seal); }
+.public-site .plan-item h2 { margin-block: 1rem .75rem; }
+.public-site .plan-fields { display: grid; grid-template-columns: minmax(6rem, auto) 1fr; gap: .35rem 1rem; margin: 0; }
+.public-site .plan-fields dt {
   font-size: .72rem; text-transform: var(--caps); letter-spacing: var(--track);
   color: var(--mute); font-weight: 600; padding-block-start: .2rem;
 }
-.plan-fields dd { margin: 0; }
+.public-site .plan-fields dd { margin: 0; }
 @media (max-width: 32rem) {
-  .plan-fields { grid-template-columns: 1fr; gap: 0; }
-  .plan-fields dd { margin-block-end: .75rem; }
+  .public-site .plan-fields { grid-template-columns: 1fr; gap: 0; }
+  .public-site .plan-fields dd { margin-block-end: .75rem; }
 }
 
 /* ---- Government model -------------------------------------------------------------------- */
 
-.constraints { list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: 2.5rem; margin-block: 1.5rem 2.5rem; }
-.constraints strong { display: block; font-family: var(--mono); font-size: 3rem; line-height: 1; color: var(--seal); }
-.constraints span { color: var(--mute); font-size: .9rem; }
-.portfolios { list-style: none; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr)); gap: .5rem; }
-.portfolios li {
+.public-site .constraints { list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: 2.5rem; margin-block: 1.5rem 2.5rem; }
+.public-site .constraints strong { display: block; font-family: var(--mono); font-size: 3rem; line-height: 1; color: var(--seal); }
+.public-site .constraints span { color: var(--mute); font-size: .9rem; }
+.public-site .portfolios { list-style: none; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr)); gap: .5rem; }
+.public-site .portfolios li {
   display: flex; gap: .6rem; align-items: baseline; padding: .7rem .85rem;
   border: 1px solid var(--rule); border-radius: 4px; background: var(--card); font-size: .95rem;
 }
-.portfolio-number { font-family: var(--mono); font-size: .75rem; color: var(--mute); flex: none; }
+.public-site .portfolio-number { font-family: var(--mono); font-size: .75rem; color: var(--mute); flex: none; }
 
-.prose h3 { font-size: 1.05rem; margin-block: 1.75rem .5rem; }
-.prose p { margin-block: .75rem; }
+.public-site .prose h3 { font-size: 1.05rem; margin-block: 1.75rem .5rem; }
+.public-site .prose p { margin-block: .75rem; }
 
 /* A quiet entrance so long documents do not arrive as one wall. Disabled below for reduced motion. */
 @media (prefers-reduced-motion: no-preference) {
-  .clause, .plan-item { animation: rise .5s ease-out both; animation-timeline: view(); animation-range: entry 0% cover 22%; }
+  .public-site .clause, .public-site .plan-item { animation: rise .5s ease-out both; animation-timeline: view(); animation-range: entry 0% cover 22%; }
   @keyframes rise { from { opacity: .25; transform: translateY(1rem); } to { opacity: 1; transform: none; } }
 }
 
@@ -358,9 +477,25 @@ footer.wrap { display: flex; flex-wrap: wrap; gap: .25rem 1.5rem; }
 
   h1 { font-size: clamp(1.75rem, 1.1rem + 3.2vw, 2.25rem); }
   .lede { font-size: 1.05rem; }
-  .clause, .plan-item { padding-block: 1.5rem; }
-  .constraints { gap: 1.5rem; }
-  .constraints strong { font-size: 2.25rem; }
+  .public-site .public-rule { block-size: 6px; }
+  .public-site .home-hero { padding-block: .5rem 1.5rem; }
+  .public-site .home-hero h1 { font-size: 2.5rem; margin-block-end: 1.25rem; }
+  .public-site .recipient-proof { display: flex; flex-wrap: wrap; margin-block-end: 1.25rem; }
+  .public-site .portrait-stack { margin-block-end: .75rem; }
+  .public-site .primary-action, .public-site button.primary-action { inline-size: 100%; min-block-size: 4rem; padding-inline: 1.25rem; font-size: 1.25rem; }
+  .public-site .ask-action-row { display: block; }
+  .public-site .suggestions { flex-wrap: wrap; }
+  .public-site .surface { padding: 1.25rem 1rem; }
+  .public-site .document-intro { padding-block: .5rem 1.5rem; }
+  .public-site .document-stage { padding: 1.15rem 1rem 1.25rem; }
+  .public-site .stage-fields { grid-template-columns: 1fr; gap: 0; }
+  .public-site .stage-fields dd { margin-block-end: .75rem; }
+  .public-site .document-constraints, .public-site .document-portfolios { grid-template-columns: 1fr; }
+  .public-site .document-ask { display: block; padding: 1.25rem 1rem; }
+  .public-site .document-ask .primary-action { margin-block-start: 1rem; }
+  .public-site .clause, .public-site .plan-item { padding-block: 1.5rem; }
+  .public-site .constraints { gap: 1.5rem; }
+  .public-site .constraints strong { font-size: 2.25rem; }
 }
 
 /* ---- Admin console ------------------------------------------------------------------------

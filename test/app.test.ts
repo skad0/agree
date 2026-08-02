@@ -47,6 +47,84 @@ test("all public locales render with the correct text direction", async () => {
   }
 });
 
+test("redesigned home leads to the locale request journey without a draft surface", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "agree-public-home-"));
+  try {
+    const { app, close } = createApp({ sqlitePath: join(dir, "app.db") });
+    for (const [locale, direction] of [["en", "ltr"], ["he", "rtl"]] as const) {
+      const response = await app.request(`/${locale}`);
+      assert.equal(response.status, 200, locale);
+      const html = await response.text();
+      assert.match(html, new RegExp(`<html lang="${locale}" dir="${direction}"`));
+      assert.match(html, new RegExp(`class="primary-action" href="/${locale}/request"`));
+      assert.match(html, new RegExp(`href="/${locale}/request"`));
+      assert.doesNotMatch(html, /<form\b|<textarea\b|name="(?:context|message|subject|whatsappMessage|socialMessage)"/);
+      assert.doesNotMatch(html, /Your letter is ready|Your content is prepared below/);
+    }
+    close();
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("disabled requests hide the home request proof and active CTA", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "agree-public-disabled-"));
+  try {
+    const { app, db, close } = createApp({ sqlitePath: join(dir, "app.db") });
+    db.prepare("UPDATE campaigns SET requests_enabled = 0 WHERE id = 1").run();
+    const response = await app.request("/he");
+    assert.equal(response.status, 200);
+    const html = await response.text();
+    assert.doesNotMatch(html, /class="recipient-proof"/);
+    assert.doesNotMatch(html, /class="ask-action-row"/);
+    assert.doesNotMatch(html, /class="primary-action" href="\/he\/request"/);
+    assert.doesNotMatch(html, /class="recipient-count"/);
+    close();
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("home cache and locale selection keep their public/private contracts", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "agree-public-cache-"));
+  try {
+    const { app, close } = createApp({ sqlitePath: join(dir, "app.db") });
+    const normal = await app.request("/en");
+    assert.equal(normal.status, 200);
+    assert.equal(normal.headers.get("cache-control"), "public, max-age=0, s-maxage=60");
+    assert.equal(normal.headers.get("set-cookie"), null);
+
+    const selected = await app.request("/he?lang=1");
+    assert.equal(selected.status, 200);
+    assert.equal(selected.headers.get("cache-control"), "private, no-store");
+    assert.match(selected.headers.get("set-cookie") ?? "", /(?:^|;\s*)locale=he(?:;|$)/);
+    close();
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("unrelated home query input has no rendered, cookie, or database effect", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "agree-public-query-"));
+  try {
+    const { app, db, close } = createApp({ sqlitePath: join(dir, "app.db") });
+    const tables = (db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name").all() as { name: string }[]).map((row) => row.name);
+    const snapshot = () => tables.map((name) => ({ name, rows: db.prepare(`SELECT * FROM "${name.replaceAll('"', '""')}"`).all() }));
+    const before = snapshot();
+    const sentinel = "query-only-sentinel-7f4e";
+    const response = await app.request(`/he?unrelated=${sentinel}`);
+    const html = await response.text();
+    assert.equal(response.status, 200);
+    assert.doesNotMatch(html, new RegExp(sentinel));
+    assert.doesNotMatch(response.headers.get("set-cookie") ?? "", new RegExp(sentinel));
+    assert.deepEqual(snapshot(), before);
+    assert.doesNotMatch(JSON.stringify(snapshot()), new RegExp(sentinel));
+    close();
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("campaign documents render from SQLite in every locale", async () => {
   const dir = mkdtempSync(join(tmpdir(), "agree-content-"));
   try {
@@ -83,6 +161,107 @@ test("campaign documents render from SQLite in every locale", async () => {
     assert.doesNotMatch(await (await app.request("/uk/government-model")).text(), /translation unavailable/);
 
     assert.equal((await app.request("/en/demands")).status, 301);
+    close();
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("document surfaces preserve canonical routes and server-render all content in LTR and RTL", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "agree-document-surfaces-"));
+  try {
+    const { app, db, close } = createApp({ sqlitePath: join(dir, "app.db") });
+    const urls = ["/en/standard", "/en/coalition-agreement", "/en/first-100-days", "/en/government-model", "/en/about", "/en/methodology", "/he/standard", "/he/coalition-agreement", "/he/first-100-days", "/he/government-model", "/he/about", "/he/methodology"];
+    for (const url of urls) {
+      const response = await app.request(url);
+      assert.equal(response.status, 200, url);
+      assert.match(await response.text(), /class="document-intro"/);
+    }
+
+    const standard = await (await app.request("/en/standard")).text();
+    assert.match(standard, /Elections held on schedule/);
+    assert.match(standard, /class="document-clause-list"/);
+    assert.match(standard, /class="document-clause-number"><bdi>01<\/bdi>/);
+
+    const coalition = await (await app.request("/he/coalition-agreement")).text();
+    assert.match(coalition, /מנגנון מועמד משותף|מועמדות משותפת/);
+    assert.match(coalition, /class="document-clause-list"/);
+
+    const plan = await (await app.request("/he/first-100-days")).text();
+    const planRows = db.prepare(`SELECT pt.title, pt.decision, pt.instrument, pt.owners, pt.criterion
+      FROM plan_items p JOIN plan_item_translations pt ON pt.plan_item_id = p.id AND pt.locale = 'he'
+      WHERE p.is_active = 1 ORDER BY p.sort_order`).all() as Array<Record<string, string | null>>;
+    for (const row of planRows) for (const value of Object.values(row)) if (value) {
+      const escaped = value.replaceAll("&", "&amp;").replaceAll('"', "&quot;");
+      assert.ok(plan.includes(value) || plan.includes(escaped), `plan content missing from server HTML: ${value}`);
+    }
+    assert.match(plan, /<bdi dir="ltr" class="stage-days">1–14<\/bdi>/);
+    assert.match(plan, /class="plan-bar"[^>]*x="86"[^>]*width="14"/);
+    assert.match(plan, /<script src="[^"]+"/); // scripts may be present, but content must not depend on them.
+
+    const model = await (await app.request("/en/government-model")).text();
+    assert.match(model, /Defence/);
+    assert.match(model, /class="document-constraints"/);
+    assert.match(model, /class="document-portfolios"/);
+
+    const about = await (await app.request("/en/about")).text();
+    const methodology = await (await app.request("/en/methodology")).text();
+    assert.match(about, /independent civic platform/);
+    assert.match(methodology, /Every figure is counted and published separately/);
+    assert.match(methodology, /This does not mean it was sent/);
+
+    for (const locale of ["en", "he"] as const) {
+      const compatibility = await app.request(`/${locale}/demands`);
+      assert.equal(compatibility.status, 301, `/${locale}/demands`);
+      assert.equal(compatibility.headers.get("location"), `/${locale}/standard`);
+    }
+    close();
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("document request affordance and cache state follow campaign controls", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "agree-document-state-"));
+  try {
+    const { app, db, close } = createApp({ sqlitePath: join(dir, "app.db") });
+    const enabled = await app.request("/en/standard");
+    assert.equal(enabled.status, 200);
+    assert.match(await enabled.text(), /class="document-ask"/);
+    assert.equal(enabled.headers.get("cache-control"), "public, max-age=0, s-maxage=60");
+
+    db.prepare("UPDATE campaigns SET requests_enabled = 0 WHERE id = 1").run();
+    const disabled = await app.request("/he/standard");
+    assert.equal(disabled.status, 200);
+    const disabledHtml = await disabled.text();
+    assert.doesNotMatch(disabledHtml, /class="document-ask"/);
+    assert.doesNotMatch(disabledHtml, /class="primary-action" href="\/he\/request"/);
+
+    const selected = await app.request("/he/standard?lang=1");
+    assert.equal(selected.status, 200);
+    assert.equal(selected.headers.get("cache-control"), "private, no-store");
+    assert.match(selected.headers.get("set-cookie") ?? "", /(?:^|;\s*)locale=he(?:;|$)/);
+    close();
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("inactive campaigns do not expose public document content", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "agree-document-inactive-"));
+  try {
+    const { app, db, close } = createApp({ sqlitePath: join(dir, "app.db") });
+    db.prepare("UPDATE campaigns SET status = 'draft' WHERE id = 1").run();
+    for (const path of ["standard", "coalition-agreement", "first-100-days", "government-model", "about", "methodology"]) {
+      const response = await app.request(`/en/${path}`);
+      assert.equal(response.status, 503, path);
+      const html = await response.text();
+      assert.doesNotMatch(html, /class="document-(clause-list|stages|portfolios|prose|ask)"/, path);
+      assert.match(html, /role="status"/, path);
+    }
+    const compatibility = await app.request("/en/demands");
+    assert.equal(compatibility.status, 301);
+    assert.equal(compatibility.headers.get("location"), "/en/standard");
     close();
   } finally {
     rmSync(dir, { recursive: true, force: true });
@@ -235,6 +414,195 @@ test("appeals render in seven locales, count every action, and do not store pers
     assert.equal(sent.status, 303);
     const actions = runtime.db.prepare("SELECT action_type FROM request_actions WHERE generated_request_id = ? ORDER BY action_type").all(Number(actionRequestId)).map((row) => row.action_type);
     assert.deepEqual(actions, [...performed, "reported_sent"].sort());
+    runtime.close();
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("single-recipient request flow keeps RTL form, action, and result contracts", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "agree-request-redesign-"));
+  try {
+    const runtime = createApp({ sqlitePath: join(dir, "app.db"), env: { NODE_ENV: "test", SESSION_SECRET: "test-secret" } });
+    const chooser = await runtime.app.request("/he/request");
+    assert.equal(chooser.status, 200);
+    assert.equal(chooser.headers.get("cache-control"), "private, no-store");
+    const chooserHtml = await chooser.text();
+    assert.match(chooserHtml, /<html lang="he" dir="rtl"/);
+    assert.match(chooserHtml, /\/he\/request\/build\?recipient=1/);
+    assert.doesNotMatch(chooserHtml, /name="recipientId"/);
+
+    const build = await runtime.app.request("/he/request/build?recipient=1");
+    assert.equal(build.status, 200);
+    assert.equal(build.headers.get("cache-control"), "private, no-store");
+    const buildHtml = await build.text();
+    const csrf = buildHtml.match(/name="csrf" value="([^"]+)"/)?.[1];
+    const cookie = build.headers.get("set-cookie")?.split(";")[0] ?? "";
+    assert.ok(csrf);
+    assert.match(buildHtml, /<html lang="he" dir="rtl"/);
+    assert.equal((buildHtml.match(/name="recipientId" value="1"/g) ?? []).length, 1);
+    assert.match(buildHtml, /<select name="messageLocale"/);
+    assert.match(buildHtml, /name="name"/);
+    assert.match(buildHtml, /name="city"/);
+    assert.match(buildHtml, /name="context"/);
+    assert.match(buildHtml, /<bdi>2\/3<\/bdi>/);
+    assert.match(buildHtml, /\/en\/request\/build\?lang=1&amp;recipient=1/);
+
+    const preview = await postForm(runtime.app, "/he/request/preview", {
+      csrf: csrf!, recipientId: "1", demandId: "1", messageLocale: "he", name: "אזרח", city: "ירושלים", context: "שאלה פרטית"
+    }, cookie);
+    assert.equal(preview.status, 200);
+    assert.equal(preview.headers.get("cache-control"), "private, no-store");
+    const previewHtml = await preview.text();
+    assert.match(previewHtml, /name="action" value="email_opened"/);
+    assert.match(previewHtml, /name="action" value="text_copied"/);
+    assert.match(previewHtml, /formaction="\/he\/request\/report-sent"/);
+    assert.match(previewHtml, /הטקסט הוכן לבדיקה/);
+    assert.match(previewHtml, /<bdi>3\/3<\/bdi>/);
+    assert.doesNotMatch(previewHtml, /delivery|delivered|מסירה|נמסר/i);
+    const requestId = previewHtml.match(/name="requestId" value="(\d+)"/)?.[1];
+    const capability = previewHtml.match(/name="capability" value="([^"]+)"/)?.[1];
+    assert.ok(requestId); assert.ok(capability);
+    const stored = runtime.db.prepare("SELECT recipient_id, locale, selected_demands FROM generated_requests WHERE id = ?").get(Number(requestId)) as { recipient_id: number; locale: string; selected_demands: string };
+    assert.deepEqual({ ...stored }, { recipient_id: 1, locale: "he", selected_demands: "[1]" });
+
+    const opened = await postForm(runtime.app, "/he/request/action", {
+      csrf: csrf!, requestId: requestId!, capability: capability!, action: "email_opened", subject: "S", message: "M", whatsappMessage: "W", socialMessage: "P"
+    }, cookie);
+    assert.equal(opened.status, 200);
+    assert.equal(opened.headers.get("cache-control"), "private, no-store");
+    assert.match(await opened.text(), /mailto:/);
+
+    const copied = await postForm(runtime.app, "/he/request/copy", { csrf: csrf!, requestId: requestId!, capability: capability! }, cookie);
+    assert.equal(copied.status, 204);
+    assert.equal(copied.headers.get("cache-control"), "private, no-store");
+    const reported = await postForm(runtime.app, "/he/request/report-sent", { csrf: csrf!, requestId: requestId!, capability: capability! }, cookie);
+    assert.equal(reported.status, 303);
+    assert.equal(reported.headers.get("cache-control"), "private, no-store");
+    const result = await runtime.app.request(reported.headers.get("location")!);
+    assert.equal(result.status, 200);
+    assert.equal(result.headers.get("cache-control"), "private, no-store");
+    const resultHtml = await result.text();
+    assert.match(resultHtml, /<html lang="he" dir="rtl"/);
+    assert.match(resultHtml, /<bdi dir="auto">/);
+    assert.match(resultHtml, /הטקסט הוכן לבדיקה/);
+    assert.doesNotMatch(resultHtml, /delivery|delivered|מסירה|נמסר/i);
+    assert.deepEqual(runtime.db.prepare("SELECT action_type FROM request_actions WHERE generated_request_id = ? ORDER BY action_type").all(Number(requestId)).map((row) => row.action_type), ["email_opened", "reported_sent", "text_copied"]);
+    runtime.close();
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("secondary public pages preserve localized forms, private states, and error semantics", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "agree-secondary-pages-"));
+  try {
+    const runtime = createApp({ sqlitePath: join(dir, "app.db"), env: { NODE_ENV: "test", SESSION_SECRET: "test-secret" } });
+
+    const support = await getForm(runtime.app, "/he/support?lang=1");
+    assert.match(support.html, /<html lang="he" dir="rtl"/);
+    assert.match(support.cookie, /^locale=he$/);
+    assert.match(support.html, /name="email"/);
+    assert.match(support.html, /name="consent"/);
+    const badSupport = await postForm(runtime.app, "/he/support", { csrf: "wrong", email: "person@example.org", consent: "yes" }, support.cookie);
+    assert.equal(badSupport.status, 403);
+    assert.equal(badSupport.headers.get("cache-control"), "private, no-store");
+    runtime.db.prepare("UPDATE campaigns SET support_enabled = 0 WHERE id = 1").run();
+    const disabledSupport = await runtime.app.request("/he/support");
+    assert.equal(disabledSupport.status, 503);
+    assert.equal(disabledSupport.headers.get("cache-control"), "private, no-store");
+    assert.match(await disabledSupport.text(), /<h1>[^<]+<\/h1>/);
+    runtime.db.prepare("UPDATE campaigns SET support_enabled = 1 WHERE id = 1").run();
+
+    const selectedVerification = await runtime.app.request("/verify-email?locale=he&token=expired-token&lang=1");
+    assert.equal(selectedVerification.headers.get("cache-control"), "private, no-store");
+    assert.match(selectedVerification.headers.get("set-cookie") ?? "", /(?:^|;\s*)locale=he(?:;|$)/);
+    const verification = await getForm(runtime.app, "/verify-email?locale=he&token=expired-token");
+    assert.match(verification.html, /<html lang="he" dir="rtl"/);
+    assert.match(verification.html, /name="token" value="expired-token"/);
+    assert.match(verification.html, /action="\/verify-email"/);
+    assert.match(verification.html, /\/verify-email\?token=expired-token&amp;locale=en&amp;lang=1/);
+    assert.equal((await postForm(runtime.app, "/verify-email", { csrf: verification.csrf, token: "expired-token", locale: "he" }, verification.cookie)).status, 400);
+
+    const responseNew = await getForm(runtime.app, "/ar/responses/new?lang=1");
+    assert.match(responseNew.html, /<html lang="ar" dir="rtl"/);
+    assert.match(responseNew.cookie, /^locale=ar$/);
+    assert.match(responseNew.html, /encType="multipart\/form-data"/);
+    assert.match(responseNew.html, /name="submissionToken"/);
+    for (const field of ["recipientId", "receivedAt", "channel", "responseText", "email", "consent"]) assert.match(responseNew.html, new RegExp(`name="${field}"`), field);
+    const thanks = await runtime.app.request("/he/responses/thanks");
+    assert.equal(thanks.status, 200);
+    assert.equal(thanks.headers.get("cache-control"), "private, no-store");
+    assert.match(await thanks.text(), /<html lang="he" dir="rtl"/);
+    assert.match(await (await runtime.app.request("/he/responses/thanks")).text(), /role="status"/);
+
+    for (const locale of ["en", "he"] as const) {
+      const privacy = await runtime.app.request(`/${locale}/privacy`);
+      assert.equal(privacy.status, 200);
+      const privacyHtml = await privacy.text();
+      assert.match(privacyHtml, new RegExp(`<html lang="${locale}" dir="${locale === "he" ? "rtl" : "ltr"}`));
+      assert.match(privacyHtml, new RegExp(`href="/${locale}/delete-data"`));
+      assert.match(privacyHtml, /<h1>[^<]+<\/h1>/);
+    }
+    const selectedPrivacy = await runtime.app.request("/he/privacy?lang=1");
+    assert.equal(selectedPrivacy.headers.get("cache-control"), "private, no-store");
+    assert.match(selectedPrivacy.headers.get("set-cookie") ?? "", /(?:^|;\s*)locale=he(?:;|$)/);
+
+    const deletion = await getForm(runtime.app, "/he/delete-data?lang=1");
+    assert.match(deletion.cookie, /^locale=he$/);
+    assert.equal(deletion.html.match(/<html lang="he" dir="rtl"/)?.[0], '<html lang="he" dir="rtl"');
+    assert.equal((await runtime.app.request("/he/delete-data")).headers.get("cache-control"), "private, no-store");
+    assert.match(deletion.html, /name="email"/);
+    assert.match(deletion.html, /name="csrf"/);
+    const tokenDeletion = await runtime.app.request("/he/delete-data?token=delete-token");
+    assert.equal(tokenDeletion.headers.get("cache-control"), "private, no-store");
+    assert.match(await tokenDeletion.text(), /\/en\/delete-data\?lang=1&amp;token=delete-token/);
+
+    for (const locale of ["en", "he"] as const) {
+      const missing = await runtime.app.request(`/${locale}/definitely-missing`);
+      assert.equal(missing.status, 404, locale);
+      const missingHtml = await missing.text();
+      assert.match(missingHtml, new RegExp(`<html lang="${locale}" dir="${locale === "he" ? "rtl" : "ltr"}`));
+      assert.match(missingHtml, /role="status"/);
+    }
+    assert.equal((await runtime.app.request("/admin")).status, 403);
+    runtime.close();
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("public campaign gates and localized error pages do not leak campaign or unknown paths", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "agree-public-gates-"));
+  try {
+    const runtime = createApp({ sqlitePath: join(dir, "app.db") });
+    const normalHome = await runtime.app.request("/en");
+    assert.doesNotMatch(await normalHome.text(), /Public Service Office|\>\+\d+\</);
+    const about = await runtime.app.request("/en/about");
+    const aboutHtml = await about.text();
+    assert.doesNotMatch(aboutHtml, /\[personal funds \/ funds of a registered organisation \/ other\]/);
+    assert.match(aboutHtml, /Connections/);
+
+    runtime.db.prepare("UPDATE campaigns SET status = 'draft' WHERE id = 1").run();
+    const inactiveHome = await runtime.app.request("/he");
+    assert.equal(inactiveHome.status, 503);
+    assert.equal(inactiveHome.headers.get("cache-control"), "private, no-store");
+    const inactiveHtml = await inactiveHome.text();
+    assert.match(inactiveHtml, /<html lang="he" dir="rtl"/);
+    assert.doesNotMatch(inactiveHtml, /Elections held on schedule|Public Service Office/);
+
+    const unknown = await runtime.app.request("/he/not-a-real-route");
+    assert.equal(unknown.status, 404);
+    assert.equal(unknown.headers.get("cache-control"), "private, no-store");
+    const unknownHtml = await unknown.text();
+    assert.match(unknownHtml, /<html lang="he" dir="rtl"/);
+    assert.doesNotMatch(unknownHtml, /not-a-real-route/);
+    assert.doesNotMatch(unknownHtml, /\/en\/not-a-real-route|\/ar\/not-a-real-route/);
+
+    const plainUnknown = await runtime.app.request("/not-a-real-route");
+    assert.equal(plainUnknown.status, 404);
+    assert.equal(plainUnknown.headers.get("cache-control"), "private, no-store");
+    assert.equal(await plainUnknown.text(), "Not found");
     runtime.close();
   } finally {
     rmSync(dir, { recursive: true, force: true });

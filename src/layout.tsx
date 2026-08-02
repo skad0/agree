@@ -27,15 +27,16 @@ export function Shell({ locale, title, bodyClass, children }: { locale: Locale; 
   </html>;
 }
 
-export function Layout({ locale, title, path, languageQuery = "", children }: { locale: Locale; title: string; path: string; languageQuery?: string; children: Child }) {
+export function Layout({ locale, title, path, languageQuery = "", languageHref, children }: { locale: Locale; title: string; path: string; languageQuery?: string; languageHref?: (locale: Locale) => string; children: Child }) {
   // Strip only a complete registered locale segment. Keeping this derived from `locales` means
   // newly registered locales (and paths such as /uk/...) retain their route when switching.
   const localePrefix = locales.find((option) => path === `/${option}` || path.startsWith(`/${option}/`) || path.startsWith(`/${option}?`));
   const suffix = localePrefix ? path.slice(localePrefix.length + 1) : path;
   const query = languageQuery ? `&${languageQuery}` : "";
-  return <Shell locale={locale} title={title}>
+  return <Shell locale={locale} title={title} bodyClass="public-site">
       <a class="skip-link" href="#content">{t(locale, "skip")}</a>
-      <header class="wrap">
+      <div class="public-rule" aria-hidden="true"><span></span><span></span></div>
+      <header class="wrap site-header">
         <a class="wordmark" href={`/${locale}`}>{t(locale, "siteName")}</a>
         {/* Two tiers on purpose: what you can read, and what you can do. The three actions keep
             the same order and the same words everywhere, so the sequence can be memorised. */}
@@ -48,7 +49,7 @@ export function Layout({ locale, title, path, languageQuery = "", children }: { 
         <details class="languages">
           <summary><span class="label">{t(locale, "language")}</span> <span lang={locale}>{localeNames[locale]}</span></summary>
           <ul>{locales.map((option) => <li>
-            <a href={`/${option}${suffix}${suffix.includes("?") ? "&" : "?"}lang=1${query}`} hrefLang={option} lang={option} dir={dirOf(option)}
+            <a href={languageHref ? languageHref(option) : `/${option}${suffix}${suffix.includes("?") ? "&" : "?"}lang=1${query}`} hrefLang={option} lang={option} dir={dirOf(option)}
               aria-current={option === locale ? "true" : undefined}>{localeNames[option]}</a>
           </li>)}</ul>
         </details>

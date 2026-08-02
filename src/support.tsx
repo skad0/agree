@@ -5,6 +5,8 @@ import type { Db } from "./db.js";
 import { sendEmail } from "./email.js";
 import { isLocale, t, type Locale } from "./i18n.js";
 import { Layout } from "./layout.js";
+import { privateNoStore, rememberLocale } from "./public-state.js";
+import { Callout, JourneyIntro, Surface } from "./components/public-ui.js";
 import { createRateLimiter, issueCsrf, text, Turnstile, validCsrf, validTurnstile } from "./security.js";
 
 export function registerSupportRoutes(app: Hono, db: Db, config: Config) {
@@ -13,13 +15,14 @@ export function registerSupportRoutes(app: Hono, db: Db, config: Config) {
   app.get("/:locale/support", (context) => {
     const locale = localeParam(context.req.param("locale"));
     if (!locale) return context.notFound();
-    if (!campaignEnabled(db, "support_enabled")) return page(context, locale, t(locale, "formDisabled"), config);
+    rememberLocale(context, locale, config);
+    if (!campaignEnabled(db, "support_enabled")) return page(context, locale, t(locale, "formDisabled"), config, 503);
     const csrf = issueCsrf(context, config);
-    context.header("Cache-Control", "private, no-store");
+    privateNoStore(context);
     return context.html(<Layout locale={locale} title={t(locale, "supportTitle")} path={context.req.path}>
-      <p class="eyebrow">{t(locale, "navSupport")}</p>
-      <h1 id="support-heading">{t(locale, "supportTitle")}</h1>
-      <form method="post" aria-labelledby="support-heading">
+      <div class="support-page">
+      <JourneyIntro eyebrow={t(locale, "navSupport")} title={t(locale, "supportTitle")} headingId="support-heading" />
+      <Surface class="support-form-surface"><form class="public-form" method="post" aria-labelledby="support-heading">
         <input type="hidden" name="csrf" value={csrf} />
         <label for="support-email">{t(locale, "email")}<input id="support-email" name="email" type="email" required autoComplete="email" maxLength={254} /></label>
         <label for="support-name">{t(locale, "name")}<input id="support-name" name="name" autoComplete="name" maxLength={100} /></label>
@@ -28,13 +31,15 @@ export function registerSupportRoutes(app: Hono, db: Db, config: Config) {
         <label for="support-consent"><input id="support-consent" name="consent" type="checkbox" value="yes" required /> {t(locale, "consent")}</label>
         <Turnstile config={config} />
         <button type="submit">{t(locale, "submit")}</button>
-      </form>
+      </form></Surface>
+      </div>
     </Layout>);
   });
 
   app.post("/:locale/support", async (context) => {
     const locale = localeParam(context.req.param("locale"));
     if (!locale) return context.notFound();
+    privateNoStore(context);
     if (!campaignEnabled(db, "support_enabled")) return page(context, locale, t(locale, "formDisabled"), config, 503);
     const body = await context.req.parseBody({ all: true });
     if (!rateLimit(context, "support", config.rateLimitSupport, 900)) return page(context, locale, "Too many requests", config, 429);
@@ -79,27 +84,29 @@ export function registerSupportRoutes(app: Hono, db: Db, config: Config) {
     const sent = await sendEmail(config, email, "Verify your civic campaign support", `<p><a href="${safeLink}">Verify your support</a></p>`);
     const developmentLink = !sent && config.nodeEnv !== "production" ? <p><a href={link}>Development verification link</a></p> : null;
     return context.html(<Layout locale={locale} title={t(locale, "verifyTitle")} path={`/${locale}/support`}>
-      <h1>{t(locale, "verifyTitle")}</h1><p role="status">{t(locale, sent ? "verificationSent" : "verificationUnavailable")}</p>{developmentLink}
+      <div class="support-page"><JourneyIntro title={t(locale, "verifyTitle")} /><Surface class="status-surface"><p role="status">{t(locale, sent ? "verificationSent" : "verificationUnavailable")}</p>{developmentLink}</Surface></div>
     </Layout>, sent || developmentLink ? 200 : 503);
   });
 
   app.get("/verify-email", (context) => {
     const locale = localeParam(context.req.query("locale") ?? "en") ?? "en";
     const token = context.req.query("token") ?? "";
+    rememberLocale(context, locale, config);
     const csrf = issueCsrf(context, config);
-    context.header("Cache-Control", "private, no-store");
-    return context.html(<Layout locale={locale} title={t(locale, "verifyTitle")} path={`/${locale}`}>
-      <h1>{t(locale, "verifyTitle")}</h1>
-      <form method="post" action="/verify-email">
+    privateNoStore(context);
+    return context.html(<Layout locale={locale} title={t(locale, "verifyTitle")} path={`/${locale}`} languageHref={(option) => `/verify-email?token=${encodeURIComponent(token)}&locale=${option}&lang=1`}>
+      <div class="support-page"><JourneyIntro title={t(locale, "verifyTitle")} />
+      <Surface class="verify-form-surface"><form class="public-form" method="post" action="/verify-email">
         <input type="hidden" name="csrf" value={csrf} /><input type="hidden" name="token" value={token} /><input type="hidden" name="locale" value={locale} />
         <Turnstile config={config} /><button type="submit">{t(locale, "verifyButton")}</button>
-      </form>
+      </form></Surface></div>
     </Layout>);
   });
 
   app.post("/verify-email", async (context) => {
     const body = await context.req.parseBody();
     const locale = localeParam(text(body.locale)) ?? "en";
+    privateNoStore(context);
     if (!rateLimit(context, "verify", config.rateLimitVerify, 3600)) return page(context, locale, "Too many requests", config, 429);
     if (!validCsrf(context, config, body) || !await validTurnstile(context, config, body)) return page(context, locale, t(locale, "invalidForm"), config, 403);
     const now = new Date().toISOString();
@@ -125,8 +132,8 @@ export function registerSupportRoutes(app: Hono, db: Db, config: Config) {
 }
 
 function page(context: any, locale: Locale, message: string, _config: Config, status = 200) {
-  context.header("Cache-Control", "private, no-store");
-  return context.html(<Layout locale={locale} title={t(locale, "siteName")} path={`/${locale}`}><p role="status">{message}</p></Layout>, status);
+  privateNoStore(context);
+  return context.html(<Layout locale={locale} title={t(locale, "siteName")} path={`/${locale}`}><div class="status-page"><h1>{t(locale, "siteName")}</h1><Callout tone="muted"><p role="status">{message}</p></Callout></div></Layout>, status);
 }
 
 function campaignEnabled(db: Db, column: "support_enabled") {

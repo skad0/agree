@@ -5,6 +5,10 @@ import { openDatabase } from "./db.js";
 import { registerPublicRoutes } from "./public.js";
 import { registerAdminRoutes } from "./admin.js";
 import { configureSecurity } from "./security.js";
+import { isLocale, t } from "./i18n.js";
+import { Layout } from "./layout.js";
+import { Callout, JourneyIntro } from "./components/public-ui.js";
+import { privateNoStore } from "./public-state.js";
 
 export function createApp(options: { sqlitePath?: string; env?: NodeJS.ProcessEnv } = {}) {
   const config = loadConfig(options.env);
@@ -21,7 +25,7 @@ export function createApp(options: { sqlitePath?: string; env?: NodeJS.ProcessEn
     context.header("X-Frame-Options", "DENY");
     if (config.nodeEnv === "production") context.header("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
   });
-  app.use("*", bodyLimit({ maxSize: 11 * 1024 * 1024, onError: (context) => context.text("Request body too large", 413) }));
+  app.use("*", bodyLimit({ maxSize: 11 * 1024 * 1024, onError: (context) => { privateNoStore(context); return context.text("Request body too large", 413); } }));
 
   app.get("/health", (context) => {
     db.prepare("SELECT 1").get();
@@ -32,9 +36,18 @@ export function createApp(options: { sqlitePath?: string; env?: NodeJS.ProcessEn
   registerAdminRoutes(app, db, config);
   registerPublicRoutes(app, db, config);
 
-  app.notFound((context) => context.text("Not found", 404));
+  app.notFound((context) => {
+    const segment = context.req.path.split("/")[1] ?? "";
+    if (!isLocale(segment) || context.req.path.startsWith("/admin")) { privateNoStore(context); return context.text("Not found", 404); }
+    const locale = segment;
+    privateNoStore(context);
+    return context.html(<Layout locale={locale} title={t(locale, "siteName")} path={`/${locale}`}>
+      <div class="status-page"><JourneyIntro title={t(locale, "unavailable")} /><Callout tone="muted"><p role="status">{t(locale, "unavailable")}</p></Callout></div>
+    </Layout>, 404);
+  });
   app.onError((error, context) => {
     console.error(error);
+    privateNoStore(context);
     return context.json({ error: { code: "INTERNAL_ERROR", message: "Internal server error" } }, 500);
   });
 

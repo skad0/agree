@@ -5,16 +5,18 @@ import type { Db } from "./db.js";
 import { sendEmail } from "./email.js";
 import { isLocale, t, type Locale } from "./i18n.js";
 import { Layout } from "./layout.js";
+import { privateNoStore, rememberLocale } from "./public-state.js";
+import { JourneyIntro, Surface } from "./components/public-ui.js";
 import { recordErasureEvent } from "./erasure-ledger.js";
 import { drainResponseObjectWork, queueResponseObjectDelete } from "./response-storage.js";
 import { createRateLimiter, issueCsrf, text, Turnstile, validCsrf, validTurnstile } from "./security.js";
 
 export function registerPrivacyRoutes(app: Hono, db: Db, config: Config) {
   const rateLimit = createRateLimiter();
-  app.get("/:locale/privacy", (context) => { const locale = localeParam(context.req.param("locale")); if (!locale) return context.notFound(); const body = t(locale, "privacyBody").replaceAll("{{PRIVACY_CONTACT_EMAIL}}", config.privacyContactEmail); return context.html(<Layout locale={locale} title={t(locale, "privacyTitle")} path={context.req.path}><h1>{t(locale, "privacyTitle")}</h1>{body.split("\n\n").map((paragraph) => <p>{paragraph}</p>)}<p><a href={`/${locale}/delete-data`}>{t(locale, "deleteTitle")}</a></p></Layout>); });
-  app.get("/:locale/delete-data", (context) => { const locale = localeParam(context.req.param("locale")); if (!locale) return context.notFound(); const csrf = issueCsrf(context, config); const token = context.req.query("token"); context.header("Cache-Control", "private, no-store"); return context.html(<Layout locale={locale} title={t(locale, "deleteTitle")} path={context.req.path}><h1>{t(locale, "deleteTitle")}</h1><p>{t(locale, "deleteBody")}</p><form method="post"><input type="hidden" name="csrf" value={csrf} />{token ? <><input type="hidden" name="token" value={token} /><Turnstile config={config} /><button type="submit">{t(locale, "deleteConfirm")}</button></> : <><label>{t(locale, "email")}<input type="email" name="email" required /></label><Turnstile config={config} /><button type="submit">{t(locale, "submit")}</button></>}</form></Layout>); });
+  app.get("/:locale/privacy", (context) => { const locale = localeParam(context.req.param("locale")); if (!locale) return context.notFound(); rememberLocale(context, locale, config); const body = t(locale, "privacyBody").replaceAll("{{PRIVACY_CONTACT_EMAIL}}", config.privacyContactEmail); return context.html(<Layout locale={locale} title={t(locale, "privacyTitle")} path={context.req.path}><div class="privacy-page"><JourneyIntro title={t(locale, "privacyTitle")} /><Surface class="privacy-surface"><div class="privacy-copy">{privacyParagraphs(body)}<p><a href={`/${locale}/delete-data`}>{t(locale, "deleteTitle")}</a></p></div></Surface></div></Layout>); });
+  app.get("/:locale/delete-data", (context) => { const locale = localeParam(context.req.param("locale")); if (!locale) return context.notFound(); rememberLocale(context, locale, config); const csrf = issueCsrf(context, config); const token = context.req.query("token"); privateNoStore(context); return context.html(<Layout locale={locale} title={t(locale, "deleteTitle")} path={context.req.path} languageQuery={token ? `token=${encodeURIComponent(token)}` : ""}><div class="privacy-page"><JourneyIntro title={t(locale, "deleteTitle")} /><Surface class="delete-form-surface"><p>{t(locale, "deleteBody")}</p><form class="public-form" method="post"><input type="hidden" name="csrf" value={csrf} />{token ? <><input type="hidden" name="token" value={token} /><Turnstile config={config} /><button type="submit">{t(locale, "deleteConfirm")}</button></> : <><label>{t(locale, "email")}<input type="email" name="email" required /></label><Turnstile config={config} /><button type="submit">{t(locale, "submit")}</button></>}</form></Surface></div></Layout>); });
   app.post("/:locale/delete-data", async (context) => {
-    const locale = localeParam(context.req.param("locale")); if (!locale) return context.notFound(); const body = await context.req.parseBody();
+    const locale = localeParam(context.req.param("locale")); if (!locale) return context.notFound(); privateNoStore(context); const body = await context.req.parseBody();
     if (!rateLimit(context, "delete", 3, 3600) || !validCsrf(context, config, body)) return statusPage(context, locale, t(locale, "invalidForm"), 403);
     const suppliedToken = text(body.token);
     if (suppliedToken) {
@@ -36,7 +38,7 @@ export function registerPrivacyRoutes(app: Hono, db: Db, config: Config) {
     const email = text(body.email).trim().toLowerCase(); if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return statusPage(context, locale, t(locale, "invalidForm"), 422);
     const token = randomBytes(32).toString("base64url"); const now = new Date().toISOString(); db.prepare("INSERT INTO privacy_deletion_tokens (token_hash, email_normalized, expires_at, created_at) VALUES (?, ?, ?, ?)").run(hashToken(token), email, new Date(Date.now() + 3_600_000).toISOString(), now);
     const link = `${config.appBaseUrl}/${locale}/delete-data?token=${token}`; const sent = await sendEmail(config, email, "Confirm civic platform data deletion", `<p><a href="${link}">Review and confirm data deletion</a></p>`); const developmentLink = !sent && config.nodeEnv !== "production" ? <p><a href={link}>Development deletion link</a></p> : null;
-    return context.html(<Layout locale={locale} title={t(locale, "deleteTitle")} path={context.req.path}><p role="status">{t(locale, sent ? "deleteSent" : "verificationUnavailable")}</p>{developmentLink}</Layout>, sent || developmentLink ? 200 : 503);
+    privateNoStore(context); return context.html(<Layout locale={locale} title={t(locale, "deleteTitle")} path={context.req.path}><div class="privacy-page"><Surface class="status-surface"><p role="status">{t(locale, sent ? "deleteSent" : "verificationUnavailable")}</p>{developmentLink}</Surface></div></Layout>, sent || developmentLink ? 200 : 503);
   });
 }
 function deleteData(db: Db, email: string, eraseThrough: string) {
@@ -55,4 +57,9 @@ function deleteData(db: Db, email: string, eraseThrough: string) {
 }
 function hashToken(token: string) { return createHash("sha256").update(token).digest("hex"); }
 function localeParam(value: string) { return isLocale(value) ? value : undefined; }
-function statusPage(context: any, locale: Locale, message: string, status = 200) { return context.html(<Layout locale={locale} title={t(locale, "deleteTitle")} path={`/${locale}/delete-data`}><p role="status">{message}</p></Layout>, status); }
+function privacyParagraphs(body: string) {
+  return body.split("\n\n").map((paragraph) => paragraph.startsWith("### ")
+    ? <h2>{paragraph.slice(4)}</h2>
+    : <p>{paragraph}</p>);
+}
+function statusPage(context: any, locale: Locale, message: string, status = 200) { privateNoStore(context); return context.html(<Layout locale={locale} title={t(locale, "deleteTitle")} path={`/${locale}/delete-data`}><div class="privacy-page"><h1>{t(locale, "deleteTitle")}</h1><Surface class="status-surface"><p role="status">{message}</p></Surface></div></Layout>, status); }

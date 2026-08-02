@@ -2,15 +2,17 @@ import type { Hono } from "hono";
 import { AMHARIC_BOLD, AMHARIC_REGULAR, CSS, JS, THEME_JS, amharicBoldPath, amharicRegularPath, cssPath, jsPath, themePath } from "./assets.js";
 import { registerContentRoutes } from "./content.js";
 import { markdown } from "./markdown.js";
-import { getCookie, setCookie } from "hono/cookie";
+import { getCookie } from "hono/cookie";
 import type { Config } from "./config.js";
 import type { Db } from "./db.js";
-import { dirOf, isLocale, localeFromRequest, localeNames, locales, t, type Locale } from "./i18n.js";
+import { isLocale, localeFromRequest, t, type Locale } from "./i18n.js";
 import { Layout } from "./layout.js";
 import { registerRequestRoutes } from "./requests.js";
 import { registerResponseRoutes } from "./responses.js";
 import { registerPrivacyRoutes } from "./privacy.js";
 import { registerSupportRoutes } from "./support.js";
+import { Callout, PrimaryAction, Surface } from "./components/public-ui.js";
+import { privateNoStore, publicCache, publicCampaignActive, publicRequestsEnabled, rememberLocale } from "./public-state.js";
 
 type Demand = { id: number; title: string | null; body: string | null };
 
@@ -36,7 +38,7 @@ export function registerPublicRoutes(app: Hono, db: Db, config: Config) {
   registerRequestRoutes(app, db, config);
   registerResponseRoutes(app, db, config);
   registerPrivacyRoutes(app, db, config);
-  registerContentRoutes(app, db);
+  registerContentRoutes(app, db, config);
 
   app.get("/", (context) => context.redirect(`/${localeFromRequest(getCookie(context, "locale"), context.req.header("Accept-Language"))}`));
 
@@ -44,7 +46,9 @@ export function registerPublicRoutes(app: Hono, db: Db, config: Config) {
     const locale = publicLocale(context.req.param("locale"));
     if (!locale) return context.notFound();
     rememberLocale(context, locale, config);
+    if (!publicCampaignActive(db)) return statusPage(context, locale, t(locale, "formDisabled"), 503);
     const demands = demandRows(db, locale);
+    const requestsEnabled = publicRequestsEnabled(db);
     const counts = {
       supporters: Number(db.prepare("SELECT count(*) AS count FROM supporters WHERE email_verified_at IS NOT NULL AND deleted_at IS NULL").get()?.count ?? 0),
       generated: Number(db.prepare("SELECT count(*) AS count FROM generated_requests").get()?.count ?? 0),
@@ -53,15 +57,25 @@ export function registerPublicRoutes(app: Hono, db: Db, config: Config) {
     };
     publicCache(context);
     return context.html(<Layout locale={locale} title={t(locale, "homeTitle")} path={context.req.path}>
-      <nav class="scripts" aria-label={t(locale, "language")}>
-        {locales.map((option) => <a href={`/${option}?lang=1`} hrefLang={option} lang={option} dir={dirOf(option)}
-          aria-current={option === locale ? "true" : undefined}>{localeNames[option]}</a>)}
-      </nav>
-      <p class="eyebrow">{t(locale, "slogan")}</p>
-      <h1 id="home-heading">{t(locale, "homeTitle")}</h1>
-      <p class="lede">{t(locale, "subtitle")}</p>
-      <p><a role="button" class="cta" href={`/${locale}/support`}>{t(locale, "cta")}</a></p>
-      <p class="neutrality" role="note">{t(locale, "neutrality")}</p>
+      <section class="home-hero" aria-labelledby="home-heading">
+        <p class="eyebrow">{t(locale, "slogan")}</p>
+        <h1 id="home-heading">{t(locale, "homeTitle")}</h1>
+        {requestsEnabled ? <div class="ask-action-row"><PrimaryAction href={`/${locale}/request`}>{t(locale, "navRequest")}</PrimaryAction></div> : null}
+        <nav class="suggestions" aria-label={t(locale, "documentsTitle")}>
+          <span>{t(locale, "documentsTitle")}</span>
+          <a href={`/${locale}/standard`}>{t(locale, "navStandard")}</a>
+          <a href={`/${locale}/coalition-agreement`}>{t(locale, "navCoalition")}</a>
+          <a href={`/${locale}/first-100-days`}>{t(locale, "navPlan")}</a>
+        </nav>
+        <p class="proof-count"><bdi>{counts.generated}</bdi> {t(locale, "generated")}</p>
+      </section>
+
+      <Surface class="home-information">
+        <p>{t(locale, "problem")}</p>
+        <p>{t(locale, "solution")}</p>
+        <Callout tone="caution"><p role="note">{t(locale, "neutrality")}</p></Callout>
+        <p><a class="secondary-action" href={`/${locale}/support`}>{t(locale, "cta")}</a></p>
+      </Surface>
 
       <ul class="metrics" aria-label={t(locale, "supporters")}>
         {counts.supporters > 0 ? <li><strong>{counts.supporters}</strong><span>{t(locale, "supporters")}</span></li> : null}
@@ -69,9 +83,6 @@ export function registerPublicRoutes(app: Hono, db: Db, config: Config) {
         {counts.sent > 0 ? <li><strong>{counts.sent}</strong><span>{t(locale, "sent")}</span></li> : null}
         {counts.responses > 0 ? <li><strong>{counts.responses}</strong><span>{t(locale, "responses")}</span></li> : null}
       </ul>
-
-      <p>{t(locale, "problem")}</p>
-      <p>{t(locale, "solution")}</p>
 
       {/* The three actions in the order a supporter performs them, always numbered the same way. */}
       <h2 class="section-label">{t(locale, "howItWorks")}</h2>
@@ -110,17 +121,11 @@ function demandList(locale: Locale, demands: Demand[], full = false) {
   </li>)}</ol>;
 }
 
+function statusPage(context: any, locale: Locale, message: string, status = 200) {
+  privateNoStore(context);
+  return context.html(<Layout locale={locale} title={t(locale, "siteName")} path={`/${locale}`}><div class="status-page"><h1>{t(locale, "siteName")}</h1><p role="status">{message}</p></div></Layout>, status);
+}
+
 function publicLocale(value: string) {
   return isLocale(value) ? value : undefined;
-}
-
-function rememberLocale(context: any, locale: Locale, config: Config) {
-  if (context.req.query("lang") === "1") {
-    setCookie(context, "locale", locale, { httpOnly: true, secure: config.nodeEnv === "production", sameSite: "Lax", maxAge: 31_536_000, path: "/" });
-    context.header("Cache-Control", "private, no-store");
-  }
-}
-
-function publicCache(context: any) {
-  if (!context.res.headers.has("Cache-Control")) context.header("Cache-Control", "public, max-age=0, s-maxage=60");
 }
