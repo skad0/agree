@@ -9,7 +9,8 @@ try {
   for (const path of ["/health", "/en", "/he", "/ar", "/yi", "/ru", "/uk", "/am",
     "/en/standard", "/he/standard", "/uk/standard", "/en/coalition-agreement", "/uk/coalition-agreement", "/en/first-100-days", "/ar/first-100-days", "/uk/first-100-days",
     "/en/government-model", "/uk/government-model", "/en/about", "/uk/about", "/en/methodology", "/uk/methodology", "/en/demands",
-    "/en/support", "/uk/support", "/en/request", "/uk/request", "/en/responses/new", "/uk/responses/new", "/en/privacy", "/uk/privacy", "/en/delete-data", "/uk/delete-data", "/admin"]) {
+    "/en/support", "/uk/support", "/en/request", "/uk/request", "/en/responses/new", "/uk/responses/new", "/en/privacy", "/uk/privacy", "/en/delete-data", "/uk/delete-data",
+    "/en/terms", "/uk/terms", "/he/terms", "/en/accessibility", "/uk/accessibility", "/he/accessibility", "/en/corrections", "/uk/corrections", "/he/corrections", "/admin"]) {
     const response = await runtime.app.request(path); const expected = expect[path] ?? 200;
     console.log(`${response.status} ${path}`); if (response.status !== expected) throw new Error(`Expected ${expected}`);
   }
