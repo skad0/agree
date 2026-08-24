@@ -64,6 +64,9 @@ export function Layout({ locale, title, path, languageQuery = "", languageHref, 
         <a href={`/${locale}/coalition-agreement`}>{t(locale, "navCoalition")}</a>
         <a href={`/${locale}/methodology`}>{t(locale, "navMethodology")}</a>
         <a href={`/${locale}/privacy`}>{t(locale, "navPrivacy")}</a>
+        <a href={`/${locale}/terms`}>{t(locale, "navTerms")}</a>
+        <a href={`/${locale}/accessibility`}>{t(locale, "navAccessibility")}</a>
+        <a href={`/${locale}/corrections`}>{t(locale, "navCorrections")}</a>
         <AppearanceSwitcher locale={locale} />
       </footer>
   </Shell>;

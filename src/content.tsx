@@ -34,6 +34,12 @@ export function registerContentRoutes(app: Hono, db: Db, config: Config) {
   page("government-model", "modelTitle", "modelLede", (locale) => portfolioGrid(locale, portfolios(db, locale)));
   page("about", "aboutTitle", "slogan", (locale) => prose(t(locale, "aboutBody")));
   page("methodology", "methodologyTitle", "slogan", (locale) => prose(t(locale, "methodologyBody")));
+  // Canonical package Part XIV (terms) and Part XV (accessibility); corrections derive from the
+  // user-rights list in Part XIII. The contact placeholder resolves to the operational address.
+  const contact = (locale: Locale, key: string) => t(locale, key).replaceAll("{{PRIVACY_CONTACT_EMAIL}}", config.privacyContactEmail);
+  page("terms", "termsTitle", "slogan", (locale) => prose(contact(locale, "termsBody")));
+  page("accessibility", "accessibilityTitle", "slogan", (locale) => prose(contact(locale, "accessibilityBody")));
+  page("corrections", "correctionsTitle", "slogan", (locale) => prose(contact(locale, "correctionsBody")));
 
   // The old placeholder route keeps working so existing links do not break.
   app.get("/:locale/demands", (context) => {

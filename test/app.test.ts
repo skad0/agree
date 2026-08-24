@@ -171,7 +171,7 @@ test("document surfaces preserve canonical routes and server-render all content 
   const dir = mkdtempSync(join(tmpdir(), "agree-document-surfaces-"));
   try {
     const { app, db, close } = createApp({ sqlitePath: join(dir, "app.db") });
-    const urls = ["/en/standard", "/en/coalition-agreement", "/en/first-100-days", "/en/government-model", "/en/about", "/en/methodology", "/he/standard", "/he/coalition-agreement", "/he/first-100-days", "/he/government-model", "/he/about", "/he/methodology"];
+    const urls = ["/en/standard", "/en/coalition-agreement", "/en/first-100-days", "/en/government-model", "/en/about", "/en/methodology", "/en/terms", "/en/accessibility", "/en/corrections", "/he/standard", "/he/coalition-agreement", "/he/first-100-days", "/he/government-model", "/he/about", "/he/methodology", "/he/terms", "/he/accessibility", "/he/corrections"];
     for (const url of urls) {
       const response = await app.request(url);
       assert.equal(response.status, 200, url);
@@ -209,6 +209,14 @@ test("document surfaces preserve canonical routes and server-render all content 
     assert.match(about, /independent civic platform/);
     assert.match(methodology, /Every figure is counted and published separately/);
     assert.match(methodology, /This does not mean it was sent/);
+
+    const terms = await (await app.request("/en/terms")).text();
+    assert.match(terms, /does not represent a state body/);
+    assert.match(terms, /privacy@example\.org|does not confirm delivery/);
+    const accessibility = await (await app.request("/he/accessibility")).text();
+    assert.match(accessibility, /תקן|WCAG/);
+    const corrections = await (await app.request("/en/corrections")).text();
+    assert.match(corrections, /correction/);
 
     for (const locale of ["en", "he"] as const) {
       const compatibility = await app.request(`/${locale}/demands`);
@@ -330,7 +338,7 @@ test("every locale has every key used by the templates", async () => {
   const dir = mkdtempSync(join(tmpdir(), "agree-i18n-"));
   try {
     const { app, close } = createApp({ sqlitePath: join(dir, "app.db") });
-    const paths = ["", "/standard", "/coalition-agreement", "/first-100-days", "/government-model", "/about", "/methodology", "/support", "/request", "/responses/new", "/privacy"];
+    const paths = ["", "/standard", "/coalition-agreement", "/first-100-days", "/government-model", "/about", "/methodology", "/support", "/request", "/responses/new", "/privacy", "/terms", "/accessibility", "/corrections"];
     for (const locale of ["he", "ar", "yi", "ru", "uk", "en", "am"]) {
       for (const path of paths) {
         const response = await app.request(`/${locale}${path}`);

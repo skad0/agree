@@ -123,5 +123,14 @@
   "appearance": "Appearance",
   "appearanceLight": "Light",
   "appearanceDark": "Dark",
-  "appearanceSystem": "System"
+  "appearanceSystem": "System",
+  "navTerms": "Terms",
+  "navAccessibility": "Accessibility",
+  "navCorrections": "Corrections",
+  "termsTitle": "Terms of use",
+  "termsBody": "### Purpose\n\nThe platform provides information and a technical tool for composing a personal appeal.\n\nIt:\n\n- does not represent a state body;\n- is not a legal adviser;\n- does not guarantee a reply;\n- does not confirm delivery;\n- does not express a party's position on its behalf.\n\n### User obligations\n\nThe user must not:\n\n- impersonate another person;\n- upload forged material;\n- alter a reply so as to distort its meaning;\n- publish unnecessary personal data;\n- use the service for threats or mass spam;\n- bypass technical restrictions.\n\n### User material\n\nBy uploading material, the user permits the operator to:\n\n- store it;\n- verify the source;\n- conceal personal data;\n- contact the recipient;\n- publish the verified part together with context.\n\nSubmitting material does not guarantee publication.\n\n### Moderation\n\nThe operator may:\n\n- request confirmation;\n- conceal personal data;\n- reject material;\n- correct a technical error;\n- suspend a feature in case of abuse.",
+  "accessibilityTitle": "Accessibility statement",
+  "accessibilityBody": "The project aims to conform to Israeli Standard 5568 and level AA of the applicable WCAG. Official guidance indicates that the Israeli web accessibility standard is based on WCAG 2.0 level AA. The exact legal applicability and possible exemptions depend on the operator's status and the nature of the service, so a separate review is conducted before launch.\n\nThe site provides:\n\n- keyboard operation;\n- visible focus;\n- semantic structure;\n- form labels;\n- error messages for screen readers;\n- correct RTL and LTR;\n- sufficient contrast;\n- scaling;\n- alternative text;\n- reduced motion support;\n- an accessibility statement in every language.\n\nAccessibility contact: {{PRIVACY_CONTACT_EMAIL}}.",
+  "correctionsTitle": "Data corrections",
+  "correctionsBody": "A user may request:\n\n- access to their data;\n- correction;\n- deletion;\n- refusal of notifications;\n- withdrawal of consent to publication;\n- an explanation of the purpose of processing.\n\nTo correct data or request access, contact {{PRIVACY_CONTACT_EMAIL}}. Deletion is carried out through the verified-email flow on the deletion page.\n\nA party or politician may confirm the authenticity of material, provide full context, or correct a technical error — at the same address."
 }
