@@ -297,6 +297,11 @@ footer.wrap { display: flex; flex-wrap: wrap; gap: .25rem 1.5rem; }
 .public-site .recipient-name { font-size: 1.05rem; }
 .public-site .recipient-ask { display: inline-flex; align-items: center; min-block-size: 2.75rem; padding-inline: 1rem; border: 1px solid var(--seal); border-radius: 3px; color: var(--seal); text-decoration: none; font-weight: 700; }
 .public-site .recipient-ask:hover { background: var(--seal); color: var(--paper); }
+.public-site .recipient-row-selected { border-color: var(--seal); }
+.public-site .recipient-actions { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
+.public-site .recipient-actions button, .public-site .directory-basket button { min-block-size: 2.75rem; }
+.public-site .directory-basket { display: grid; gap: .5rem; }
+.public-site .directory-basket ul { list-style: none; padding: 0; margin: 0; display: grid; gap: .35rem; }
 .public-site .request-recipient-line { margin-block: 0 1.5rem; font-size: 1.1rem; }
 .public-site .request-form { max-inline-size: 48rem; }
 .public-site .request-form fieldset { border: 0; padding: 0; }

@@ -402,12 +402,13 @@ test("appeals render in seven locales, count every action, and do not store pers
     const actionHtml = await previewForAction.text();
     const capability = actionHtml.match(/name="capability" value="([^"]+)"/)?.[1];
     const actionRequestId = actionHtml.match(/name="requestId" value="(\d+)"/)?.[1];
-    assert.ok(capability); assert.ok(actionRequestId);
+    const contactProof = actionHtml.match(/name="contactProof" value="([^"]+)"/)?.[1];
+    assert.ok(capability); assert.ok(actionRequestId); assert.ok(contactProof);
     const performed = ["email_opened", "whatsapp_opened", "text_copied", "shared_x", "shared_facebook", "shared_whatsapp", "shared_telegram"];
     for (const action of performed) {
       const response = await postForm(runtime.app, action === "text_copied" ? "/en/request/copy" : "/en/request/action", action === "text_copied"
         ? { csrf: actionForm.csrf, requestId: actionRequestId, capability }
-        : { csrf: actionForm.csrf, requestId: actionRequestId, capability, action, subject: "S", message: "EMAIL", whatsappMessage: "WA", socialMessage: "POST" }, actionForm.cookie);
+        : { csrf: actionForm.csrf, requestId: actionRequestId, capability, contactProof, action, subject: "S", message: "EMAIL", whatsappMessage: "WA", socialMessage: "POST" }, actionForm.cookie);
       assert.equal(response.status, action === "text_copied" ? 204 : 200, action);
     }
     const sent = await postForm(runtime.app, "/en/request/report-sent", { csrf: actionForm.csrf, requestId: actionRequestId, capability }, actionForm.cookie);
@@ -473,12 +474,13 @@ test("single-recipient request flow keeps RTL form, action, and result contracts
     assert.doesNotMatch(previewHtml, /delivery|delivered|מסירה|נמסר/i);
     const requestId = previewHtml.match(/name="requestId" value="(\d+)"/)?.[1];
     const capability = previewHtml.match(/name="capability" value="([^"]+)"/)?.[1];
-    assert.ok(requestId); assert.ok(capability);
+    const contactProof = previewHtml.match(/name="contactProof" value="([^"]+)"/)?.[1];
+    assert.ok(requestId); assert.ok(capability); assert.ok(contactProof);
     const stored = runtime.db.prepare("SELECT recipient_id, locale, selected_demands FROM generated_requests WHERE id = ?").get(Number(requestId)) as { recipient_id: number; locale: string; selected_demands: string };
     assert.deepEqual({ ...stored }, { recipient_id: 1, locale: "he", selected_demands: "[1]" });
 
     const opened = await postForm(runtime.app, "/he/request/action", {
-      csrf: csrf!, requestId: requestId!, capability: capability!, action: "email_opened", subject: "S", message: "M", whatsappMessage: "W", socialMessage: "P"
+      csrf: csrf!, requestId: requestId!, capability: capability!, contactProof: contactProof!, action: "email_opened", subject: "S", message: "M", whatsappMessage: "W", socialMessage: "P"
     }, cookie);
     assert.equal(opened.status, 200);
     assert.equal(opened.headers.get("cache-control"), "private, no-store");

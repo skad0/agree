@@ -148,5 +148,20 @@
   "directorySuggestUnavailable": "Підказки недоступні. Скористайтеся пошуком.",
   "directoryQuestionHelp": "Про це запитання",
   "directoryQuestionWhat": "Про що запитують?",
-  "directoryQuestionAnswer": "Що має містити конкретна відповідь?"
+  "directoryQuestionAnswer": "Що має містити конкретна відповідь?",
+  "directoryAdd": "Додати",
+  "directoryRemove": "Прибрати",
+  "directoryReview": "Перегляд звернень",
+  "directoryPrepare": "Підготувати звернення",
+  "directoryNextPerson": "Наступна людина",
+  "directoryPeopleSelected": "Вибрано людей: {n}",
+  "directoryHiddenSelected": "Приховано вибраних поточними фільтрами: {n}",
+  "directorySelectionMax": "Можна вибрати не більше {n} людей. Перші {n} залишаються.",
+  "directorySelectionExpired": "Термін вибору минув. Виберіть людей знову.",
+  "directorySelectionInvalid": "Не вдалося перевірити вибір. Виберіть людей знову.",
+  "directoryContactChanged": "Контактні дані змінилися. Зробіть попередній перегляд знову.",
+  "directoryUnavailablePerson": "З цією людиною більше не можна зв’язатися.",
+  "directoryDirectEmail": "Ел. пошта",
+  "directoryDirectWhatsapp": "WhatsApp",
+  "directorySharedMailbox": "{n} людини, 1 спільна партійна адреса"
 }

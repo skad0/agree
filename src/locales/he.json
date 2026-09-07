@@ -148,5 +148,20 @@
   "directorySuggestUnavailable": "ההצעות אינן זמינות. אפשר להשתמש בחיפוש.",
   "directoryQuestionHelp": "על השאלה הזו",
   "directoryQuestionWhat": "מה השאלה?",
-  "directoryQuestionAnswer": "מה תשובה קונקרטית תכלול?"
+  "directoryQuestionAnswer": "מה תשובה קונקרטית תכלול?",
+  "directoryAdd": "הוספה",
+  "directoryRemove": "הסרה",
+  "directoryReview": "סקירת הפניות",
+  "directoryPrepare": "הכנת הפניות",
+  "directoryNextPerson": "האדם הבא",
+  "directoryPeopleSelected": "נבחרו {n} אנשים",
+  "directoryHiddenSelected": "{n} מהנבחרים מוסתרים במסננים הנוכחיים",
+  "directorySelectionMax": "אפשר לבחור עד {n} אנשים. {n} הראשונים נשארים.",
+  "directorySelectionExpired": "בחירת האנשים פגה. בחרו שוב.",
+  "directorySelectionInvalid": "לא ניתן לאמת את הבחירה. בחרו שוב.",
+  "directoryContactChanged": "פרטי הקשר השתנו. יש להציג תצוגה מקדימה מחדש.",
+  "directoryUnavailablePerson": "אין יותר אפשרות לפנות לאדם הזה.",
+  "directoryDirectEmail": "דוא״ל",
+  "directoryDirectWhatsapp": "וואטסאפ",
+  "directorySharedMailbox": "{n} אנשים, כתובת מפלגה משותפת אחת"
 }
