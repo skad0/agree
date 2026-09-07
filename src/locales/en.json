@@ -163,5 +163,20 @@
   "directoryUnavailablePerson": "This person is no longer available to contact.",
   "directoryDirectEmail": "Email",
   "directoryDirectWhatsapp": "WhatsApp",
-  "directorySharedMailbox": "{n} people, 1 shared party address"
+  "directorySharedMailbox": "{n} people, 1 shared party address",
+  "stancePositionOn": "Position on",
+  "stanceNone": "No question selected",
+  "stanceUnknown": "No verified position available",
+  "stancePartyOnly": "Party position available — individual position unknown",
+  "stanceListOnly": "List position available — individual position unknown",
+  "stanceHistorical": "Earlier statement — see context",
+  "stanceUnderReview": "Under review",
+  "stanceMultiple": "Multiple statements — see dates",
+  "stanceSupports": "Supports",
+  "stanceSupportsWithReservations": "Supports with reservations",
+  "stanceOpposes": "Opposes",
+  "stanceStatementAvailable": "Statement available",
+  "stanceSource": "Source",
+  "stanceMethodology": "These labels are reviewed public statements about a named question. Missing evidence is not opposition. A party statement is not a personal statement.",
+  "methodologyStance": "### Reviewed public positions\n\nA public position appears only after an administrator reviews a source, matches it to a versioned standard question, and publishes it. A moderator marking a private reply as confirmed does not publish anything. Unknown means no verified record is available here; it does not mean the person opposes the question, refused to answer, or was never asked. A party or list statement is shown as an organisational position and is never treated as an individual's answer. An older question version is labelled as historical context, not a current answer. There is no score, ranking, endorsement or colour scale. To correct a record, write to {{PRIVACY_CONTACT_EMAIL}}."
 }

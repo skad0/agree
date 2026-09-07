@@ -286,6 +286,14 @@ footer.wrap { display: flex; flex-wrap: wrap; gap: .25rem 1.5rem; }
 .public-site .directory-search-actions, .public-site .directory-pager { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
 .public-site .directory-search-actions button, .public-site .directory-pager button { min-block-size: 2.75rem; }
 .public-site .directory-filter-note, .public-site .directory-status, .public-site .directory-chip, .public-site .recipient-meta { color: var(--mute); margin: 0; }
+.public-site .recipient-stance { color: var(--mute); margin-block: .4rem 0; font-size: .95rem; }
+.public-site .recipient-stance p { margin: 0; }
+.public-site .recipient-stance p + p { margin-block-start: .25rem; }
+.public-site .recipient-stance a { color: var(--ink); }
+.public-site .stance-question { display: grid; gap: .5rem; margin-block: 0 1.25rem; }
+.public-site .stance-question label { font-weight: 700; }
+.public-site .stance-question select { display: block; inline-size: 100%; margin-block-start: .5rem; min-block-size: 3.75rem; }
+.public-site .stance-methodology { color: var(--mute); font-size: .9rem; margin: 0; }
 .public-site .directory-suggest { list-style: none; margin: 0; padding: 0; border: 1px solid var(--rule); background: var(--card); }
 .public-site .directory-suggest[hidden] { display: none; }
 .public-site .directory-suggest [role=option] { display: flex; flex-wrap: wrap; gap: .35rem 1rem; align-items: baseline; min-block-size: 2.75rem; padding: .5rem 1rem; cursor: pointer; }

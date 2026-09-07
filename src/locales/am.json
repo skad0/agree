@@ -163,5 +163,20 @@
   "directoryUnavailablePerson": "ይህን ሰው ማግኘት አሁን አይቻልም።",
   "directoryDirectEmail": "ኢሜይል",
   "directoryDirectWhatsapp": "ዋትስአፕ",
-  "directorySharedMailbox": "{n} ሰዎች፣ 1 የጋራ የፓርቲ አድራሻ"
+  "directorySharedMailbox": "{n} ሰዎች፣ 1 የጋራ የፓርቲ አድራሻ",
+  "stancePositionOn": "አቋም በዚህ ጥያቄ",
+  "stanceNone": "ጥያቄ አልተመረጠም",
+  "stanceUnknown": "የተረጋገጠ አቋም የለም",
+  "stancePartyOnly": "የፓርቲ አቋም አለ — የግለሰቡ አቋም አይታወቅም",
+  "stanceListOnly": "የዝርዝር አቋም አለ — የግለሰቡ አቋም አይታወቅም",
+  "stanceHistorical": "ቀደም ያለ መግለጫ — አውድ ይመልከቱ",
+  "stanceUnderReview": "በግምገማ ላይ",
+  "stanceMultiple": "ብዙ መግለጫዎች — ቀኖችን ይመልከቱ",
+  "stanceSupports": "ይደግፋል",
+  "stanceSupportsWithReservations": "በማስታወሻ ይደግፋል",
+  "stanceOpposes": "ይቃወማል",
+  "stanceStatementAvailable": "መግለጫ አለ",
+  "stanceSource": "ምንጭ",
+  "stanceMethodology": "እነዚህ ምልክቶች በተጠቀሰ ጥያቄ ላይ የተገመገሙ ይፋዊ መግለጫዎች ናቸው። ማስረጃ አለመኖር ተቃውሞ አይደለም። የፓርቲ አቋም የግል አቋም አይደለም።",
+  "methodologyStance": "### የተገመገሙ ይፋዊ አቋሞች\n\nይፋዊ አቋም የሚታየው አስተዳዳሪ ምንጭን ከገመገመ፣ ከስሪት ከተሰጠ መደበኛ ጥያቄ ጋር ካጣጣመና ከፃፈ በኋላ ብቻ ነው። የግል ምላሽን አረጋጋጭ ሲያረጋግጥ ምንም አይታተምም። «የተረጋገጠ አቋም የለም» ማለት እዚህ የተረጋገጠ መዝገብ የለም ማለት ነው፤ ሰውየው እንደሚቃወም፣ መመለስ እንደከለከለ ወይም እንዳልተጠየቀ አይናገርም። የፓርቲ ወይም የዝርዝር አቋም እንደ ድርጅታዊ አቋም ይታያል እንጂ እንደ የግል መልስ አይቆጠርም። የቆየ የጥያቄ ስሪት እንደ ታሪካዊ አውድ ይሰየማል እንጂ እንደ የአሁን መልስ አይደለም። ነጥብ፣ ደረጃ፣ ድጋፍ ምልክት ወይም የቀለም ሚዛን የለም። መዝገብ ለማስተካከል ወደ {{PRIVACY_CONTACT_EMAIL}} ይጻፉ።"
 }

@@ -987,7 +987,7 @@ test("moderators are confined to response moderation and receive a restricted na
     assert.equal(dashboard.status, 200);
     const dashboardHtml = await dashboard.text();
     assert.match(dashboardHtml, /href="\/admin\/responses"/);
-    assert.doesNotMatch(dashboardHtml, /href="\/admin\/settings"|href="\/admin\/supporters"|href="\/admin\/audit"|href="\/admin\/demands"/);
+    assert.doesNotMatch(dashboardHtml, /href="\/admin\/settings"|href="\/admin\/supporters"|href="\/admin\/audit"|href="\/admin\/demands"|href="\/admin\/stances"/);
     assert.equal((await runtime.app.request("/admin/responses", { headers })).status, 200);
     const responseId = Number(runtime.db.prepare(`INSERT INTO submitted_responses
       (recipient_id, received_at, channel, response_text, submitter_email, consent_at, status, created_at)
@@ -996,11 +996,12 @@ test("moderators are confined to response moderation and receive a restricted na
     const updated = await postForm(runtime.app, `/admin/responses/${responseId}`, { csrf: responseForm.csrf, status: "confirmed" }, responseForm.cookie, headers);
     assert.equal(updated.status, 303);
     assert.equal(runtime.db.prepare("SELECT status FROM submitted_responses WHERE id = ?").get(responseId)?.status, "confirmed");
-    for (const path of ["/admin/demands", "/admin/recipients", "/admin/templates", "/admin/supporters", "/admin/supporters.csv", "/admin/audit", "/admin/settings", "/admin/export/stats"]) {
+    for (const path of ["/admin/demands", "/admin/recipients", "/admin/stances", "/admin/templates", "/admin/supporters", "/admin/supporters.csv", "/admin/audit", "/admin/settings", "/admin/export/stats"]) {
       assert.equal((await runtime.app.request(path, { headers })).status, 403, path);
     }
     assert.equal((await postForm(runtime.app, "/admin/settings", { csrf: "not-forbidden-to-parse", campaign: "yes" }, "", headers)).status, 403);
     assert.equal((await postForm(runtime.app, "/admin/demands", { csrf: "not-forbidden-to-parse", action: "save", locale: "en", title: "Nope", body: "Nope" }, "", headers)).status, 403);
+    assert.equal((await postForm(runtime.app, "/admin/stances", { csrf: "not-forbidden-to-parse", action: "publish", subjectKind: "person", subjectId: "1", questionVersionId: "1", classification: "supports" }, "", headers)).status, 403);
     runtime.close();
   } finally {
     rmSync(dir, { recursive: true, force: true });

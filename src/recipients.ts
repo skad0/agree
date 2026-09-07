@@ -41,6 +41,7 @@ export type DirectoryQuery = {
   partyId: number | null;
   personId: number | null;
   page: number;
+  questionVersionId: number | null;
 };
 
 export type DirectoryPage = {
@@ -100,16 +101,19 @@ export function parseDirectoryQuery(fields: {
   page?: string;
   currentPage?: string;
   clear?: string;
+  questionVersionId?: string;
 }): DirectoryQuery {
+  const questionVersionId = parsePositiveId(fields.questionVersionId);
   if (fields.clear) {
-    return { q: "", listId: null, partyId: null, personId: null, page: 1 };
+    return { q: "", listId: null, partyId: null, personId: null, page: 1, questionVersionId };
   }
   return {
     q: (fields.q ?? "").trim().slice(0, DIRECTORY_MAX_QUERY),
     listId: parsePositiveId(fields.listId),
     partyId: parsePositiveId(fields.partyId),
     personId: parsePositiveId(fields.personId),
-    page: Math.max(1, parsePositiveId(fields.page) ?? parsePositiveId(fields.currentPage) ?? 1)
+    page: Math.max(1, parsePositiveId(fields.page) ?? parsePositiveId(fields.currentPage) ?? 1),
+    questionVersionId
   };
 }
 
