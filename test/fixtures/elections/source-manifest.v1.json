@@ -1,0 +1,69 @@
+{
+  "version": 1,
+  "parserVersion": "1",
+  "limits": {
+    "timeoutMs": 20000,
+    "maxBytes": 5242880,
+    "maxRecords": 100000
+  },
+  "allowedHosts": [
+    "data.gov.il",
+    "e.data.gov.il",
+    "aws-e.data.gov.il",
+    "knesset.gov.il",
+    "www.gov.il"
+  ],
+  "sources": [
+    {
+      "id": "cec-candidates-lists",
+      "kind": "ckan_package",
+      "packageId": "candidates-lists",
+      "status": "verified",
+      "hosts": ["data.gov.il", "e.data.gov.il", "aws-e.data.gov.il"],
+      "resources": [
+        {
+          "id": "cec-knesset-19",
+          "electionNumber": 19,
+          "resourceId": "9162e35c-8834-422c-9202-ed42faf4a9f9",
+          "status": "verified"
+        },
+        {
+          "id": "cec-knesset-20",
+          "electionNumber": 20,
+          "resourceId": "7099b732-303e-4431-bbed-0e47e937b5e8",
+          "status": "verified"
+        },
+        {
+          "id": "cec-knesset-21",
+          "electionNumber": 21,
+          "resourceId": "597e0059-099e-4200-9131-b3ba645bc685",
+          "status": "verified"
+        },
+        {
+          "id": "cec-knesset-22",
+          "electionNumber": 22,
+          "resourceId": "ae484c34-86a5-4dd7-8462-a22a366287cc",
+          "status": "verified"
+        },
+        {
+          "id": "cec-knesset-23",
+          "electionNumber": 23,
+          "resourceId": "83d16550-75af-4c47-9f2c-dfeba4394fb1",
+          "status": "verified"
+        },
+        {
+          "id": "cec-knesset-24",
+          "electionNumber": 24,
+          "resourceId": "0f07d5bf-5b8d-4c28-bf37-e69459ddb4ed",
+          "status": "verified"
+        },
+        {
+          "id": "cec-newer",
+          "electionNumber": 25,
+          "status": "blocked",
+          "reason": "Official newer CEC candidate page returned HTTP 403; candidates-lists package covers elections 19-24 only."
+        }
+      ]
+    }
+  ]
+}

@@ -23,6 +23,13 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env) {
   }
   if (nodeEnv === "production" && (!isEmail(privacyContactEmail) || privacyContactEmail.includes("CAMPAIGN OPERATOR CONTACT"))) throw new Error("PRIVACY_CONTACT_EMAIL must be a real email address in production");
   const erasureLedger = parseErasureLedger(env, nodeEnv === "production");
+  const electionEtlEnabled = flag(env.ELECTION_ETL_ENABLED, false);
+  const electionEtlScheduleEnabled = flag(env.ELECTION_ETL_SCHEDULE_ENABLED, false);
+  const electionEtlElectionNumber = optionalPositiveInt(env.ELECTION_ETL_ELECTION_NUMBER, "ELECTION_ETL_ELECTION_NUMBER");
+  const electionEtlSourceManifest = env.ELECTION_ETL_SOURCE_MANIFEST?.trim() ?? "";
+  if (electionEtlEnabled && electionEtlElectionNumber === undefined) throw new Error("ELECTION_ETL_ELECTION_NUMBER is required when ELECTION_ETL_ENABLED=true");
+  if (electionEtlEnabled && !electionEtlSourceManifest) throw new Error("ELECTION_ETL_SOURCE_MANIFEST is required when ELECTION_ETL_ENABLED=true");
+  if (electionEtlScheduleEnabled && !electionEtlEnabled) throw new Error("ELECTION_ETL_SCHEDULE_ENABLED requires ELECTION_ETL_ENABLED=true");
   return {
     port,
     nodeEnv,
@@ -59,7 +66,12 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env) {
     rateLimitAction: integer(env.RATE_LIMIT_ACTION, 30),
     rateLimitResponses: integer(env.RATE_LIMIT_RESPONSES, 3),
     responsePutTimeoutMs: Math.min(integer(env.RESPONSE_PUT_TIMEOUT_MS, 30_000), 30_000),
-    erasureLedgerPutTimeoutMs: Math.min(integer(env.ERASURE_LEDGER_PUT_TIMEOUT_MS, 10_000), 30_000)
+    erasureLedgerPutTimeoutMs: Math.min(integer(env.ERASURE_LEDGER_PUT_TIMEOUT_MS, 10_000), 30_000),
+    electionEtlEnabled,
+    electionEtlElectionNumber,
+    electionEtlScheduleEnabled,
+    electionEtlSourceManifest,
+    electionEtlArtifactDir: env.ELECTION_ETL_ARTIFACT_DIR?.trim() || "data/election-artifacts"
   };
 }
 
@@ -84,6 +96,20 @@ function parseLedgerKeys(value: string | undefined) {
 function integer(value: string | undefined, fallback: number) {
   const parsed = Number(value);
   return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function optionalPositiveInt(value: string | undefined, name: string): number | undefined {
+  if (!value?.trim()) return undefined;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed <= 0) throw new Error(`${name} must be a positive integer`);
+  return parsed;
+}
+
+function flag(value: string | undefined, fallback: boolean): boolean {
+  if (value === undefined || value.trim() === "") return fallback;
+  if (value === "true") return true;
+  if (value === "false") return false;
+  throw new Error("boolean environment values must be true or false");
 }
 
 function isEmail(value: string) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value); }

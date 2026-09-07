@@ -609,7 +609,7 @@ test("public campaign gates and localized error pages do not leak campaign or un
   }
 });
 
-test("public post text mentions the handle, falls back to Knesset plus name, and builds share links", async () => {
+test("public post text mentions the handle, falls back to the name, and builds share links", async () => {
   const dir = mkdtempSync(join(tmpdir(), "agree-social-"));
   try {
     const runtime = createApp({ sqlitePath: join(dir, "app.db"), env: { NODE_ENV: "test", SESSION_SECRET: "test-secret", APP_BASE_URL: "https://campaign.test" } });
@@ -635,7 +635,8 @@ test("public post text mentions the handle, falls back to Knesset plus name, and
     assert.match(withHandle, /https:\/\/campaign.test\/en/);
 
     const withoutHandle = await preview(3);
-    assert.match(withoutHandle, /Knesset member MK Number 3/);
+    assert.match(withoutHandle, /MK Number 3/);
+    assert.doesNotMatch(withoutHandle, /Knesset member/);
 
     const request = runtime.db.prepare("SELECT id FROM generated_requests ORDER BY id DESC LIMIT 1").get() as { id: number };
     const form = await getForm(runtime.app, "/en/request/build?recipient=3");

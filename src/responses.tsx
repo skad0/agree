@@ -4,6 +4,7 @@ import type { Config } from "./config.js";
 import type { Db } from "./db.js";
 import { isLocale, t, type Locale } from "./i18n.js";
 import { Layout } from "./layout.js";
+import { listNamedRecipients } from "./recipients.js";
 import { privateNoStore, rememberLocale } from "./public-state.js";
 import { Callout, JourneyIntro, Surface } from "./components/public-ui.js";
 import { hasObjectStorage, putObject, RESPONSE_PUT_TIMEOUT_MS } from "./s3.js";
@@ -22,7 +23,7 @@ export function registerResponseRoutes(app: Hono, db: Db, config: Config) {
     if (!campaignEnabled(db)) return statusPage(context, locale, t(locale, "formDisabled"), 503);
     const csrf = issueCsrf(context, config);
     const submissionToken = issueResponseSubmissionToken(config);
-    const recipients = db.prepare(`SELECT r.id, rt.name FROM recipients r JOIN recipient_translations rt ON rt.recipient_id = r.id AND rt.locale = ? WHERE r.is_active = 1 ORDER BY rt.name`).all(locale) as { id: number; name: string }[];
+    const recipients = listNamedRecipients(db, locale);
     privateNoStore(context);
     return context.html(<Layout locale={locale} title={t(locale, "responseTitle")} path={context.req.path}>
       <div class="response-page"><JourneyIntro eyebrow={t(locale, "navResponse")} title={t(locale, "responseTitle")} headingId="response-heading" />
