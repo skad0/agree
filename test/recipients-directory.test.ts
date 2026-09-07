@@ -45,8 +45,12 @@ test("listContactableRecipients matches previous request eligibility on seed dat
     assert.ok(browse.some((row) => row.id === 9001 && row.contactable === false));
     assert.ok(browse.some((row) => row.id === actual[0]!.id && row.contactable === true));
 
-    assert.equal(mention({ type: "politician", name: "MK Number 3", socialHandle: null }, "en"), "MK Number 3");
-    assert.equal(mention({ type: "politician", name: "MK Number 2", socialHandle: "@mk_handle" }, "en"), "@mk_handle");
+    const electionId = Number((db.prepare(`INSERT INTO elections (number, publication_status) VALUES (24, 'historical') RETURNING id`).get() as { id: number }).id);
+    db.prepare(`INSERT INTO directory_publications (election_id, version, status, activated_at) VALUES (?, 1, 'active', ?)`).run(electionId, new Date().toISOString());
+    assert.ok(listDirectoryBrowse(db, "he").some((row) => row.id === actual[0]!.id));
+
+    assert.equal(mention({ name: "MK Number 3", socialHandle: null }), "MK Number 3");
+    assert.equal(mention({ name: "MK Number 2", socialHandle: "@mk_handle" }), "@mk_handle");
     db.close();
   } finally {
     rmSync(dir, { recursive: true, force: true });

@@ -43,8 +43,6 @@ export function hasSendableChannel(recipient: Pick<Recipient, "email" | "whatsap
 }
 
 export function listDirectoryBrowse(db: Db, locale: Locale): DirectoryBrowseItem[] {
-  const published = db.prepare("SELECT 1 FROM directory_publications WHERE status = 'active' LIMIT 1").get();
-  if (published) return [];
   return listNamedRecipients(db, locale).map((row) => ({
     id: row.id,
     name: row.name,
@@ -53,6 +51,6 @@ export function listDirectoryBrowse(db: Db, locale: Locale): DirectoryBrowseItem
   }));
 }
 
-export function mention(recipient: Pick<Recipient, "name" | "type" | "socialHandle">, _locale: Locale): string {
+export function mention(recipient: Pick<Recipient, "name" | "socialHandle">): string {
   return recipient.socialHandle?.trim() || recipient.name;
 }

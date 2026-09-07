@@ -93,7 +93,7 @@ export function registerRequestRoutes(app: Hono, db: Db, config: Config) {
     const fields = {
       recipient: recipient.name,
       demands: demands.map((demand) => `• ${demand.title}`).join("\n"),
-      handle: mention(recipient, messageLocale),
+      handle: mention(recipient),
       link: `${config.appBaseUrl}/${messageLocale}`,
       name: text(body.name).slice(0, 100), city: text(body.city).slice(0, 100), context: text(body.context).slice(0, 500)
     };
@@ -216,7 +216,7 @@ export function registerRequestRoutes(app: Hono, db: Db, config: Config) {
     const demands = placeholders ? db.prepare(`SELECT dt.title FROM demand_translations dt WHERE dt.locale = ? AND dt.demand_id IN (${placeholders}) ORDER BY dt.demand_id`).all(request.locale, ...demandIds) as { title: string }[] : [];
     const social = db.prepare("SELECT body FROM message_templates WHERE locale = ? AND channel = 'social'").get(request.locale) as { body: string } | undefined;
     const recipient = { id: 0, type: request.type, name: request.recipient, email: null, whatsapp: null, socialHandle: request.socialHandle } satisfies Recipient;
-    const message = social ? fill(social.body, { recipient: request.recipient, demands: demands.map((demand) => `• ${demand.title}`).join("\n"), handle: mention(recipient, request.locale), link: `${config.appBaseUrl}/${request.locale}/request/result?request=${request.publicId}`, name: "", city: "", context: "" }) : `${mention(recipient, request.locale)}\n\n${demands.map((demand) => `• ${demand.title}`).join("\n")}`;
+    const message = social ? fill(social.body, { recipient: request.recipient, demands: demands.map((demand) => `• ${demand.title}`).join("\n"), handle: mention(recipient), link: `${config.appBaseUrl}/${request.locale}/request/result?request=${request.publicId}`, name: "", city: "", context: "" }) : `${mention(recipient)}\n\n${demands.map((demand) => `• ${demand.title}`).join("\n")}`;
     const share = encodeURIComponent(message);
     const link = encodeURIComponent(`${config.appBaseUrl}/${request.locale}/request/result?request=${request.publicId}`);
     privateNoStore(context);
