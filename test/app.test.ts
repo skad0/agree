@@ -768,6 +768,7 @@ test("ambiguous aborted PUT retains delayed cleanup until a late remote commit i
     Object.entries({ csrf: form.csrf, submissionToken: form.html.match(/name="submissionToken" value="([^"]+)"/)?.[1] ?? "", recipientId: "1", receivedAt: "2026-01-01", channel: "email", responseText: "Ambiguous", email: "ambiguous@example.org", consent: "yes", "cf-turnstile-response": "valid" }).forEach(([key, value]) => body.set(key, value));
     body.set("file", new File([Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 9])], "late.png", { type: "image/png" }));
     assert.equal((await runtime.app.request("/en/responses", { method: "POST", headers: { cookie: form.cookie }, body })).status, 303);
+    await drainResponseObjectWork(runtime.db, runtime.config);
     assert.ok(putSignal);
     assert.equal(remoteObjects.size, 1);
     assert.deepEqual(deleted, []);
@@ -796,6 +797,7 @@ test("TypeError PUT failures are also retained as delayed ambiguous cleanup", as
     Object.entries({ csrf: form.csrf, submissionToken: form.html.match(/name="submissionToken" value="([^"]+)"/)?.[1] ?? "", recipientId: "1", receivedAt: "2026-01-01", channel: "email", responseText: "Transport failure", email: "transport@example.org", consent: "yes", "cf-turnstile-response": "valid" }).forEach(([key, value]) => body.set(key, value));
     body.set("file", new File([Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 3])], "transport.png", { type: "image/png" }));
     assert.equal((await runtime.app.request("/en/responses", { method: "POST", headers: { cookie: form.cookie }, body })).status, 303);
+    await drainResponseObjectWork(runtime.db, runtime.config);
     const next = Date.parse(String(runtime.db.prepare("SELECT next_attempt_at FROM response_object_work").get()?.next_attempt_at));
     assert.ok(next > Date.now() + 5_000);
     assert.equal(deletes, 0);
