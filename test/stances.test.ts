@@ -117,15 +117,31 @@ test("reviewed stances distinguish person from party, unknown, history, and retr
       statementAt: "2025-01-01"
     }, "published");
     assert.equal(older.ok, true);
+    const midVersion = saveQuestionVersion(db, { demandId: fixture.demandId, semanticVersion: "1.0.5", reviewed: true });
+    assert.equal(midVersion.ok, true);
+    if (midVersion.ok) {
+      const mid = saveStance(db, {
+        subject: { kind: "person", personId: fixture.unlinkedPersonId },
+        questionVersionId: midVersion.id,
+        classification: "opposes",
+        summary: "Mid wording.",
+        sourceUrl: "https://example.org/mid",
+        statementAt: "2025-06-01"
+      }, "published");
+      assert.equal(mid.ok, true);
+    }
     const historical = displayStanceForSubjects(db, { personId: fixture.unlinkedPersonId }, fixture.currentVersionId, "en");
     assert.equal(historical.state, "published");
     if (historical.state === "published") {
       assert.equal(historical.historical, true);
-      assert.equal(historical.classification, "supports_with_reservations");
+      assert.equal(historical.classification, "opposes");
+      assert.equal(historical.summary, "Mid wording.");
     }
 
     if (older.ok) {
       retractStance(db, older.id);
+      assert.equal(displayStanceForSubjects(db, { personId: fixture.unlinkedPersonId }, fixture.currentVersionId, "en").state, "published");
+      if (midVersion.ok) retractStance(db, Number(db.prepare("SELECT id FROM public_stances WHERE question_version_id = ?").get(midVersion.id)?.id));
       assert.equal(displayStanceForSubjects(db, { personId: fixture.unlinkedPersonId }, fixture.currentVersionId, "en").state, "unknown");
     }
 

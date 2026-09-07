@@ -402,7 +402,7 @@ function projectStance(
   if (publishedPersonal.length) return publishedView(publishedPersonal, "person", false, false);
   const olderPersonal = personal.filter((row) => row.publicationState === "published" && compareSemanticVersion(row.semanticVersion, selected.semanticVersion) < 0)
     .sort((a, b) => compareSemanticVersion(b.semanticVersion, a.semanticVersion));
-  if (olderPersonal.length) return publishedView(olderPersonal, "person", false, true);
+  if (olderPersonal.length) return publishedView(latestVersionRows(olderPersonal), "person", false, true);
 
   const selectedOrg = organizational.filter((row) => row.questionVersionId === selected.id && row.publicationState === "published");
   if (selectedOrg.length) {
@@ -413,9 +413,15 @@ function projectStance(
     .sort((a, b) => compareSemanticVersion(b.semanticVersion, a.semanticVersion));
   if (olderOrg.length) {
     const attribution: StanceSubjectKind = olderOrg[0]!.listId != null ? "list" : "party";
-    return publishedView(olderOrg, attribution, Boolean(subjects.personId), true);
+    return publishedView(latestVersionRows(olderOrg), attribution, Boolean(subjects.personId), true);
   }
   return { state: "unknown" };
+}
+
+function latestVersionRows(sortedDescending: StanceRecord[]): StanceRecord[] {
+  const latest = sortedDescending[0]?.semanticVersion;
+  if (!latest) return [];
+  return sortedDescending.filter((row) => row.semanticVersion === latest);
 }
 
 function publishedView(rows: StanceRecord[], attribution: StanceSubjectKind, individualUnknown: boolean, historical: boolean): StanceDisplay {
