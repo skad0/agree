@@ -1,4 +1,5 @@
-import { backup, DatabaseSync } from "node:sqlite";
+import { DatabaseSync } from "node:sqlite";
+import * as sqlite from "node:sqlite";
 import { mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -10,6 +11,8 @@ import { openDatabase } from "./db.js";
 import { queueResponseObjectDelete } from "./response-storage.js";
 import { randomBytes } from "node:crypto";
 
+type SqliteBackup = (sourceDb: DatabaseSync, path: string) => Promise<unknown>;
+
 export function hasBackupStorage(config: Config) {
   return Boolean(config.backupEndpoint && config.backupAccessKey && config.backupSecretKey && config.backupBucket);
 }
@@ -17,13 +20,23 @@ export function hasBackupStorage(config: Config) {
 export async function backupDatabase(db: Db, config: Config) {
   const store = backupStore(config); const directory = mkdtempSync(join(tmpdir(), "agree-backup-")); const file = join(directory, "app.db");
   try {
-    await backup(db, file);
+    await copyDatabaseFile(db, file);
     const data = new Uint8Array(await import("node:fs/promises").then((fs) => fs.readFile(file)));
     const day = new Date().toISOString().slice(0, 10); const week = isoWeek(new Date());
     const keys = [`daily/${day}.db`, `weekly/${week}.db`];
     for (const key of keys) await putStoreObject(store, key, "application/vnd.sqlite3", data);
     return keys;
   } finally { rmSync(directory, { recursive: true, force: true }); }
+}
+
+async function copyDatabaseFile(db: Db, file: string) {
+  const backupFn = (sqlite as { backup?: SqliteBackup }).backup;
+  if (typeof backupFn === "function") {
+    await backupFn(db, file);
+    return;
+  }
+  const escaped = file.replaceAll("'", "''");
+  db.exec(`VACUUM INTO '${escaped}'`);
 }
 
 export type RestoreReport = { backupKey: string; validatedEvents: number; eventDigest: string; affectedRows: number; attachmentJobs: number; activation: "activated" };
