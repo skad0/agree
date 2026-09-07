@@ -82,7 +82,6 @@ export function hasSendableChannel(recipient: Pick<Recipient, "email" | "whatsap
 }
 
 export function listDirectoryBrowse(db: Db, locale: Locale): DirectoryBrowseItem[] {
-  // ponytail: legacy named recipients until an accepted election publication exists; do not invent candidacies.
   return listNamedRecipients(db, locale).map((row) => ({
     id: row.id,
     name: row.name,
