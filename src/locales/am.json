@@ -148,5 +148,20 @@
   "directorySuggestUnavailable": "ጥቆማዎች አይገኙም። ፍለጋውን ይጠቀሙ።",
   "directoryQuestionHelp": "ስለዚህ ጥያቄ",
   "directoryQuestionWhat": "ምን እየተጠየቀ ነው?",
-  "directoryQuestionAnswer": "ተጨባጭ መልስ ምን ያካትታል?"
+  "directoryQuestionAnswer": "ተጨባጭ መልስ ምን ያካትታል?",
+  "directoryAdd": "ጨምር",
+  "directoryRemove": "አስወግድ",
+  "directoryReview": "ጥያቄዎችን ይገምግሙ",
+  "directoryPrepare": "ጥያቄዎችን አዘጋጁ",
+  "directoryNextPerson": "ቀጣዩ ሰው",
+  "directoryPeopleSelected": "{n} ሰዎች ተመርጠዋል",
+  "directoryHiddenSelected": "{n} የተመረጡ በአሁኑ ማጣሪያዎች ተደብቀዋል",
+  "directorySelectionMax": "እስከ {n} ሰዎች መምረጥ ይቻላል። የመጀመሪያዎቹ {n} ይቀራሉ።",
+  "directorySelectionExpired": "ምርጫው ጊዜው አልፏል። እንደገና ይምረጡ።",
+  "directorySelectionInvalid": "ምርጫውን ማረጋገጥ አልተቻለም። እንደገና ይምረጡ።",
+  "directoryContactChanged": "የመገናኛ ዝርዝሮች ተለውጠዋል። መልእክቱን እንደገና ይመልከቱ።",
+  "directoryUnavailablePerson": "ይህን ሰው ማግኘት አሁን አይቻልም።",
+  "directoryDirectEmail": "ኢሜይል",
+  "directoryDirectWhatsapp": "ዋትስአፕ",
+  "directorySharedMailbox": "{n} ሰዎች፣ 1 የጋራ የፓርቲ አድራሻ"
 }

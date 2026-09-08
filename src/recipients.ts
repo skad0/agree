@@ -98,6 +98,7 @@ export function parseDirectoryQuery(fields: {
   partyId?: string;
   personId?: string;
   page?: string;
+  currentPage?: string;
   clear?: string;
 }): DirectoryQuery {
   if (fields.clear) {
@@ -108,7 +109,7 @@ export function parseDirectoryQuery(fields: {
     listId: parsePositiveId(fields.listId),
     partyId: parsePositiveId(fields.partyId),
     personId: parsePositiveId(fields.personId),
-    page: Math.max(1, parsePositiveId(fields.page) ?? 1)
+    page: Math.max(1, parsePositiveId(fields.page) ?? parsePositiveId(fields.currentPage) ?? 1)
   };
 }
 
@@ -125,18 +126,14 @@ export function directoryFilters(items: DirectoryBrowseItem[]): DirectoryPage["f
   };
 }
 
-export function searchDirectory(items: DirectoryBrowseItem[], query: DirectoryQuery): DirectoryPage {
+function matchingDirectoryItems(items: DirectoryBrowseItem[], query: DirectoryQuery): DirectoryBrowseItem[] {
   const filters = directoryFilters(items);
   const knownLists = new Set(filters.lists.map((row) => row.id));
   const knownParties = new Set(filters.parties.map((row) => row.id));
-  if (query.listId && !knownLists.has(query.listId)) {
-    return { rows: [], total: 0, page: 1, pageCount: 1, filters };
-  }
-  if (query.partyId && !knownParties.has(query.partyId)) {
-    return { rows: [], total: 0, page: 1, pageCount: 1, filters };
-  }
+  if (query.listId && !knownLists.has(query.listId)) return [];
+  if (query.partyId && !knownParties.has(query.partyId)) return [];
   const terms = searchTokens(query.q);
-  const matched = items.filter((item) => {
+  return items.filter((item) => {
     if (query.personId && item.id !== query.personId) return false;
     if (query.listId && item.list?.id !== query.listId) return false;
     if (query.partyId && item.party?.id !== query.partyId) return false;
@@ -145,11 +142,36 @@ export function searchDirectory(items: DirectoryBrowseItem[], query: DirectoryQu
     const rank = (rankItem(a, terms) ?? 9) - (rankItem(b, terms) ?? 9);
     return rank || compareText(a.name, b.name) || a.id - b.id;
   });
+}
+
+export function searchDirectory(items: DirectoryBrowseItem[], query: DirectoryQuery): DirectoryPage {
+  const filters = directoryFilters(items);
+  const matched = matchingDirectoryItems(items, query);
   const total = matched.length;
   const pageCount = Math.max(1, Math.ceil(total / DIRECTORY_PAGE_SIZE));
   const page = Math.min(query.page, pageCount);
   const start = (page - 1) * DIRECTORY_PAGE_SIZE;
   return { rows: matched.slice(start, start + DIRECTORY_PAGE_SIZE), total, page, pageCount, filters };
+}
+
+export function selectedHiddenByFilter(items: DirectoryBrowseItem[], query: DirectoryQuery, selectedIds: number[]): number {
+  const matched = new Set(matchingDirectoryItems(items, query).map((row) => row.id));
+  return selectedIds.filter((id) => !matched.has(id)).length;
+}
+
+export function directoryPublicationRef(db: Db): { electionId: number; publicationId: number } | null {
+  const row = db.prepare(`SELECT id AS publicationId, election_id AS electionId FROM directory_publications WHERE status = 'active' ORDER BY id DESC LIMIT 1`)
+    .get() as { publicationId: number; electionId: number } | undefined;
+  return row ?? null;
+}
+
+export function recipientsByIds(db: Db, locale: Locale, ids: number[]): Recipient[] {
+  if (!ids.length) return [];
+  const found = new Map(listNamedRecipients(db, locale).filter((row) => ids.includes(row.id)).map((row) => [row.id, row]));
+  return ids.flatMap((id) => {
+    const row = found.get(id);
+    return row ? [row] : [];
+  });
 }
 
 export function suggestDirectory(items: DirectoryBrowseItem[], query: Pick<DirectoryQuery, "q" | "listId" | "partyId">): DirectorySuggestion[] {

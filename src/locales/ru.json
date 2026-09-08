@@ -148,5 +148,20 @@
   "directorySuggestUnavailable": "Подсказки недоступны. Воспользуйтесь поиском.",
   "directoryQuestionHelp": "Об этом вопросе",
   "directoryQuestionWhat": "О чём спрашивают?",
-  "directoryQuestionAnswer": "Что включить в конкретный ответ?"
+  "directoryQuestionAnswer": "Что включить в конкретный ответ?",
+  "directoryAdd": "Добавить",
+  "directoryRemove": "Убрать",
+  "directoryReview": "Просмотр обращений",
+  "directoryPrepare": "Подготовить обращения",
+  "directoryNextPerson": "Следующий человек",
+  "directoryPeopleSelected": "Выбрано людей: {n}",
+  "directoryHiddenSelected": "Скрыто выбранных текущими фильтрами: {n}",
+  "directorySelectionMax": "Можно выбрать не больше {n} человек. Первые {n} остаются.",
+  "directorySelectionExpired": "Срок выбора истёк. Выберите людей снова.",
+  "directorySelectionInvalid": "Не удалось проверить выбор. Выберите людей снова.",
+  "directoryContactChanged": "Контактные данные изменились. Сделайте предпросмотр снова.",
+  "directoryUnavailablePerson": "С этим человеком больше нельзя связаться.",
+  "directoryDirectEmail": "Эл. почта",
+  "directoryDirectWhatsapp": "WhatsApp",
+  "directorySharedMailbox": "{n} человека, 1 общий партийный адрес"
 }

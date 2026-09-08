@@ -148,5 +148,20 @@
   "directorySuggestUnavailable": "Suggestions are unavailable. Use Search.",
   "directoryQuestionHelp": "About this question",
   "directoryQuestionWhat": "What is being asked?",
-  "directoryQuestionAnswer": "What would a concrete answer include?"
+  "directoryQuestionAnswer": "What would a concrete answer include?",
+  "directoryAdd": "Add",
+  "directoryRemove": "Remove",
+  "directoryReview": "Review questions",
+  "directoryPrepare": "Prepare questions",
+  "directoryNextPerson": "Next person",
+  "directoryPeopleSelected": "{n} people selected",
+  "directoryHiddenSelected": "{n} selected people are hidden by the current filters",
+  "directorySelectionMax": "You can select up to {n} people. The first {n} remain selected.",
+  "directorySelectionExpired": "This selection expired. Choose people again.",
+  "directorySelectionInvalid": "This selection could not be verified. Choose people again.",
+  "directoryContactChanged": "Contact details changed. Preview this message again.",
+  "directoryUnavailablePerson": "This person is no longer available to contact.",
+  "directoryDirectEmail": "Email",
+  "directoryDirectWhatsapp": "WhatsApp",
+  "directorySharedMailbox": "{n} people, 1 shared party address"
 }

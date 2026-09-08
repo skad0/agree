@@ -148,5 +148,20 @@
   "directorySuggestUnavailable": "الاقتراحات غير متاحة. استخدموا البحث.",
   "directoryQuestionHelp": "عن هذا السؤال",
   "directoryQuestionWhat": "ما المطلوب؟",
-  "directoryQuestionAnswer": "ماذا تتضمن إجابة ملموسة؟"
+  "directoryQuestionAnswer": "ماذا تتضمن إجابة ملموسة؟",
+  "directoryAdd": "إضافة",
+  "directoryRemove": "إزالة",
+  "directoryReview": "مراجعة الأسئلة",
+  "directoryPrepare": "إعداد الأسئلة",
+  "directoryNextPerson": "الشخص التالي",
+  "directoryPeopleSelected": "تم اختيار {n} أشخاص",
+  "directoryHiddenSelected": "{n} من المختارين مخفيون بالمرشحات الحالية",
+  "directorySelectionMax": "يمكن اختيار {n} أشخاص كحد أقصى. يبقى أول {n}.",
+  "directorySelectionExpired": "انتهت صلاحية الاختيار. اختاروا من جديد.",
+  "directorySelectionInvalid": "تعذر التحقق من الاختيار. اختاروا من جديد.",
+  "directoryContactChanged": "تغيرت بيانات الاتصال. عاينوا الرسالة من جديد.",
+  "directoryUnavailablePerson": "لم يعد بالإمكان التواصل مع هذا الشخص.",
+  "directoryDirectEmail": "البريد",
+  "directoryDirectWhatsapp": "واتساب",
+  "directorySharedMailbox": "{n} أشخاص، عنوان حزب مشترك واحد"
 }

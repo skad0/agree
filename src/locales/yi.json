@@ -148,5 +148,20 @@
   "directorySuggestUnavailable": "די פֿאָרשלאָגן זענען נישט פֿאַראַן. נוצט זוכן.",
   "directoryQuestionHelp": "וועגן דער פֿראַגע",
   "directoryQuestionWhat": "וואָס פֿרעגט מען?",
-  "directoryQuestionAnswer": "וואָס זאָל אַ קאָנקרעטער ענטפֿער אַרײַננעמען?"
+  "directoryQuestionAnswer": "וואָס זאָל אַ קאָנקרעטער ענטפֿער אַרײַננעמען?",
+  "directoryAdd": "צולייגן",
+  "directoryRemove": "אַראָפּנעמען",
+  "directoryReview": "איבערקוקן די פֿראַגעס",
+  "directoryPrepare": "צוגרייטן די פֿראַגעס",
+  "directoryNextPerson": "דער נעקסטער מענטש",
+  "directoryPeopleSelected": "{n} מענטשן אויסגעקליבן",
+  "directoryHiddenSelected": "{n} אויסגעקליבענע זענען באַהאַלטן אין די איצטיקע פֿילטערס",
+  "directorySelectionMax": "מען קען אויסקלײַבן ביז {n} מענטשן. די ערשטע {n} בלײַבן.",
+  "directorySelectionExpired": "די אויסקלײַבונג איז אויסגעגאַנגען. קלײַבט ווידער.",
+  "directorySelectionInvalid": "מען קען נישט באַשטעטיקן די אויסקלײַבונג. קלײַבט ווידער.",
+  "directoryContactChanged": "די קאָנטאַקט־פּרטים האָבן זיך געביטן. מאַכט נאָך אַמאָל אַ פֿאָרויסיקע קוק.",
+  "directoryUnavailablePerson": "מען קען שוין נישט פֿאַרבינדן זיך מיטן מענטש.",
+  "directoryDirectEmail": "אימעיל",
+  "directoryDirectWhatsapp": "וואַטסאַפּ",
+  "directorySharedMailbox": "{n} מענטשן, 1 געמיינזאַמע פּאַרטיי־אַדרעס"
 }

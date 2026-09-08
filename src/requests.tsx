@@ -4,13 +4,17 @@ import type { Config } from "./config.js";
 import type { Db } from "./db.js";
 import { isLocale, localeNames, locales, t, type Locale } from "./i18n.js";
 import { Layout } from "./layout.js";
-import { Callout, JourneyIntro, Surface } from "./components/public-ui.js";
+import { Callout, JourneyIntro, PrimaryAction, Surface } from "./components/public-ui.js";
 import {
+  directoryPublicationRef,
   getContactableRecipient,
+  listContactableRecipients,
   listDirectoryBrowse,
   mention,
   parseDirectoryQuery,
+  recipientsByIds,
   searchDirectory,
+  selectedHiddenByFilter,
   suggestDirectory,
   type DirectoryBrowseItem,
   type DirectoryPage,
@@ -19,6 +23,23 @@ import {
   type Recipient
 } from "./recipients.js";
 import { privateNoStore, rememberLocale } from "./public-state.js";
+import {
+  addRecipient,
+  beginHandoff,
+  completeCurrent,
+  contactFingerprint,
+  currentRecipientId,
+  emptyBasket,
+  issueContactProof,
+  readBasket,
+  removeRecipient,
+  SELECTION_MAX,
+  sharedMailboxGroups,
+  signBasket,
+  verifyContactProof,
+  type ContactDestination,
+  type SelectionBasket
+} from "./recipient-selection.js";
 import { createRateLimiter, issueCsrf, issueRequestCapability, text, Turnstile, validCsrf, validTurnstile, values, verifyRequestCapability } from "./security.js";
 
 type Template = { channel: "email" | "whatsapp" | "social"; subject: string | null; body: string };
@@ -36,9 +57,8 @@ export function registerRequestRoutes(app: Hono, db: Db, config: Config) {
     privateNoStore(context);
     if (!campaignEnabled(db)) return statusPage(context, locale, t(locale, "formDisabled"), 503);
     const csrf = issueCsrf(context, config);
-    const items = listDirectoryBrowse(db, locale);
     const query = parseDirectoryQuery({});
-    return context.html(directoryDocument(locale, context.req.path, csrf, query, searchDirectory(items, query), items));
+    return context.html(directoryPage(locale, context.req.path, csrf, db, query, emptyBasket(Date.now(), directoryPublicationRef(db)), "", undefined));
   });
 
   app.post("/:locale/request", async (context) => {
@@ -50,12 +70,75 @@ export function registerRequestRoutes(app: Hono, db: Db, config: Config) {
     if (!validCsrf(context, config, body)) return statusPage(context, locale, t(locale, "invalidForm"), 403);
     if (!campaignEnabled(db)) return statusPage(context, locale, t(locale, "formDisabled"), 503);
     const csrf = issueCsrf(context, config);
-    const items = listDirectoryBrowse(db, locale);
+    const loaded = loadBasket(db, config, body);
     const query = parseDirectoryQuery({
       q: text(body.q), listId: text(body.listId), partyId: text(body.partyId),
-      personId: text(body.personId), page: text(body.page), clear: text(body.clear)
+      personId: text(body.personId), page: text(body.page), currentPage: text(body.currentPage), clear: text(body.clear)
     });
-    return context.html(directoryDocument(locale, context.req.path, csrf, query, searchDirectory(items, query), items));
+    return context.html(directoryPage(locale, context.req.path, csrf, db, query, loaded.basket, loaded.token, selectionNotice(locale, loaded.reason)));
+  });
+
+  app.post("/:locale/request/selection", async (context) => {
+    const locale = localeParam(context.req.param("locale"));
+    if (!locale) return context.notFound();
+    privateNoStore(context);
+    const body = await context.req.parseBody();
+    if (!rateLimit(context, "directory-selection", 60, 3600)) return statusPage(context, locale, "Too many requests", 429);
+    if (!validCsrf(context, config, body)) return statusPage(context, locale, t(locale, "invalidForm"), 403);
+    if (!campaignEnabled(db)) return statusPage(context, locale, t(locale, "formDisabled"), 503);
+    const csrf = issueCsrf(context, config);
+    const loaded = loadBasket(db, config, body);
+    let basket = loaded.basket;
+    let reason: SelectionNoticeReason | undefined = loaded.reason;
+    const addId = positiveInteger(text(body.add));
+    const removeId = positiveInteger(text(body.remove));
+    if (addId) {
+      const eligible = new Set(listContactableRecipients(db, locale).map((row) => row.id));
+      const added = addRecipient(basket, addId, eligible);
+      basket = added.basket;
+      if (added.error === "limit") reason = "limit";
+      else if (added.error === "ineligible" && !reason) reason = "ineligible";
+    }
+    if (removeId) basket = removeRecipient(basket, removeId);
+    const query = parseDirectoryQuery({
+      q: text(body.q), listId: text(body.listId), partyId: text(body.partyId),
+      personId: text(body.personId), page: text(body.page), currentPage: text(body.currentPage)
+    });
+    return context.html(directoryPage(locale, `/${locale}/request`, csrf, db, query, basket, signedSelection(basket, config), selectionNotice(locale, reason)));
+  });
+
+  app.post("/:locale/request/review", async (context) => {
+    const locale = localeParam(context.req.param("locale"));
+    if (!locale) return context.notFound();
+    privateNoStore(context);
+    const body = await context.req.parseBody();
+    if (!rateLimit(context, "directory-review", 60, 3600)) return statusPage(context, locale, "Too many requests", 429);
+    if (!validCsrf(context, config, body)) return statusPage(context, locale, t(locale, "invalidForm"), 403);
+    if (!campaignEnabled(db)) return statusPage(context, locale, t(locale, "formDisabled"), 503);
+    const loaded = loadBasket(db, config, body);
+    if (loaded.reason || !loaded.basket.ids.length) {
+      const csrf = issueCsrf(context, config);
+      return context.html(directoryPage(locale, `/${locale}/request`, csrf, db, parseDirectoryQuery({}), loaded.basket, loaded.token, selectionNotice(locale, loaded.reason ?? "empty")));
+    }
+    const csrf = issueCsrf(context, config);
+    return context.html(reviewDocument(locale, context.req.path, csrf, db, loaded.basket, loaded.token));
+  });
+
+  app.post("/:locale/request/build", async (context) => {
+    const locale = localeParam(context.req.param("locale"));
+    if (!locale) return context.notFound();
+    privateNoStore(context);
+    const body = await context.req.parseBody();
+    if (!rateLimit(context, "directory-build", 60, 3600)) return statusPage(context, locale, "Too many requests", 429);
+    if (!validCsrf(context, config, body)) return statusPage(context, locale, t(locale, "invalidForm"), 403);
+    if (!campaignEnabled(db)) return statusPage(context, locale, t(locale, "formDisabled"), 503);
+    const loaded = loadBasket(db, config, body);
+    if (loaded.reason || !loaded.basket.ids.length) return statusPage(context, locale, selectionNotice(locale, loaded.reason ?? "empty") ?? t(locale, "invalidForm"), 422);
+    const currentId = currentRecipientId(loaded.basket);
+    const recipient = currentId ? getContactableRecipient(db, locale, currentId) : undefined;
+    if (!recipient) return statusPage(context, locale, t(locale, "directoryUnavailablePerson"), 422);
+    const csrf = issueCsrf(context, config);
+    return context.html(buildDocument(locale, context.req.path, csrf, db, recipient, config, loaded.token, loaded.basket.handoff?.demandIds ?? null));
   });
 
   app.post("/:locale/request/suggest", async (context) => {
@@ -79,31 +162,9 @@ export function registerRequestRoutes(app: Hono, db: Db, config: Config) {
     const recipientId = positiveInteger(context.req.query("recipient"));
     const recipient = recipientId ? getContactableRecipient(db, locale, recipientId) : undefined;
     if (!recipient) return context.redirect(`/${locale}/request`);
-    const demands = db.prepare(`SELECT d.id, dt.title, dt.body, dt.rationale FROM demands d JOIN campaigns c ON c.id = d.campaign_id
-      LEFT JOIN demand_translations dt ON dt.demand_id = d.id AND dt.locale = ?
-      WHERE c.status = 'active' AND d.is_active = 1 AND d.document = 'standard' ORDER BY d.sort_order`).all(locale) as { id: number; title: string | null; body: string | null; rationale: string | null }[];
     const csrf = issueCsrf(context, config);
     privateNoStore(context);
-    return context.html(<Layout locale={locale} title={t(locale, "buildTitle")} path={context.req.path} languageQuery={`recipient=${recipient.id}`}>
-      <div class="request-page request-build-page">
-      <JourneyIntro eyebrow={<>{t(locale, "stepBuild")} · <bdi>2/3</bdi></>} title={t(locale, "buildTitle")} headingId="build-heading" />
-      <p class="request-recipient-line">{t(locale, "recipient")}: <strong>{recipient.name}</strong></p>
-      <form class="request-form wording-panel" method="post" action={`/${locale}/request/preview`} aria-labelledby="build-heading">
-        <input type="hidden" name="csrf" value={csrf} /><input type="hidden" name="recipientId" value={recipient.id} />
-        <fieldset class="demand-fieldset"><legend>{t(locale, "selectDemand")}</legend>{demands.map((demand) => demand.title
-          ? <div class="demand-option">
-              <label><input type="checkbox" name="demandId" value={demand.id} /> {demand.title}</label>
-              <QuestionHelp locale={locale} body={demand.body} rationale={demand.rationale} />
-            </div>
-          : <p role="status">{t(locale, "unavailable")}</p>)}</fieldset>
-        <label>{t(locale, "messageLanguage")}<select name="messageLocale">{locales.map((option) => <option value={option} selected={option === locale} lang={option}>{localeNames[option]}</option>)}</select></label>
-        <label>{t(locale, "name")}<input name="name" maxLength={100} /></label>
-        <label>{t(locale, "city")}<input name="city" maxLength={100} /></label>
-        <label>{t(locale, "personalContext")}<textarea name="context" maxLength={500}></textarea></label>
-        <Turnstile config={config} /><button type="submit">{t(locale, "next")}</button>
-      </form>
-      </div>
-    </Layout>);
+    return context.html(buildDocument(locale, context.req.path, csrf, db, recipient, config, "", null, `recipient=${recipient.id}`));
   });
 
   app.post("/:locale/request/preview", async (context) => {
@@ -128,6 +189,16 @@ export function registerRequestRoutes(app: Hono, db: Db, config: Config) {
     const whatsapp = templates.find((template) => template.channel === "whatsapp");
     const social = templates.find((template) => template.channel === "social");
     if (!recipient || !email || !whatsapp || !social || demands.length !== new Set(demandIds).size) return statusPage(context, pageLocale, t(pageLocale, "unavailable"), 422);
+    const loaded = loadBasket(db, config, body);
+    let selectionToken = "";
+    if (text(body.selection)) {
+      if (loaded.reason || !loaded.basket.ids.length) return statusPage(context, pageLocale, selectionNotice(pageLocale, loaded.reason ?? "empty") ?? t(pageLocale, "invalidForm"), 422);
+      const withHandoff = loaded.basket.handoff
+        ? { ...loaded.basket, handoff: { ...loaded.basket.handoff, demandIds: [...new Set(demandIds)] } }
+        : beginHandoff(loaded.basket, demandIds);
+      if (!withHandoff || currentRecipientId(withHandoff) !== recipientId) return statusPage(context, pageLocale, t(pageLocale, "invalidForm"), 422);
+      selectionToken = signBasket(withHandoff, config);
+    }
     const fields = {
       recipient: recipient.name,
       demands: demands.map((demand) => `• ${demand.title}`).join("\n"),
@@ -141,6 +212,7 @@ export function registerRequestRoutes(app: Hono, db: Db, config: Config) {
     const socialBody = fill(social.body, fields);
     const created = createGeneratedRequest(db, recipient.id, messageLocale, JSON.stringify([...new Set(demandIds)]));
     const capability = issueRequestCapability(created.id, config);
+    const contactProof = issueContactProof(created.id, contactFingerprint(recipient), config);
     privateNoStore(context);
     return context.html(<Layout locale={pageLocale} title={t(pageLocale, "previewTitle")} path={context.req.path}>
       <div class="request-page request-preview-page">
@@ -148,7 +220,8 @@ export function registerRequestRoutes(app: Hono, db: Db, config: Config) {
       <p role="note">{t(pageLocale, "editHint")}</p>
       <Callout tone="muted"><p class="note">{t(pageLocale, "requestPreparedNote")}</p></Callout>
       <form class="request-form letter-ready-form" method="post" action={`/${pageLocale}/request/action`} aria-labelledby="preview-heading">
-        <input type="hidden" name="csrf" value={text(body.csrf)} /><input type="hidden" name="requestId" value={created.id} /><input type="hidden" name="capability" value={capability} />
+        <input type="hidden" name="csrf" value={text(body.csrf)} /><input type="hidden" name="requestId" value={created.id} /><input type="hidden" name="capability" value={capability} /><input type="hidden" name="contactProof" value={contactProof} />
+        {selectionToken ? <input type="hidden" name="selection" value={selectionToken} /> : null}
         <label>{t(pageLocale, "emailSubject")}<input name="subject" value={subject} maxLength={200} /></label>
         <label>{t(pageLocale, "emailBody")}<textarea id="copy-message" name="message" rows={10} maxLength={5000}>{emailBody}</textarea></label>
         <label>{t(pageLocale, "whatsappText")}<textarea name="whatsappMessage" rows={4} maxLength={2000}>{whatsappBody}</textarea></label>
@@ -192,21 +265,24 @@ export function registerRequestRoutes(app: Hono, db: Db, config: Config) {
     const message = action === "whatsapp_opened" ? text(body.whatsappMessage)
       : shareActions.includes(action) ? text(body.socialMessage) : text(body.message);
     const target = actionTarget(db, config, requestId, action, text(body.subject), message);
-    // Do not record an attempted direct contact when the recipient has no destination. Copy and
-    // share actions intentionally remain valid without a direct-contact target.
-    if ((action === "email_opened" || action === "whatsapp_opened") && !target) return statusPage(context, locale, t(locale, "unavailable"), 422);
+    if (action === "email_opened" || action === "whatsapp_opened") {
+      const contactError = openedContactError(db, config, requestId, text(body.contactProof), locale);
+      if (contactError) return statusPage(context, locale, contactError, 422);
+      if (!target) return statusPage(context, locale, t(locale, "unavailable"), 422);
+    }
     const publicId = publicRequestId(db, requestId);
     if (!publicId) return statusPage(context, locale, t(locale, "invalidForm"), 422);
     db.prepare("INSERT INTO request_actions (generated_request_id, action_type, created_at) VALUES (?, ?, ?)").run(requestId, action, new Date().toISOString());
+    const csrf = issueCsrf(context, config);
     privateNoStore(context);
     return context.html(<Layout locale={locale} title={t(locale, "actionReady")} path={context.req.path}>
       <div class="request-page action-ready-page">
       <JourneyIntro title={t(locale, "actionReady")} />
       <Surface class="action-ready-surface">
       {target ? <p><a class="primary-action" role="button" href={target.href} dir="ltr" target={target.href.startsWith("https:") ? "_blank" : undefined} rel="noopener noreferrer">{target.label}</a></p> : null}
-      {/* Facebook's sharer accepts a URL only, so the post text has to be pasted by hand. */}
       {action === "shared_facebook" ? <p role="note">{t(locale, "facebookNote")}</p> : null}
       {action === "text_copied" || action === "shared_facebook" ? <><textarea id="copy-message" readOnly>{message}</textarea><button type="button" data-copy="copy-message">{t(locale, "copyText")}</button></> : null}
+      {nextPersonForm(locale, csrf, db, config, body)}
       <p><a href={`/${locale}/request/result?request=${publicId}`}>{t(locale, "next")}</a></p>
       </Surface>
       </div>
@@ -221,7 +297,7 @@ export function registerRequestRoutes(app: Hono, db: Db, config: Config) {
     const keys = Object.keys(body).filter((key) => body[key] !== undefined);
     const requestId = positiveInteger(text(body.requestId));
     if (!campaignEnabled(db)) return statusPage(context, locale, t(locale, "formDisabled"), 503);
-    if (!rateLimit(context, "copy", config.rateLimitAction, 3600) || keys.some((key) => !["csrf", "requestId", "capability"].includes(key)) || !validCsrf(context, config, body) || !requestId || !requestExists(db, requestId) || !verifyRequestCapability(text(body.capability), requestId, config)) return statusPage(context, locale, t(locale, "invalidForm"), 422);
+    if (!rateLimit(context, "copy", config.rateLimitAction, 3600) || keys.some((key) => !["csrf", "requestId", "capability", "selection", "contactProof"].includes(key)) || !validCsrf(context, config, body) || !requestId || !requestExists(db, requestId) || !verifyRequestCapability(text(body.capability), requestId, config)) return statusPage(context, locale, t(locale, "invalidForm"), 422);
     db.prepare("INSERT INTO request_actions (generated_request_id, action_type, created_at) VALUES (?, 'text_copied', ?)").run(requestId, new Date().toISOString());
     return context.body(null, 204);
   });
@@ -238,6 +314,16 @@ export function registerRequestRoutes(app: Hono, db: Db, config: Config) {
     const publicId = publicRequestId(db, requestId);
     if (!publicId) return statusPage(context, locale, t(locale, "invalidForm"), 422);
     db.prepare("INSERT INTO request_actions (generated_request_id, action_type, created_at) VALUES (?, 'reported_sent', ?)").run(requestId, new Date().toISOString());
+    const next = nextPersonForm(locale, issueCsrf(context, config), db, config, body);
+    if (next) {
+      privateNoStore(context);
+      return context.html(<Layout locale={locale} title={t(locale, "afterReport")} path={context.req.path}>
+        <div class="request-page action-ready-page">
+          <JourneyIntro title={t(locale, "afterReport")} />
+          <Surface class="action-ready-surface">{next}<p><a href={`/${locale}/request/result?request=${publicId}`}>{t(locale, "next")}</a></p></Surface>
+        </div>
+      </Layout>);
+    }
     return context.redirect(`/${locale}/request/result?request=${publicId}`, 303);
   });
 
@@ -271,15 +357,26 @@ export function registerRequestRoutes(app: Hono, db: Db, config: Config) {
   });
 }
 
-function directoryDocument(locale: Locale, path: string, csrf: string, query: DirectoryQuery, page: DirectoryPage, items: DirectoryBrowseItem[]) {
+function directoryPage(locale: Locale, path: string, csrf: string, db: Db, query: DirectoryQuery, basket: SelectionBasket, token: string, notice?: string) {
+  const items = listDirectoryBrowse(db, locale);
+  return directoryDocument(locale, path, csrf, query, searchDirectory(items, query), items, basket, token, notice);
+}
+
+function directoryDocument(locale: Locale, path: string, csrf: string, query: DirectoryQuery, page: DirectoryPage, items: DirectoryBrowseItem[], basket: SelectionBasket, token: string, notice?: string) {
   const selected = query.personId ? items.find((item) => item.id === query.personId) : undefined;
+  const selectedIds = new Set(basket.ids);
+  const selectedPeople = basket.ids.map((id) => items.find((item) => item.id === id));
+  const hidden = selectedHiddenByFilter(items, query, basket.ids);
   return <Layout locale={locale} title={t(locale, "requestTitle")} path={path}>
     <div class="request-page request-recipient-page">
       <JourneyIntro eyebrow={<>{t(locale, "stepChoose")} · <bdi>1/3</bdi></>} title={t(locale, "directoryTitle")} />
       <Callout tone="muted"><p>{t(locale, "directoryNoElection")}</p></Callout>
+      {notice ? <Callout tone="caution"><p role="status">{notice}</p></Callout> : null}
       <Surface class="recipient-panel">
         <form class="directory-search" method="post" action={`/${locale}/request`} data-directory-search data-suggest={`/${locale}/request/suggest`} data-suggest-unavailable={t(locale, "directorySuggestUnavailable")}>
           <input type="hidden" name="csrf" value={csrf} />
+          <input type="hidden" name="currentPage" value={page.page} />
+          {token ? <input type="hidden" name="selection" value={token} /> : null}
           {query.personId ? <input type="hidden" name="personId" value={query.personId} /> : null}
           <label>{t(locale, "directorySearchLabel")}
             <input id="directory-q" name="q" type="search" value={query.q} maxLength={100} autoComplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="directory-suggest" />
@@ -299,10 +396,15 @@ function directoryDocument(locale: Locale, path: string, csrf: string, query: Di
           <div class="directory-search-actions">
             <button type="submit" name="page" value="1">{t(locale, "directorySearch")}</button>
             {query.q || query.personId || query.listId || query.partyId ? <button type="submit" name="clear" value="1">{t(locale, "directoryClear")}</button> : null}
+            {basket.ids.length ? <button type="submit" class="primary-action" formaction={`/${locale}/request/review`}>{t(locale, "directoryReview")}</button> : null}
           </div>
           {selected ? <p class="directory-chip">{selected.name}</p> : null}
-          <p class="directory-status" role="status">{page.total} {t(locale, "directoryMatches")}{page.pageCount > 1 ? ` · ${t(locale, "directoryPage")} ${page.page}` : ""}</p>
-          {page.rows.length ? <ul class="recipient-list">{page.rows.map((item) => <li class="recipient-row">
+          {basket.ids.length ? <div class="directory-basket">
+            <p class="directory-status" role="status">{t(locale, "directoryPeopleSelected").replace("{n}", String(basket.ids.length))}</p>
+            <ul>{selectedPeople.map((person) => person ? <li>{person.name} <button type="submit" formaction={`/${locale}/request/selection`} name="remove" value={person.id}>{t(locale, "directoryRemove")}</button></li> : null)}</ul>
+          </div> : null}
+          <p class="directory-status" role="status">{page.total} {t(locale, "directoryMatches")}{page.pageCount > 1 ? ` · ${t(locale, "directoryPage")} ${page.page}` : ""}{basket.ids.length ? ` · ${t(locale, "directoryPeopleSelected").replace("{n}", String(basket.ids.length))}` : ""}{hidden ? ` · ${t(locale, "directoryHiddenSelected").replace("{n}", String(hidden))}` : ""}</p>
+          {page.rows.length ? <ul class="recipient-list">{page.rows.map((item) => <li class={selectedIds.has(item.id) ? "recipient-row recipient-row-selected" : "recipient-row"}>
             <div class="recipient-copy">
               <strong class="recipient-name">{item.name}</strong>
               <p class="recipient-meta">{item.type === "party" ? t(locale, "directoryRoleParty") : t(locale, "directoryRolePerson")}
@@ -311,7 +413,11 @@ function directoryDocument(locale: Locale, path: string, csrf: string, query: Di
                 {" · "}{item.contactable ? t(locale, "directoryContactable") : t(locale, "directoryNotContactable")}
               </p>
             </div>
-            {item.contactable ? <a class="recipient-ask" href={`/${locale}/request/build?recipient=${item.id}`}>{t(locale, "directoryAsk")}</a> : null}
+            <div class="recipient-actions">
+              {item.contactable && selectedIds.has(item.id) ? <button type="submit" formaction={`/${locale}/request/selection`} name="remove" value={item.id}>{t(locale, "directoryRemove")}</button> : null}
+              {item.contactable && !selectedIds.has(item.id) ? <button type="submit" formaction={`/${locale}/request/selection`} name="add" value={item.id}>{t(locale, "directoryAdd")}</button> : null}
+              {item.contactable ? <a class="recipient-ask" href={`/${locale}/request/build?recipient=${item.id}`}>{t(locale, "directoryAsk")}</a> : null}
+            </div>
           </li>)}</ul> : <p>{t(locale, "directoryEmpty")}</p>}
           {page.pageCount > 1 ? <div class="directory-pager">
             {page.page > 1 ? <button type="submit" name="page" value={page.page - 1}>{t(locale, "directoryPrevious")}</button> : null}
@@ -321,6 +427,128 @@ function directoryDocument(locale: Locale, path: string, csrf: string, query: Di
       </Surface>
     </div>
   </Layout>;
+}
+
+function reviewDocument(locale: Locale, path: string, csrf: string, db: Db, basket: SelectionBasket, token: string) {
+  const people = reviewPeople(db, locale, basket.ids);
+  const shared = sharedMailboxGroups(people.filter((row) => row.contactable));
+  return <Layout locale={locale} title={t(locale, "directoryReview")} path={path}>
+    <div class="request-page request-review-page">
+      <JourneyIntro eyebrow={<>{t(locale, "stepChoose")} · <bdi>1/3</bdi></>} title={t(locale, "directoryReview")} headingId="review-heading" />
+      {shared.map((group) => <Callout tone="caution"><p role="status">{t(locale, "directorySharedMailbox").replace("{n}", String(group.count))}</p></Callout>)}
+      <Surface class="recipient-panel">
+        <form method="post" action={`/${locale}/request/build`}>
+          <input type="hidden" name="csrf" value={csrf} />
+          <input type="hidden" name="selection" value={token} />
+          <ul class="recipient-list">{people.map((person) => <li class="recipient-row">
+            <div class="recipient-copy">
+              <strong class="recipient-name">{person.name}</strong>
+              <p class="recipient-meta">{destinationLine(locale, person)}</p>
+            </div>
+            <button type="submit" formaction={`/${locale}/request/selection`} name="remove" value={person.id}>{t(locale, "directoryRemove")}</button>
+          </li>)}</ul>
+          {people.some((row) => row.contactable) ? <PrimaryAction>{t(locale, "directoryPrepare")}</PrimaryAction> : null}
+        </form>
+      </Surface>
+    </div>
+  </Layout>;
+}
+
+function buildDocument(locale: Locale, path: string, csrf: string, db: Db, recipient: Recipient, config: Config, selection: string, selectedDemands: number[] | null, languageQuery?: string) {
+  const demands = db.prepare(`SELECT d.id, dt.title, dt.body, dt.rationale FROM demands d JOIN campaigns c ON c.id = d.campaign_id
+    LEFT JOIN demand_translations dt ON dt.demand_id = d.id AND dt.locale = ?
+    WHERE c.status = 'active' AND d.is_active = 1 AND d.document = 'standard' ORDER BY d.sort_order`).all(locale) as { id: number; title: string | null; body: string | null; rationale: string | null }[];
+  const checked = new Set(selectedDemands ?? []);
+  return <Layout locale={locale} title={t(locale, "buildTitle")} path={path} languageQuery={languageQuery}>
+    <div class="request-page request-build-page">
+      <JourneyIntro eyebrow={<>{t(locale, "stepBuild")} · <bdi>2/3</bdi></>} title={t(locale, "buildTitle")} headingId="build-heading" />
+      <p class="request-recipient-line">{t(locale, "recipient")}: <strong>{recipient.name}</strong></p>
+      <form class="request-form wording-panel" method="post" action={`/${locale}/request/preview`} aria-labelledby="build-heading">
+        <input type="hidden" name="csrf" value={csrf} /><input type="hidden" name="recipientId" value={recipient.id} />
+        {selection ? <input type="hidden" name="selection" value={selection} /> : null}
+        <fieldset class="demand-fieldset"><legend>{t(locale, "selectDemand")}</legend>{demands.map((demand) => demand.title
+          ? <div class="demand-option">
+              <label>{checked.has(demand.id)
+                ? <input type="checkbox" name="demandId" value={demand.id} checked />
+                : <input type="checkbox" name="demandId" value={demand.id} />} {demand.title}</label>
+              <QuestionHelp locale={locale} body={demand.body} rationale={demand.rationale} />
+            </div>
+          : <p role="status">{t(locale, "unavailable")}</p>)}</fieldset>
+        <label>{t(locale, "messageLanguage")}<select name="messageLocale">{locales.map((option) => <option value={option} selected={option === locale} lang={option}>{localeNames[option]}</option>)}</select></label>
+        <label>{t(locale, "name")}<input name="name" maxLength={100} /></label>
+        <label>{t(locale, "city")}<input name="city" maxLength={100} /></label>
+        <label>{t(locale, "personalContext")}<textarea name="context" maxLength={500}></textarea></label>
+        <Turnstile config={config} /><button type="submit">{t(locale, "next")}</button>
+      </form>
+    </div>
+  </Layout>;
+}
+
+function reviewPeople(db: Db, locale: Locale, ids: number[]): ContactDestination[] {
+  const named = recipientsByIds(db, locale, ids);
+  const sendable = new Set(listContactableRecipients(db, locale).map((row) => row.id));
+  return named.map((row) => ({
+    id: row.id,
+    name: row.name,
+    email: row.email,
+    whatsapp: row.whatsapp,
+    contactable: sendable.has(row.id)
+  }));
+}
+
+function destinationLine(locale: Locale, person: ContactDestination) {
+  if (person.email?.trim()) return `${t(locale, "directoryDirectEmail")}: ${person.email.trim()}`;
+  if (person.whatsapp?.trim()) return `${t(locale, "directoryDirectWhatsapp")}: ${person.whatsapp.trim()}`;
+  return t(locale, "directoryUnavailablePerson");
+}
+
+type SelectionNoticeReason = "tampered" | "expired" | "version" | "limit" | "ineligible" | "empty";
+
+function loadBasket(db: Db, config: Config, body: Record<string, unknown>) {
+  const publication = directoryPublicationRef(db);
+  const parsed = readBasket(text(body.selection), config, { publication });
+  return { basket: parsed.basket, token: parsed.ok && parsed.basket.ids.length ? signBasket(parsed.basket, config) : "", reason: parsed.ok ? undefined : parsed.reason };
+}
+
+function signedSelection(basket: SelectionBasket, config: Config) {
+  return basket.ids.length ? signBasket(basket, config) : "";
+}
+
+function selectionNotice(locale: Locale, reason?: SelectionNoticeReason) {
+  switch (reason) {
+    case undefined: return undefined;
+    case "limit": return t(locale, "directorySelectionMax").replace("{n}", String(SELECTION_MAX));
+    case "expired":
+    case "version": return t(locale, "directorySelectionExpired");
+    case "ineligible": return t(locale, "directoryNotContactable");
+    case "empty": return t(locale, "directorySelectionInvalid");
+    case "tampered": return t(locale, "directorySelectionInvalid");
+    default: {
+      const _never: never = reason;
+      return _never;
+    }
+  }
+}
+
+function openedContactError(db: Db, config: Config, requestId: number, proof: string, locale: Locale) {
+  const row = db.prepare(`SELECT g.recipient_id AS recipientId, g.locale FROM generated_requests g WHERE g.id = ?`).get(requestId) as { recipientId: number; locale: string } | undefined;
+  if (!row || !isLocale(row.locale)) return t(locale, "unavailable");
+  const recipient = getContactableRecipient(db, row.locale, row.recipientId);
+  if (!recipient) return t(locale, "directoryUnavailablePerson");
+  if (!verifyContactProof(proof, requestId, contactFingerprint(recipient), config)) return t(locale, "directoryContactChanged");
+  return undefined;
+}
+
+function nextPersonForm(locale: Locale, csrf: string, db: Db, config: Config, body: Record<string, unknown>) {
+  const loaded = loadBasket(db, config, body);
+  if (loaded.reason || !loaded.basket.handoff) return null;
+  const next = completeCurrent(loaded.basket);
+  if (!next.handoff?.remainingIds.length) return null;
+  return <form method="post" action={`/${locale}/request/build`}>
+    <input type="hidden" name="csrf" value={csrf} />
+    <input type="hidden" name="selection" value={signBasket(next, config)} />
+    <button type="submit" class="primary-action">{t(locale, "directoryNextPerson")}</button>
+  </form>;
 }
 
 function QuestionHelp({ locale, body, rationale }: { locale: Locale; body: string | null; rationale: string | null }) {
