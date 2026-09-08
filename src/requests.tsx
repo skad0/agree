@@ -220,18 +220,20 @@ export function registerRequestRoutes(app: Hono, db: Db, config: Config) {
       if (!withHandoff || currentRecipientId(withHandoff) !== recipientId) return statusPage(context, pageLocale, t(pageLocale, "invalidForm"), 422);
       selectionToken = signBasket(withHandoff, config);
     }
+    const created = createGeneratedRequest(db, recipient.id, messageLocale, JSON.stringify([...new Set(demandIds)]));
+    const campaignLink = `${config.appBaseUrl}/${messageLocale}`;
+    const resultLink = `${config.appBaseUrl}/${messageLocale}/request/result?request=${created.public_id}`;
     const fields = {
       recipient: recipient.name,
       demands: demands.map((demand) => `• ${demand.title}`).join("\n"),
       handle: mention(recipient),
-      link: `${config.appBaseUrl}/${messageLocale}`,
       name: text(body.name).slice(0, 100), city: text(body.city).slice(0, 100), context: text(body.context).slice(0, 500)
     };
-    const subject = fill(email.subject ?? "", fields);
-    const emailBody = fill(email.body, fields);
-    const whatsappBody = fill(whatsapp.body, fields);
-    const socialBody = fill(social.body, fields);
-    const created = createGeneratedRequest(db, recipient.id, messageLocale, JSON.stringify([...new Set(demandIds)]));
+    // Email/WhatsApp {link} points at the campaign; social {link} is the public result URL for sharing.
+    const subject = fill(email.subject ?? "", { ...fields, link: campaignLink });
+    const emailBody = fill(email.body, { ...fields, link: campaignLink });
+    const whatsappBody = fill(whatsapp.body, { ...fields, link: campaignLink });
+    const socialBody = fill(social.body, { ...fields, link: resultLink });
     const capability = issueRequestCapability(created.id, config);
     const contactProof = issueContactProof(created.id, contactFingerprint(recipient), config);
     privateNoStore(context);
@@ -361,16 +363,24 @@ export function registerRequestRoutes(app: Hono, db: Db, config: Config) {
     const demands = placeholders ? db.prepare(`SELECT dt.title FROM demand_translations dt WHERE dt.locale = ? AND dt.demand_id IN (${placeholders}) ORDER BY dt.demand_id`).all(request.locale, ...demandIds) as { title: string }[] : [];
     const social = db.prepare("SELECT body FROM message_templates WHERE locale = ? AND channel = 'social'").get(request.locale) as { body: string } | undefined;
     const recipient = { id: 0, type: request.type, name: request.recipient, email: null, whatsapp: null, socialHandle: request.socialHandle } satisfies Recipient;
-    const message = social ? fill(social.body, { recipient: request.recipient, demands: demands.map((demand) => `• ${demand.title}`).join("\n"), handle: mention(recipient), link: `${config.appBaseUrl}/${request.locale}/request/result?request=${request.publicId}`, name: "", city: "", context: "" }) : `${mention(recipient)}\n\n${demands.map((demand) => `• ${demand.title}`).join("\n")}`;
+    const resultUrl = `${config.appBaseUrl}/${request.locale}/request/result?request=${request.publicId}`;
+    const message = social ? fill(social.body, { recipient: request.recipient, demands: demands.map((demand) => `• ${demand.title}`).join("\n"), handle: mention(recipient), link: resultUrl, name: "", city: "", context: "" }) : `${mention(recipient)}\n\n${demands.map((demand) => `• ${demand.title}`).join("\n")}`;
     const share = encodeURIComponent(message);
-    const link = encodeURIComponent(`${config.appBaseUrl}/${request.locale}/request/result?request=${request.publicId}`);
+    const link = encodeURIComponent(resultUrl);
     privateNoStore(context);
-    return context.html(<Layout locale={locale} title={t(locale, "resultTitle")} path={context.req.path} languageQuery={`request=${request.publicId}`}>
+    return context.html(<Layout locale={locale} title={t(locale, "resultTitle")} path={context.req.path} languageQuery={`request=${request.publicId}`}
+      shareMeta={{ url: resultUrl, description: message.slice(0, 300) }}>
       <div class="request-page request-result-page">
       <JourneyIntro title={t(locale, "resultTitle")} />
       <Surface class="result-surface">
         <p>{t(locale, "shareForRecipient")} <strong><bdi dir="auto">{request.recipient}</bdi></strong>.</p>
-        <nav class="result-actions" aria-label={t(locale, "shareForRecipient")}><a href={`https://wa.me/?text=${share}`}>WhatsApp</a> · <a href={`https://t.me/share/url?url=${link}&text=${share}`}>Telegram</a> · <a href={`https://www.facebook.com/sharer/sharer.php?u=${link}`}>Facebook</a> · <a href={`${config.appBaseUrl}/${request.locale}/request/result?request=${request.publicId}`}>Link</a></nav>
+        <nav class="result-actions" aria-label={t(locale, "shareForRecipient")}>
+          <a href={`https://x.com/intent/post?text=${share}`}>X</a> ·
+          <a href={`https://wa.me/?text=${share}`}>WhatsApp</a> ·
+          <a href={`https://t.me/share/url?url=${link}&text=${share}`}>Telegram</a> ·
+          <a href={`https://www.facebook.com/sharer/sharer.php?u=${link}`}>Facebook</a> ·
+          <a href={resultUrl}>Link</a>
+        </nav>
         <Callout tone="muted"><p>{t(locale, "requestPreparedNote")}</p></Callout>
       </Surface>
       </div>
@@ -697,17 +707,20 @@ function requestExists(db: Db, id: number) { return Boolean(db.prepare("SELECT 1
 function campaignEnabled(db: Db) { return db.prepare("SELECT requests_enabled AS enabled FROM campaigns WHERE status = 'active' LIMIT 1").get()?.enabled === 1; }
 function localeParam(value: string) { return isLocale(value) ? value : undefined; }
 function positiveInteger(value: string | undefined) { const number = Number(value); return Number.isInteger(number) && number > 0 ? number : undefined; }
-function fill(template: string, fields: Record<string, string>) { return template.replace(/\{(recipient|demands|handle|link|name|city|context)\}/g, (_, key: string) => fields[key] ?? "").replace(/\n{3,}/g, "\n\n").trim(); }
+function fill(template: string, fields: Record<string, string>) {
+  return template.replace(/\r\n/g, "\n").replace(/\{(recipient|demands|handle|link|name|city|context)\}/g, (_, key: string) => fields[key] ?? "").replace(/\n{3,}/g, "\n\n").trim();
+}
 function statusPage(context: any, locale: Locale, message: string, status = 200) { privateNoStore(context); return context.html(<Layout locale={locale} title={t(locale, "siteName")} path={`/${locale}`}><div class="status-page"><h1>{t(locale, "siteName")}</h1><p role="status">{message}</p></div></Layout>, status); }
 function actionTarget(db: Db, config: Config, requestId: number, action: string, subject: string, message: string) {
-  const row = db.prepare(`SELECT r.email, r.whatsapp, g.locale FROM generated_requests g JOIN recipients r ON r.id = g.recipient_id WHERE g.id = ?`)
-    .get(requestId) as { email: string | null; whatsapp: string | null; locale: string } | undefined;
+  const row = db.prepare(`SELECT r.email, r.whatsapp, g.locale, g.public_id AS publicId FROM generated_requests g JOIN recipients r ON r.id = g.recipient_id WHERE g.id = ?`)
+    .get(requestId) as { email: string | null; whatsapp: string | null; locale: string; publicId: string } | undefined;
   if (!row) return undefined;
-  const share = encodeURIComponent(message);
-  const link = encodeURIComponent(`${config.appBaseUrl}/${row.locale}`);
+  const share = encodeURIComponent(message.replace(/\r\n/g, "\n"));
+  const resultUrl = `${config.appBaseUrl}/${row.locale}/request/result?request=${row.publicId}`;
+  const link = encodeURIComponent(resultUrl);
   const email = row.email?.trim();
   const whatsapp = row.whatsapp?.trim();
-  if (action === "email_opened" && email) return { href: `mailto:${email}?${new URLSearchParams({ subject, body: message })}`, label: email };
+  if (action === "email_opened" && email) return { href: `mailto:${email}?${new URLSearchParams({ subject, body: message.replace(/\r\n/g, "\n") })}`, label: email };
   if (action === "whatsapp_opened" && whatsapp) return { href: `https://wa.me/${whatsapp}?text=${share}`, label: "WhatsApp" };
   if (action === "shared_x") return { href: `https://x.com/intent/post?text=${share}`, label: "X" };
   if (action === "shared_facebook") return { href: `https://www.facebook.com/sharer/sharer.php?u=${link}`, label: "Facebook" };

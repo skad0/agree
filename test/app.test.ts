@@ -669,24 +669,30 @@ test("public post text mentions the handle, falls back to the name, and builds s
     const withHandle = await preview(2);
     assert.match(withHandle, /@mk_handle/);
     assert.doesNotMatch(withHandle, /Knesset member/);
-    assert.match(withHandle, /https:\/\/campaign.test\/en/);
+    const previewPublicId = (runtime.db.prepare("SELECT public_id FROM generated_requests ORDER BY id DESC LIMIT 1").get() as { public_id: string }).public_id;
+    const socialBox = withHandle.match(/name="socialMessage"[^>]*>([\s\S]*?)<\/textarea>/)?.[1] ?? "";
+    const emailBox = withHandle.match(/name="message"[^>]*>([\s\S]*?)<\/textarea>/)?.[1] ?? "";
+    assert.match(socialBox, new RegExp(`https://campaign\\.test/en/request/result\\?request=${previewPublicId}`));
+    assert.match(emailBox, /https:\/\/campaign\.test\/en(?:\r|\n|$)/);
+    assert.doesNotMatch(emailBox, /request\/result/);
 
     const withoutHandle = await preview(3);
     assert.match(withoutHandle, /MK Number 3/);
     assert.doesNotMatch(withoutHandle, /Knesset member/);
 
-    const request = runtime.db.prepare("SELECT id FROM generated_requests ORDER BY id DESC LIMIT 1").get() as { id: number };
     const form = await getForm(runtime.app, "/en/request/build?recipient=3");
     const actionPreview = await postForm(runtime.app, "/en/request/preview", { csrf: form.csrf, recipientId: "3", demandId: "1", messageLocale: "en" }, form.cookie);
     const actionPreviewHtml = await actionPreview.text();
     const capability = actionPreviewHtml.match(/name="capability" value="([^"]+)"/)?.[1];
     const actionRequestId = actionPreviewHtml.match(/name="requestId" value="(\d+)"/)?.[1];
     assert.ok(capability); assert.ok(actionRequestId);
+    const actionPublicId = (runtime.db.prepare("SELECT public_id FROM generated_requests WHERE id = ?").get(Number(actionRequestId)) as { public_id: string }).public_id;
+    const resultEncoded = encodeURIComponent(`https://campaign.test/en/request/result?request=${actionPublicId}`).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const targets: Record<string, RegExp> = {
       shared_x: /https:\/\/x\.com\/intent\/post\?text=POST/,
-      shared_facebook: /facebook\.com\/sharer\/sharer\.php\?u=https%3A%2F%2Fcampaign\.test%2Fen/,
+      shared_facebook: new RegExp(`facebook\\.com/sharer/sharer\\.php\\?u=${resultEncoded}`),
       shared_whatsapp: /https:\/\/wa\.me\/\?text=POST/,
-      shared_telegram: /t\.me\/share\/url\?url=https%3A%2F%2Fcampaign\.test%2Fen&amp;text=POST/
+      shared_telegram: new RegExp(`t\\.me/share/url\\?url=${resultEncoded}&amp;text=POST`)
     };
     for (const [action, expected] of Object.entries(targets)) {
       const response = await postForm(runtime.app, "/en/request/action", {
@@ -1441,6 +1447,11 @@ test("request result rejects missing IDs and builds a request-specific recipient
     assert.match(html, /Public Service Office/);
     assert.match(html, new RegExp(`request=${publicId}`));
     assert.match(html, /after(?:%20|&#x20;)the(?:%20|&#x20;)election/);
+    assert.match(html, /x\.com\/intent\/post\?text=/);
+    assert.match(html, /property="og:url"/);
+    assert.match(html, new RegExp(`content="https://campaign\\.test/en/request/result\\?request=${publicId}"`));
+    assert.match(html, /property="og:description"/);
+    assert.doesNotMatch(html, /%0D%0A/);
     runtime.close();
   } finally {
     rmSync(dir, { recursive: true, force: true });

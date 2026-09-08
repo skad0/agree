@@ -7,7 +7,10 @@ import { dirOf, localeNames, locales, t, type Locale } from "./i18n.js";
  * body. The public site and the admin console share the stylesheet and the theme script but not
  * the chrome: a supporter's wayfinding is the wrong furniture for someone editing the campaign.
  */
-export function Shell({ locale, title, bodyClass, children }: { locale: Locale; title: string; bodyClass?: string; children: Child }) {
+export type ShareMeta = { url: string; description: string };
+
+export function Shell({ locale, title, bodyClass, shareMeta, children }: { locale: Locale; title: string; bodyClass?: string; shareMeta?: ShareMeta; children: Child }) {
+  const fullTitle = `${title} · ${t(locale, "siteName")}`;
   return <html lang={locale} dir={dirOf(locale)}>
     <head>
       <meta charSet="utf-8" />
@@ -15,7 +18,17 @@ export function Shell({ locale, title, bodyClass, children }: { locale: Locale; 
       <meta name="color-scheme" content="light dark" />
       <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
       <meta name="theme-color" content="#0f1826" media="(prefers-color-scheme: dark)" />
-      <title>{title} · {t(locale, "siteName")}</title>
+      <title>{fullTitle}</title>
+      {shareMeta ? <>
+        <meta property="og:type" content="website" />
+        <meta property="og:title" content={fullTitle} />
+        <meta property="og:description" content={shareMeta.description} />
+        <meta property="og:url" content={shareMeta.url} />
+        <meta name="twitter:card" content="summary" />
+        <meta name="twitter:title" content={fullTitle} />
+        <meta name="twitter:description" content={shareMeta.description} />
+        <link rel="canonical" href={shareMeta.url} />
+      </> : null}
       {/* Not deferred and not inlined: it must run before first paint to avoid a flash of the
           wrong theme, and script-src has no 'unsafe-inline'. */}
       <script src={themePath}></script>
@@ -27,13 +40,13 @@ export function Shell({ locale, title, bodyClass, children }: { locale: Locale; 
   </html>;
 }
 
-export function Layout({ locale, title, path, languageQuery = "", languageHref, children }: { locale: Locale; title: string; path: string; languageQuery?: string; languageHref?: (locale: Locale) => string; children: Child }) {
+export function Layout({ locale, title, path, languageQuery = "", languageHref, shareMeta, children }: { locale: Locale; title: string; path: string; languageQuery?: string; languageHref?: (locale: Locale) => string; shareMeta?: ShareMeta; children: Child }) {
   // Strip only a complete registered locale segment. Keeping this derived from `locales` means
   // newly registered locales (and paths such as /uk/...) retain their route when switching.
   const localePrefix = locales.find((option) => path === `/${option}` || path.startsWith(`/${option}/`) || path.startsWith(`/${option}?`));
   const suffix = localePrefix ? path.slice(localePrefix.length + 1) : path;
   const query = languageQuery ? `&${languageQuery}` : "";
-  return <Shell locale={locale} title={title} bodyClass="public-site">
+  return <Shell locale={locale} title={title} bodyClass="public-site" shareMeta={shareMeta}>
       <a class="skip-link" href="#content">{t(locale, "skip")}</a>
       <div class="public-rule" aria-hidden="true"><span></span><span></span></div>
       <header class="wrap site-header">

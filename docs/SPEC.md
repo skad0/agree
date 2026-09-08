@@ -148,9 +148,11 @@ Phasing follows plan roadmap **E0–E7**. All items below are **Phase 1 / MVP** 
 - Localized templates → preview (email subject/body, WhatsApp short text, public post text)
 - Every generated text is editable on the preview before any action is taken
 - Private actions: mailto, WhatsApp deep link, copy — each logged in `request_actions`
-- Public actions: post to X, Facebook, WhatsApp, Telegram, mentioning `{handle}` and linking the campaign
+- Public actions: post to X, Facebook, WhatsApp, Telegram, mentioning `{handle}` and linking the public request result
 - Facebook's sharer accepts a URL only, so `shared_facebook` also renders the post text for manual copy
-- "I sent it" → result page + share (WhatsApp, Telegram, Facebook, link)
+- Social `{link}` and Facebook/Telegram share targets use the public request result URL; email/WhatsApp `{link}` remains the locale campaign home
+- Result page share actions include X, WhatsApp, Telegram, Facebook, and a direct link, with Open Graph/Twitter summary meta for crawlers
+- "I sent it" → result page + share
 - **Acceptance:** Appeals in all locales; action types counted separately for operators; personal text not stored in DB
 
 **E5 — Response submission**
