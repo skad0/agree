@@ -86,3 +86,68 @@ export type BoundedFetchResult = {
   mediaType: string | null;
   body: Uint8Array;
 };
+
+export type IdentityMatchBase = {
+  id: number;
+  personId: number | null;
+  proposedKnessetPersonId: string | null;
+  normalizedKey: string | null;
+  algorithmVersion: string;
+  score: number | null;
+  featuresJson: string | null;
+  createdAt: string;
+};
+
+export type IdentityMatchProposal =
+  | (IdentityMatchBase & { state: "pending" })
+  | (IdentityMatchBase & { state: "accepted" })
+  | (IdentityMatchBase & { state: "rejected" });
+
+export type ContactResolution =
+  | { level: "unresolved"; contactPointId: null; ownerKind: null; status: "missing" | "needs_review" }
+  | { level: "individual"; contactPointId: number; ownerKind: "person"; status: "verified" | "stale" | "needs_review" }
+  | { level: "party_fallback"; contactPointId: number; ownerKind: "party" | "faction"; status: "verified" | "stale" | "needs_review" };
+
+export type FinanceEntryKind = "donation" | "refund" | "loan" | "guarantee";
+
+export type FinanceFixtureEntry = {
+  kind: FinanceEntryKind;
+  amountMinor: number;
+  currency: string;
+  sourceEntryKey: string;
+  isForeign?: boolean | null;
+  subjectScope: "person" | "party";
+};
+
+export type FinanceTotals = {
+  currency: string;
+  grossDonationsMinor: number;
+  refundsMinor: number;
+  netDonationsMinor: number;
+  loansMinor: number;
+  guaranteesMinor: number;
+  foreignShare: number | null;
+};
+
+export type FinanceCoverage =
+  | { kind: "missing" }
+  | { kind: "not_applicable" }
+  | { kind: "not_yet_published" }
+  | { kind: "failed"; errorCode: string }
+  | { kind: "present"; totals: FinanceTotals };
+
+export type SourceGateOk = { ok: true; resource: SourceResource };
+export type SourceGateError = { ok: false; code: "blocked" | "unavailable"; resourceId: string; reason?: string };
+export type SourceGate = SourceGateOk | SourceGateError;
+
+export type JobLease = {
+  jobId: number;
+  token: string;
+  expiresAt: string;
+};
+
+export type PipelineStage = "acquire" | "stage" | "validate" | "enrich";
+
+export type PipelineResult =
+  | { ok: true; stage: PipelineStage; publicationActivated: false }
+  | { ok: false; stage: PipelineStage; code: string; publicationActivated: false };

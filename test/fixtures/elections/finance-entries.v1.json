@@ -1,0 +1,48 @@
+{
+  "entries": [
+    {
+      "kind": "donation",
+      "amountMinor": 10000,
+      "currency": "ILS",
+      "sourceEntryKey": "d1",
+      "isForeign": false,
+      "subjectScope": "person"
+    },
+    {
+      "kind": "donation",
+      "amountMinor": 2000,
+      "currency": "ILS",
+      "sourceEntryKey": "d2",
+      "isForeign": true,
+      "subjectScope": "person"
+    },
+    {
+      "kind": "refund",
+      "amountMinor": 500,
+      "currency": "ILS",
+      "sourceEntryKey": "r1",
+      "subjectScope": "person"
+    },
+    {
+      "kind": "loan",
+      "amountMinor": 3000,
+      "currency": "ILS",
+      "sourceEntryKey": "l1",
+      "subjectScope": "person"
+    },
+    {
+      "kind": "guarantee",
+      "amountMinor": 9000,
+      "currency": "ILS",
+      "sourceEntryKey": "g-party",
+      "subjectScope": "party"
+    },
+    {
+      "kind": "guarantee",
+      "amountMinor": 4000,
+      "currency": "ILS",
+      "sourceEntryKey": "g-person-ignored",
+      "subjectScope": "person"
+    }
+  ]
+}
