@@ -40,6 +40,15 @@ import {
   type ContactDestination,
   type SelectionBasket
 } from "./recipient-selection.js";
+import {
+  currentQuestionVersionForDemand,
+  displayStanceForRecipient,
+  displayStancesForRecipients,
+  listSelectableQuestions,
+  type PublicClassification,
+  type QuestionChoice,
+  type StanceDisplay
+} from "./stances.js";
 import { createRateLimiter, issueCsrf, issueRequestCapability, text, Turnstile, validCsrf, validTurnstile, values, verifyRequestCapability } from "./security.js";
 
 type Template = { channel: "email" | "whatsapp" | "social"; subject: string | null; body: string };
@@ -57,7 +66,9 @@ export function registerRequestRoutes(app: Hono, db: Db, config: Config) {
     privateNoStore(context);
     if (!campaignEnabled(db)) return statusPage(context, locale, t(locale, "formDisabled"), 503);
     const csrf = issueCsrf(context, config);
-    const query = parseDirectoryQuery({});
+    const query = parseDirectoryQuery({
+      questionVersionId: String(positiveInteger(context.req.query("questionVersion")) ?? currentQuestionVersionForDemand(db, positiveInteger(context.req.query("demand"))) ?? "")
+    });
     return context.html(directoryPage(locale, context.req.path, csrf, db, query, emptyBasket(Date.now(), directoryPublicationRef(db)), "", undefined));
   });
 
@@ -73,7 +84,8 @@ export function registerRequestRoutes(app: Hono, db: Db, config: Config) {
     const loaded = loadBasket(db, config, body);
     const query = parseDirectoryQuery({
       q: text(body.q), listId: text(body.listId), partyId: text(body.partyId),
-      personId: text(body.personId), page: text(body.page), currentPage: text(body.currentPage), clear: text(body.clear)
+      personId: text(body.personId), page: text(body.page), currentPage: text(body.currentPage),
+      clear: text(body.clear), questionVersionId: text(body.questionVersionId)
     });
     return context.html(directoryPage(locale, context.req.path, csrf, db, query, loaded.basket, loaded.token, selectionNotice(locale, loaded.reason)));
   });
@@ -102,7 +114,8 @@ export function registerRequestRoutes(app: Hono, db: Db, config: Config) {
     if (removeId) basket = removeRecipient(basket, removeId);
     const query = parseDirectoryQuery({
       q: text(body.q), listId: text(body.listId), partyId: text(body.partyId),
-      personId: text(body.personId), page: text(body.page), currentPage: text(body.currentPage)
+      personId: text(body.personId), page: text(body.page), currentPage: text(body.currentPage),
+      questionVersionId: text(body.questionVersionId)
     });
     return context.html(directoryPage(locale, `/${locale}/request`, csrf, db, query, basket, signedSelection(basket, config), selectionNotice(locale, reason)));
   });
@@ -116,12 +129,13 @@ export function registerRequestRoutes(app: Hono, db: Db, config: Config) {
     if (!validCsrf(context, config, body)) return statusPage(context, locale, t(locale, "invalidForm"), 403);
     if (!campaignEnabled(db)) return statusPage(context, locale, t(locale, "formDisabled"), 503);
     const loaded = loadBasket(db, config, body);
+    const questionVersionId = positiveInteger(text(body.questionVersionId)) ?? null;
     if (loaded.reason || !loaded.basket.ids.length) {
       const csrf = issueCsrf(context, config);
-      return context.html(directoryPage(locale, `/${locale}/request`, csrf, db, parseDirectoryQuery({}), loaded.basket, loaded.token, selectionNotice(locale, loaded.reason ?? "empty")));
+      return context.html(directoryPage(locale, `/${locale}/request`, csrf, db, parseDirectoryQuery({ questionVersionId: questionVersionId ? String(questionVersionId) : undefined }), loaded.basket, loaded.token, selectionNotice(locale, loaded.reason ?? "empty")));
     }
     const csrf = issueCsrf(context, config);
-    return context.html(reviewDocument(locale, context.req.path, csrf, db, loaded.basket, loaded.token));
+    return context.html(reviewDocument(locale, context.req.path, csrf, db, loaded.basket, loaded.token, questionVersionId));
   });
 
   app.post("/:locale/request/build", async (context) => {
@@ -138,7 +152,8 @@ export function registerRequestRoutes(app: Hono, db: Db, config: Config) {
     const recipient = currentId ? getContactableRecipient(db, locale, currentId) : undefined;
     if (!recipient) return statusPage(context, locale, t(locale, "directoryUnavailablePerson"), 422);
     const csrf = issueCsrf(context, config);
-    return context.html(buildDocument(locale, context.req.path, csrf, db, recipient, config, loaded.token, loaded.basket.handoff?.demandIds ?? null));
+    const questionVersionId = positiveInteger(text(body.questionVersionId)) ?? null;
+    return context.html(buildDocument(locale, context.req.path, csrf, db, recipient, config, loaded.token, loaded.basket.handoff?.demandIds ?? null, undefined, questionVersionId));
   });
 
   app.post("/:locale/request/suggest", async (context) => {
@@ -162,9 +177,11 @@ export function registerRequestRoutes(app: Hono, db: Db, config: Config) {
     const recipientId = positiveInteger(context.req.query("recipient"));
     const recipient = recipientId ? getContactableRecipient(db, locale, recipientId) : undefined;
     if (!recipient) return context.redirect(`/${locale}/request`);
+    const questionVersionId = positiveInteger(context.req.query("questionVersion")) ?? currentQuestionVersionForDemand(db, positiveInteger(context.req.query("demand")));
     const csrf = issueCsrf(context, config);
     privateNoStore(context);
-    return context.html(buildDocument(locale, context.req.path, csrf, db, recipient, config, "", null, `recipient=${recipient.id}`));
+    const languageQuery = questionVersionId ? `recipient=${recipient.id}&questionVersion=${questionVersionId}` : `recipient=${recipient.id}`;
+    return context.html(buildDocument(locale, context.req.path, csrf, db, recipient, config, "", null, languageQuery, questionVersionId));
   });
 
   app.post("/:locale/request/preview", async (context) => {
@@ -359,14 +376,18 @@ export function registerRequestRoutes(app: Hono, db: Db, config: Config) {
 
 function directoryPage(locale: Locale, path: string, csrf: string, db: Db, query: DirectoryQuery, basket: SelectionBasket, token: string, notice?: string) {
   const items = listDirectoryBrowse(db, locale);
-  return directoryDocument(locale, path, csrf, query, searchDirectory(items, query), items, basket, token, notice);
+  const page = searchDirectory(items, query);
+  const questions = listSelectableQuestions(db, locale);
+  const stances = displayStancesForRecipients(db, page.rows.map((row) => row.id), query.questionVersionId, locale);
+  return directoryDocument(locale, path, csrf, query, page, items, basket, token, questions, stances, notice);
 }
 
-function directoryDocument(locale: Locale, path: string, csrf: string, query: DirectoryQuery, page: DirectoryPage, items: DirectoryBrowseItem[], basket: SelectionBasket, token: string, notice?: string) {
+function directoryDocument(locale: Locale, path: string, csrf: string, query: DirectoryQuery, page: DirectoryPage, items: DirectoryBrowseItem[], basket: SelectionBasket, token: string, questions: QuestionChoice[], stances: Map<number, StanceDisplay>, notice?: string) {
   const selected = query.personId ? items.find((item) => item.id === query.personId) : undefined;
   const selectedIds = new Set(basket.ids);
   const selectedPeople = basket.ids.map((id) => items.find((item) => item.id === id));
   const hidden = selectedHiddenByFilter(items, query, basket.ids);
+  const selectedQuestion = questions.find((row) => row.versionId === query.questionVersionId);
   return <Layout locale={locale} title={t(locale, "requestTitle")} path={path}>
     <div class="request-page request-recipient-page">
       <JourneyIntro eyebrow={<>{t(locale, "stepChoose")} · <bdi>1/3</bdi></>} title={t(locale, "directoryTitle")} />
@@ -392,6 +413,14 @@ function directoryDocument(locale: Locale, path: string, csrf: string, query: Di
               {page.filters.parties.map((option) => <option value={option.id} selected={option.id === query.partyId}>{option.label}</option>)}
             </select>
           </label> : null}
+          {questions.length ? <label>{t(locale, "stancePositionOn")}
+            <select name="questionVersionId">
+              <option value="">{t(locale, "stanceNone")}</option>
+              {questions.map((question) => <option value={question.versionId} selected={question.versionId === query.questionVersionId}>{question.title}</option>)}
+            </select>
+          </label> : null}
+          {selectedQuestion ? <QuestionHelp locale={locale} body={selectedQuestion.body} rationale={selectedQuestion.rationale} /> : null}
+          {questions.length ? <p class="stance-methodology">{t(locale, "stanceMethodology")} <a href={`/${locale}/methodology`}>{t(locale, "navMethodology")}</a></p> : null}
           {!page.filters.lists.length && !page.filters.parties.length ? <p class="directory-filter-note">{t(locale, "directoryFiltersUnavailable")}</p> : null}
           <div class="directory-search-actions">
             <button type="submit" name="page" value="1">{t(locale, "directorySearch")}</button>
@@ -412,11 +441,12 @@ function directoryDocument(locale: Locale, path: string, csrf: string, query: Di
                 {item.party ? ` · ${item.party.label}` : ""}
                 {" · "}{item.contactable ? t(locale, "directoryContactable") : t(locale, "directoryNotContactable")}
               </p>
+              <StanceSummary locale={locale} display={stances.get(item.id) ?? { state: "none" }} />
             </div>
             <div class="recipient-actions">
               {item.contactable && selectedIds.has(item.id) ? <button type="submit" formaction={`/${locale}/request/selection`} name="remove" value={item.id}>{t(locale, "directoryRemove")}</button> : null}
               {item.contactable && !selectedIds.has(item.id) ? <button type="submit" formaction={`/${locale}/request/selection`} name="add" value={item.id}>{t(locale, "directoryAdd")}</button> : null}
-              {item.contactable ? <a class="recipient-ask" href={`/${locale}/request/build?recipient=${item.id}`}>{t(locale, "directoryAsk")}</a> : null}
+              {item.contactable ? <a class="recipient-ask" href={`/${locale}/request/build?recipient=${item.id}${query.questionVersionId ? `&questionVersion=${query.questionVersionId}` : ""}`}>{t(locale, "directoryAsk")}</a> : null}
             </div>
           </li>)}</ul> : <p>{t(locale, "directoryEmpty")}</p>}
           {page.pageCount > 1 ? <div class="directory-pager">
@@ -429,7 +459,7 @@ function directoryDocument(locale: Locale, path: string, csrf: string, query: Di
   </Layout>;
 }
 
-function reviewDocument(locale: Locale, path: string, csrf: string, db: Db, basket: SelectionBasket, token: string) {
+function reviewDocument(locale: Locale, path: string, csrf: string, db: Db, basket: SelectionBasket, token: string, questionVersionId: number | null) {
   const people = reviewPeople(db, locale, basket.ids);
   const shared = sharedMailboxGroups(people.filter((row) => row.contactable));
   return <Layout locale={locale} title={t(locale, "directoryReview")} path={path}>
@@ -440,6 +470,7 @@ function reviewDocument(locale: Locale, path: string, csrf: string, db: Db, bask
         <form method="post" action={`/${locale}/request/build`}>
           <input type="hidden" name="csrf" value={csrf} />
           <input type="hidden" name="selection" value={token} />
+          {questionVersionId ? <input type="hidden" name="questionVersionId" value={questionVersionId} /> : null}
           <ul class="recipient-list">{people.map((person) => <li class="recipient-row">
             <div class="recipient-copy">
               <strong class="recipient-name">{person.name}</strong>
@@ -454,15 +485,30 @@ function reviewDocument(locale: Locale, path: string, csrf: string, db: Db, bask
   </Layout>;
 }
 
-function buildDocument(locale: Locale, path: string, csrf: string, db: Db, recipient: Recipient, config: Config, selection: string, selectedDemands: number[] | null, languageQuery?: string) {
+function buildDocument(locale: Locale, path: string, csrf: string, db: Db, recipient: Recipient, config: Config, selection: string, selectedDemands: number[] | null, languageQuery?: string, questionVersionId: number | null = null) {
   const demands = db.prepare(`SELECT d.id, dt.title, dt.body, dt.rationale FROM demands d JOIN campaigns c ON c.id = d.campaign_id
     LEFT JOIN demand_translations dt ON dt.demand_id = d.id AND dt.locale = ?
     WHERE c.status = 'active' AND d.is_active = 1 AND d.document = 'standard' ORDER BY d.sort_order`).all(locale) as { id: number; title: string | null; body: string | null; rationale: string | null }[];
   const checked = new Set(selectedDemands ?? []);
+  const questions = listSelectableQuestions(db, locale);
+  const selectedQuestion = questions.find((row) => row.versionId === questionVersionId);
+  const stance = displayStanceForRecipient(db, recipient.id, questionVersionId, locale);
   return <Layout locale={locale} title={t(locale, "buildTitle")} path={path} languageQuery={languageQuery}>
     <div class="request-page request-build-page">
       <JourneyIntro eyebrow={<>{t(locale, "stepBuild")} · <bdi>2/3</bdi></>} title={t(locale, "buildTitle")} headingId="build-heading" />
       <p class="request-recipient-line">{t(locale, "recipient")}: <strong>{recipient.name}</strong></p>
+      {questions.length ? <form class="stance-question" method="get" action={`/${locale}/request/build`}>
+        <input type="hidden" name="recipient" value={recipient.id} />
+        <label>{t(locale, "stancePositionOn")}
+          <select name="questionVersion">
+            <option value="">{t(locale, "stanceNone")}</option>
+            {questions.map((question) => <option value={question.versionId} selected={question.versionId === questionVersionId}>{question.title}</option>)}
+          </select>
+        </label>
+        {selectedQuestion ? <QuestionHelp locale={locale} body={selectedQuestion.body} rationale={selectedQuestion.rationale} /> : null}
+        <button type="submit">{t(locale, "directorySearch")}</button>
+      </form> : null}
+      <StanceSummary locale={locale} display={stance} />
       <form class="request-form wording-panel" method="post" action={`/${locale}/request/preview`} aria-labelledby="build-heading">
         <input type="hidden" name="csrf" value={csrf} /><input type="hidden" name="recipientId" value={recipient.id} />
         {selection ? <input type="hidden" name="selection" value={selection} /> : null}
@@ -547,6 +593,7 @@ function nextPersonForm(locale: Locale, csrf: string, db: Db, config: Config, bo
   return <form method="post" action={`/${locale}/request/build`}>
     <input type="hidden" name="csrf" value={csrf} />
     <input type="hidden" name="selection" value={signBasket(next, config)} />
+    {text(body.questionVersionId) ? <input type="hidden" name="questionVersionId" value={text(body.questionVersionId)} /> : null}
     <button type="submit" class="primary-action">{t(locale, "directoryNextPerson")}</button>
   </form>;
 }
@@ -562,6 +609,48 @@ function QuestionHelp({ locale, body, rationale }: { locale: Locale; body: strin
     </details>
     {body ? <div class="question-help-tooltip" role="tooltip" aria-hidden="true"><p>{body}</p>{rationale ? <p>{rationale}</p> : null}</div> : null}
   </div>;
+}
+
+function StanceSummary({ locale, display }: { locale: Locale; display: StanceDisplay }) {
+  switch (display.state) {
+    case "none": return null;
+    case "unknown": return <p class="recipient-stance">{t(locale, "stanceUnknown")}</p>;
+    case "under_review": return <p class="recipient-stance">{t(locale, "stanceUnderReview")}</p>;
+    case "published": return <div class="recipient-stance">
+      <p>{publishedHeadline(locale, display)}</p>
+      {display.summary ? <p>{display.summary}</p> : null}
+      {display.sourceUrl ? <p>
+        <a href={display.sourceUrl} rel="nofollow noopener" dir="ltr">{t(locale, "stanceSource")}</a>
+        {display.statementAt ? <> · <time datetime={display.statementAt}>{display.statementAt.slice(0, 10)}</time></> : null}
+      </p> : null}
+    </div>;
+    default: {
+      const _never: never = display;
+      return _never;
+    }
+  }
+}
+
+function publishedHeadline(locale: Locale, display: Extract<StanceDisplay, { state: "published" }>): string {
+  const parts: string[] = [];
+  if (display.historical) parts.push(t(locale, "stanceHistorical"));
+  if (display.individualUnknown) parts.push(display.attribution === "list" ? t(locale, "stanceListOnly") : t(locale, "stancePartyOnly"));
+  else parts.push(classificationLabel(locale, display.classification));
+  return parts.join(" · ");
+}
+
+function classificationLabel(locale: Locale, classification: PublicClassification): string {
+  switch (classification) {
+    case "supports": return t(locale, "stanceSupports");
+    case "supports_with_reservations": return t(locale, "stanceSupportsWithReservations");
+    case "opposes": return t(locale, "stanceOpposes");
+    case "statement_available": return t(locale, "stanceStatementAvailable");
+    case "multiple": return t(locale, "stanceMultiple");
+    default: {
+      const _never: never = classification;
+      return _never;
+    }
+  }
 }
 
 function publicSuggestion(locale: Locale, suggestion: DirectorySuggestion) {

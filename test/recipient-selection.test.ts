@@ -145,7 +145,7 @@ test("directory selection survives filters, rejects a sixth add, and review name
     assert.match(reviewHtml, /Prepare questions/);
     assert.doesNotMatch(reviewHtml, /To:|CC:|BCC:/i);
 
-    const tampered = await postForm(app.app, "/en/request", { csrf: sixthCsrf, selection: token.slice(0, -1) + "A", q: "", page: "1" }, cookie);
+    const tampered = await postForm(app.app, "/en/request", { csrf: sixthCsrf, selection: `${token}x`, q: "", page: "1" }, cookie);
     const tamperedHtml = await tampered.text();
     assert.match(tamperedHtml, /This selection could not be verified/);
     assert.doesNotMatch(tamperedHtml, /name="selection"/);

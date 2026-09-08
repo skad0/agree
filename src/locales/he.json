@@ -163,5 +163,20 @@
   "directoryUnavailablePerson": "אין יותר אפשרות לפנות לאדם הזה.",
   "directoryDirectEmail": "דוא״ל",
   "directoryDirectWhatsapp": "וואטסאפ",
-  "directorySharedMailbox": "{n} אנשים, כתובת מפלגה משותפת אחת"
+  "directorySharedMailbox": "{n} אנשים, כתובת מפלגה משותפת אחת",
+  "stancePositionOn": "עמדה בנושא",
+  "stanceNone": "לא נבחרה שאלה",
+  "stanceUnknown": "אין עמדה מאומתת זמינה",
+  "stancePartyOnly": "יש עמדת מפלגה — עמדת האדם אינה ידועה",
+  "stanceListOnly": "יש עמדת רשימה — עמדת האדם אינה ידועה",
+  "stanceHistorical": "הצהרה מוקדמת — ראו הקשר",
+  "stanceUnderReview": "בבדיקה",
+  "stanceMultiple": "כמה הצהרות — ראו תאריכים",
+  "stanceSupports": "תומך",
+  "stanceSupportsWithReservations": "תומך עם הסתייגות",
+  "stanceOpposes": "מתנגד",
+  "stanceStatementAvailable": "יש הצהרה",
+  "stanceSource": "מקור",
+  "stanceMethodology": "התוויות האלה הן הצהרות ציבוריות שנבדקו על שאלה נקובה. היעדר ראיה אינו התנגדות. עמדת מפלגה אינה עמדת אדם.",
+  "methodologyStance": "### עמדות ציבוריות שנבדקו\n\nעמדה ציבורית מופיעה רק אחרי שמנהל בודק מקור, מתאים אותו לשאלת תקן מגרסת, ומפרסם אותה. סימון תשובה פרטית כמאומתת בידי מנחה אינו פרסום. «אין עמדה מאומתת» פירושו שאין רשומה מאומתת כאן; אין בכך טענה שהאדם מתנגד, סירב לענות או לא נשאל. עמדת מפלגה או רשימה מוצגת כעמדת ארגון ואינה נחשבת לתשובה אישית. גרסה ישנה של שאלה מסומנת כהקשר היסטורי, לא כתשובה נוכחית. אין ציון, דירוג, המלצה או סולם צבעים. לתיקון רשומה פנו אל {{PRIVACY_CONTACT_EMAIL}}."
 }

@@ -1,6 +1,6 @@
 # Israeli election enrichment: verified architecture and implementation plan
 
-Status: slice 3 implements signed transient selection, review, sequential handoffs, and destination revalidation on the legacy directory. Election number still unconfirmed. No production import and no imported recipients activated. Remaining gates: confirm the target election; close newer CEC and finance source contracts; import one complete CEC snapshot; parliamentary/contact enrichment; reviewed publication; stance UI.
+Status: slice 4 adds reviewed public stances, admin publication/retraction, and question-context display on the legacy directory. Election number still unconfirmed. No production import, no imported recipients activated, and no production stance seeds. Remaining gates: confirm the target election; close newer CEC and finance source contracts; import one complete CEC snapshot; parliamentary/contact enrichment; reviewed directory publication.
 Audit date: 2026-09-07. Repository baseline: `e3254ae`.
 
 This adapts the supplied mission to the existing civic platform. Build a repeatable, source-attributed candidate directory, parliamentary enrichment, explicit contact resolution, and election-scoped financial transparency. Coverage must be measurable; missing data must remain missing rather than being inferred as fact.

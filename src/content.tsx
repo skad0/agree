@@ -33,7 +33,10 @@ export function registerContentRoutes(app: Hono, db: Db, config: Config) {
   page("first-100-days", "planTitle", "planLede", (locale) => timeline(locale, planItems(db, locale)));
   page("government-model", "modelTitle", "modelLede", (locale) => portfolioGrid(locale, portfolios(db, locale)));
   page("about", "aboutTitle", "slogan", (locale) => prose(t(locale, "aboutBody")));
-  page("methodology", "methodologyTitle", "slogan", (locale) => prose(t(locale, "methodologyBody")));
+  page("methodology", "methodologyTitle", "slogan", (locale) => <>
+    {prose(t(locale, "methodologyBody"))}
+    {prose(t(locale, "methodologyStance").replaceAll("{{PRIVACY_CONTACT_EMAIL}}", config.privacyContactEmail))}
+  </>);
 
   // The old placeholder route keeps working so existing links do not break.
   app.get("/:locale/demands", (context) => {

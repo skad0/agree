@@ -74,8 +74,9 @@ const fixtureItems: DirectoryBrowseItem[] = [
 test("parseDirectoryQuery bounds query text and treats clear as empty", () => {
   assert.equal(parseDirectoryQuery({ q: "  x".repeat(80) }).q.length, DIRECTORY_MAX_QUERY);
   assert.deepEqual(parseDirectoryQuery({ q: "Ada", listId: "10", partyId: "20", personId: "1", page: "3", clear: "1" }), {
-    q: "", listId: null, partyId: null, personId: null, page: 1
+    q: "", listId: null, partyId: null, personId: null, page: 1, questionVersionId: null
   });
+  assert.equal(parseDirectoryQuery({ clear: "1", questionVersionId: "9" }).questionVersionId, 9);
   assert.equal(parseDirectoryQuery({ page: "0" }).page, 1);
   assert.equal(parseDirectoryQuery({ listId: "-2" }).listId, null);
 });

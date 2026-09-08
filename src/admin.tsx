@@ -6,6 +6,16 @@ import { isLocale, locales, t } from "./i18n.js";
 import { AppearanceSwitcher, Shell } from "./layout.js";
 import { issueCsrf, text, validCsrf } from "./security.js";
 import { getStoreObject, responseStore } from "./s3.js";
+import {
+  getAdminStance,
+  isStanceClassification,
+  listAdminStances,
+  listQuestionVersions,
+  parseStanceSubject,
+  retractStance,
+  saveQuestionVersion,
+  saveStance
+} from "./stances.js";
 
 type Admin = { id: number; email: string; role: "admin" | "moderator" };
 type Row = Record<string, unknown>;
@@ -19,6 +29,7 @@ const navigation = [
   { href: "/admin/responses", label: "Moderation", moderator: true },
   { href: "/admin/demands", label: "Demands", moderator: false },
   { href: "/admin/recipients", label: "Recipients", moderator: false },
+  { href: "/admin/stances", label: "Stances", moderator: false },
   { href: "/admin/templates", label: "Templates", moderator: false },
   { href: "/admin/supporters", label: "Supporters", moderator: false },
   { href: "/admin/audit", label: "Audit", moderator: false },
@@ -187,6 +198,63 @@ export function registerAdminRoutes(app: Hono, db: Db, config: Config) {
         ON CONFLICT(recipient_id, locale) DO UPDATE SET name = excluded.name`).run(recipientId, text(body.locale), text(body.name));
     });
     return context.redirect("/admin/recipients", 303);
+  });
+
+  app.get("/admin/stances", (context) => stanceAdminPage(context, db, config));
+
+  app.post("/admin/stances", async (context) => {
+    const body = await context.req.parseBody();
+    if (!validCsrf(context, config, body)) return context.text("Forbidden", 403);
+    const action = text(body.action);
+    const admin = currentAdmin(context);
+    const audit: Record<string, string | number> = { action };
+    try {
+      mutate(db, admin, action === "publish" ? "publish" : action === "retract" ? "retract" : "save", action === "version" ? "question_version" : "stance", audit, () => {
+        if (action === "version") {
+          const result = saveQuestionVersion(db, {
+            demandId: positiveInteger(body.demandId) ?? 0,
+            semanticVersion: text(body.semanticVersion),
+            reviewed: text(body.reviewed) === "yes"
+          });
+          if (!result.ok) throw new Error(result.error);
+          audit.id = result.id;
+          audit.demandId = text(body.demandId);
+          audit.semanticVersion = text(body.semanticVersion);
+          return;
+        }
+        const id = positiveInteger(body.id);
+        if (action === "retract") {
+          if (!id) throw new Error("Choose a stance to retract.");
+          const result = retractStance(db, id);
+          if (!result.ok) throw new Error(result.error);
+          audit.id = id;
+          return;
+        }
+        const subject = parseStanceSubject(text(body.subjectKind), positiveInteger(body.subjectId));
+        const classification = text(body.classification);
+        if (!subject || !isStanceClassification(classification)) throw new Error("Choose a subject, question version, and classification.");
+        const result = saveStance(db, {
+          id,
+          subject,
+          questionVersionId: positiveInteger(body.questionVersionId) ?? 0,
+          classification,
+          summary: text(body.summary) || null,
+          excerpt: text(body.excerpt) || null,
+          sourceUrl: text(body.sourceUrl) || null,
+          statementAt: text(body.statementAt) || null
+        }, action === "publish" ? "published" : "draft");
+        if (!result.ok) throw new Error(result.error);
+        audit.id = result.id;
+        audit.questionVersionId = text(body.questionVersionId);
+        audit.subjectKind = text(body.subjectKind);
+        audit.subjectId = text(body.subjectId);
+        audit.classification = classification;
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "The stance could not be saved.";
+      return stanceAdminPage(context, db, config, message, 422);
+    }
+    return context.redirect("/admin/stances", 303);
   });
 
   app.get("/admin/templates", (context) => {
@@ -379,6 +447,35 @@ async function accessEmail(context: any, config: Config) {
 }
 
 function currentAdmin(context: any) { return context.get("admin") as Admin; }
+function stanceAdminPage(context: any, db: Db, config: Config, error?: string, status = 200) {
+  const csrf = issueCsrf(context, config);
+  const editingId = positiveInteger(context.req.query("id"));
+  const editing = editingId ? getAdminStance(db, editingId) : undefined;
+  const versions = listQuestionVersions(db);
+  const stances = listAdminStances(db).map((row) => ({
+    id: row.id, state: row.publicationState, classification: row.classification,
+    question: row.question, version: row.semanticVersion, subject: row.subject
+  }));
+  const versionRows = versions.map((row) => ({
+    id: row.id, demand: row.demandId, version: row.semanticVersion, reviewed: row.reviewedAt ?? "", title: row.title ?? ""
+  }));
+  const demands = db.prepare(`SELECT d.id, dt.title FROM demands d
+    LEFT JOIN demand_translations dt ON dt.demand_id = d.id AND dt.locale = 'en'
+    WHERE d.document = 'standard' AND d.is_active = 1 ORDER BY d.sort_order, d.id`).all() as { id: number; title: string | null }[];
+  return adminPage(context, "Stances", <>
+    <h1>Stances</h1>
+    <p class="lede">Reviewed public positions. A confirmed private reply is not a publication. Publish only from an independent source and a question version.</p>
+    {error ? <p class="admin-error" role="alert">{error}</p> : null}
+    {dataTable(stances, "No stances yet.")}
+    <p class="note">Edit by ID in the form, or open <code>?id=</code> on this URL.</p>
+    <h2 class="section-label" id="edit">{editing ? `Edit stance #${editing.id}` : "Add a stance"}</h2>
+    {stanceForm(csrf, editing, versions)}
+    <h2 class="section-label">Question versions</h2>
+    <p class="note">Semantic versions attach to active standard demands. A reviewed version is eligible for the public selector.</p>
+    {dataTable(versionRows, "No question versions yet.")}
+    {versionForm(csrf, demands)}
+  </>, status);
+}
 function mutate(db: Db, admin: Admin, action: string, entity: string, payload: unknown, operation: () => void) {
   db.exec("BEGIN IMMEDIATE");
   try { operation(); db.prepare("INSERT INTO admin_audit_events (admin_id, action, entity, payload, created_at) VALUES (?, ?, ?, ?, ?)").run(admin.id, action, entity, JSON.stringify(withoutSecrets(payload)), new Date().toISOString()); db.exec("COMMIT"); }
@@ -497,6 +594,56 @@ function templateForm(csrf: string, source: Record<string, unknown> = {}) { cons
   <label class="full">Body<textarea name="body" required>{value("body")}</textarea></label>
   <p class="full"><button>Save template</button></p></form>; }
 
+function stanceForm(csrf: string, editing: ReturnType<typeof getAdminStance>, versions: ReturnType<typeof listQuestionVersions>, body: Record<string, unknown> = {}) {
+  const value = (key: string) => text(body[key]);
+  const subjectKind = value("subjectKind") || editing?.subject.kind || "person";
+  const subjectId = value("subjectId") || (editing
+    ? String(editing.subject.kind === "person" ? editing.subject.personId : editing.subject.kind === "party" ? editing.subject.partyId : editing.subject.listId)
+    : "");
+  const classification = value("classification") || editing?.classification || "statement_available";
+  const questionVersionId = value("questionVersionId") || (editing ? String(editing.questionVersionId) : "");
+  return <form method="post" class="admin-form">
+    <input type="hidden" name="csrf" value={csrf} />
+    <label>ID<input name="id" type="number" placeholder="blank creates a new stance" value={value("id") || (editing?.id ? String(editing.id) : "")} /></label>
+    <label>Subject kind<select name="subjectKind">
+      <option value="person" selected={subjectKind === "person"}>Person</option>
+      <option value="party" selected={subjectKind === "party"}>Party</option>
+      <option value="list" selected={subjectKind === "list"}>Electoral list</option>
+    </select></label>
+    <label>Subject ID<input name="subjectId" type="number" value={subjectId} /></label>
+    <label>Question version<select name="questionVersionId">
+      <option value="">Choose a version</option>
+      {versions.map((row) => <option value={row.id} selected={String(row.id) === questionVersionId}>{row.title ?? `demand ${row.demandId}`} {row.semanticVersion}</option>)}
+    </select></label>
+    <label>Classification<select name="classification">
+      {["supports", "supports_with_reservations", "opposes", "statement_available", "multiple"].map((option) =>
+        <option value={option} selected={classification === option}>{option.replaceAll("_", " ")}</option>)}
+    </select></label>
+    <label class="full">Summary<input name="summary" value={value("summary") || editing?.summary || ""} /></label>
+    <label class="full">Excerpt<textarea name="excerpt">{value("excerpt") || editing?.excerpt || ""}</textarea></label>
+    <label class="full">Source URL<input name="sourceUrl" type="url" value={value("sourceUrl") || editing?.sourceUrl || ""} /></label>
+    <label>Statement date<input name="statementAt" value={value("statementAt") || editing?.statementAt || ""} placeholder="YYYY-MM-DD" /></label>
+    <p class="full">
+      <button name="action" value="save">Save draft</button>
+      {" "}
+      <button name="action" value="publish">Publish</button>
+      {" "}
+      <button class="danger" name="action" value="retract">Retract</button>
+    </p>
+  </form>;
+}
+
+function versionForm(csrf: string, demands: { id: number; title: string | null }[]) {
+  return <form method="post" class="admin-form">
+    <input type="hidden" name="csrf" value={csrf} />
+    <input type="hidden" name="action" value="version" />
+    <label>Demand<select name="demandId" required>{demands.map((row) => <option value={row.id}>{row.title ?? `demand ${row.id}`}</option>)}</select></label>
+    <label>Semantic version<input name="semanticVersion" placeholder="1.0.0" required /></label>
+    <label class="full"><input name="reviewed" type="checkbox" value="yes" checked /> Reviewed and eligible for public display</label>
+    <p class="full"><button>Save question version</button></p>
+  </form>;
+}
+
 function positiveInteger(value: unknown) { const result = Number(text(value)); return Number.isInteger(result) && result > 0 ? result : undefined; }
 function number(value: unknown, fallback: number) { const result = Number(text(value)); return Number.isFinite(result) ? result : fallback; }
 function nullable(value: unknown) { return text(value) || null; }
@@ -504,7 +651,7 @@ function formValue(value: unknown) { return typeof value === "number" && Number.
 function has(body: Record<string, unknown>, key: string) { return Object.prototype.hasOwnProperty.call(body, key); }
 function csv(context: any, headers: string[], rows: any[]) { context.header("Content-Type", "text/csv; charset=utf-8"); context.header("Content-Disposition", "attachment"); return context.body([headers, ...rows.map((row) => headers.map((header) => row[header]))].map((row) => row.map(csvCell).join(",")).join("\n")); }
 function csvCell(value: unknown) { const string = String(value ?? ""); const safe = /^[=+\-@\t\r]/.test(string) ? `'${string}` : string; return `"${safe.replaceAll('"', '""')}"`; }
-const auditKeys = new Set(["id", "locale", "channel", "action", "document", "sortOrder", "isActive", "type", "status", "campaign", "support", "requests", "responses"]);
+const auditKeys = new Set(["id", "locale", "channel", "action", "document", "sortOrder", "isActive", "type", "status", "campaign", "support", "requests", "responses", "stanceId", "questionVersionId", "personId", "partyId", "listId", "demandId", "classification", "publicationState", "semanticVersion", "subjectKind", "subjectId"]);
 function withoutSecrets(payload: unknown) { if (!payload || typeof payload !== "object" || Array.isArray(payload)) return {}; return Object.fromEntries(Object.entries(payload).filter(([key, value]) => auditKeys.has(key) && typeof value !== "object" && String(value).length <= 120)); }
 
 function moderatorPath(path: string) {
