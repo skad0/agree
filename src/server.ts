@@ -1,6 +1,5 @@
 import { serve } from "@hono/node-server";
 import { createApp } from "./app.js";
-import { backupDatabase, hasBackupStorage } from "./backup.js";
 import { drainResponseObjectWork, enforceRetention } from "./response-storage.js";
 
 const runtime = createApp();
@@ -13,11 +12,6 @@ server.on("error", (error) => {
   runtime.close();
   process.exitCode = 1;
 });
-if (hasBackupStorage(runtime.config)) {
-  const runBackup = () => backupDatabase(runtime.db, runtime.config).then((keys) => console.log(`Backed up SQLite: ${keys.join(", ")}`)).catch((error) => console.error("SQLite backup failed", error));
-  void runBackup();
-  setInterval(runBackup, 86_400_000).unref();
-}
 let maintenanceRunning = false;
 const runResponseMaintenance = async () => {
   if (maintenanceRunning) return;

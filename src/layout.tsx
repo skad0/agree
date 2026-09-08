@@ -38,8 +38,8 @@ export function Layout({ locale, title, path, languageQuery = "", languageHref, 
       <div class="public-rule" aria-hidden="true"><span></span><span></span></div>
       <header class="wrap site-header">
         <a class="wordmark" href={`/${locale}`}>{t(locale, "siteName")}</a>
-        {/* Two tiers on purpose: what you can read, and what you can do. The three actions keep
-            the same order and the same words everywhere, so the sequence can be memorised. */}
+        {/* Two tiers on purpose: what you can read, and what you can do. Action links keep the
+            same order and wording everywhere so the sequence can be memorised. */}
         <nav class="primary" aria-label={t(locale, "documentsTitle")}>
           <a href={`/${locale}/standard`}>{t(locale, "navStandard")}</a>
           <a href={`/${locale}/first-100-days`}>{t(locale, "navPlan")}</a>
@@ -55,9 +55,8 @@ export function Layout({ locale, title, path, languageQuery = "", languageHref, 
         </details>
       </header>
       <nav class="actions-bar wrap" aria-label={t(locale, "howItWorks")}>
-        <a href={`/${locale}/support`}><b>1</b>{t(locale, "navSupport")}</a>
-        <a href={`/${locale}/request`}><b>2</b>{t(locale, "navRequest")}</a>
-        <a href={`/${locale}/responses/new`}><b>3</b>{t(locale, "navResponse")}</a>
+        <a href={`/${locale}/request`}><b>1</b>{t(locale, "navRequest")}</a>
+        <a href={`/${locale}/responses/new`}><b>2</b>{t(locale, "navResponse")}</a>
       </nav>
       <main id="content" class="wrap">{children}</main>
       <footer class="wrap">

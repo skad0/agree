@@ -39,7 +39,15 @@ export function verifyErasureLedgerManifest(config: Config, value: unknown) {
   return safeEqual(manifest.mac, hmac(key, MANIFEST_DOMAIN + JSON.stringify([manifest.schemaVersion, manifest.ledgerPrefix, manifest.keyVersion, manifest.createdAt])));
 }
 export async function setupErasureLedger(config: Config) { const manifest = createErasureLedgerManifest(config); await putErasureLedgerObject(config, ERASURE_LEDGER_MANIFEST_KEY, serializeErasureLedgerManifest(manifest)); return manifest; }
-export async function recordErasureEvent(config: Config, normalizedEmail: string, eraseThrough: string) { const event = createErasureEvent(config, normalizedEmail, eraseThrough); await putErasureLedgerObject(config, `erasure-events/v1/${event.eventId}.json`, serializeErasureEvent(event)); return event; }
+export function hasErasureLedger(config: Config) {
+  return Boolean(config.erasureLedger.endpoint && config.erasureLedger.accessKey && config.erasureLedger.secretKey && config.erasureLedger.bucket && config.erasureLedger.activeVersion && config.erasureLedger.keys.size);
+}
+export async function recordErasureEvent(config: Config, normalizedEmail: string, eraseThrough: string) {
+  if (!hasErasureLedger(config)) return null;
+  const event = createErasureEvent(config, normalizedEmail, eraseThrough);
+  await putErasureLedgerObject(config, `erasure-events/v1/${event.eventId}.json`, serializeErasureEvent(event));
+  return event;
+}
 function canonicalEvent(event: Omit<ErasureEvent, "mac"> | ErasureEvent) { return { schemaVersion: event.schemaVersion, eventId: event.eventId, keyVersion: event.keyVersion, subjectTag: event.subjectTag, eraseThrough: event.eraseThrough, recordedAt: event.recordedAt }; }
 function canonicalRepresentation(event: Omit<ErasureEvent, "mac">) { return JSON.stringify([event.schemaVersion, event.eventId, event.keyVersion, event.subjectTag, event.eraseThrough, event.recordedAt]); }
 function hmac(key: Buffer, value: string) { return createHmac("sha256", key).update(value).digest("base64url"); }

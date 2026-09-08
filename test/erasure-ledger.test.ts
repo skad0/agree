@@ -19,10 +19,11 @@ test("erasure events normalize subjects, separate domains, and verify their vers
   assert.doesNotMatch(`erasure-events/v1/${event.eventId}.json`, /person@example\.org/i);
 });
 
-test("production requires a complete ledger store and versioned signing keys", () => {
+test("production does not require a ledger store; incomplete ledger config still fails closed", () => {
   const base = { NODE_ENV: "production", SESSION_SECRET: "session", TRUSTED_PROXY: "cloudflare", TRUSTED_PROXY_SECRET: "edge-secret-012345678901234567890123", APP_BASE_URL: "https://example.org", PRIVACY_CONTACT_EMAIL: "privacy@example.org" };
-  assert.throws(() => loadConfig(base), /ERASURE_LEDGER/);
+  assert.equal(loadConfig(base).erasureLedger.endpoint, undefined);
   assert.throws(() => loadConfig({ ...base, ...ledger, ERASURE_LEDGER_HMAC_KEYS: "active:not-base64!" }), /ERASURE_LEDGER/);
+  assert.throws(() => loadConfig({ ...base, ERASURE_LEDGER_S3_ENDPOINT: "https://ledger.test" }), /Incomplete ERASURE_LEDGER/);
   assert.equal(loadConfig({ ...base, ...ledger, ERASURE_LEDGER_S3_ENDPOINT: "https://ledger.test" }).erasureLedger.activeVersion, "active");
 });
 

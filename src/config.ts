@@ -22,7 +22,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env) {
     if (url.protocol !== "https:" || !url.hostname || url.username || url.password || url.search || url.hash) throw new Error("APP_BASE_URL must be a valid HTTPS URL in production");
   }
   if (nodeEnv === "production" && (!isEmail(privacyContactEmail) || privacyContactEmail.includes("CAMPAIGN OPERATOR CONTACT"))) throw new Error("PRIVACY_CONTACT_EMAIL must be a real email address in production");
-  const erasureLedger = parseErasureLedger(env, nodeEnv === "production");
+  const erasureLedger = parseErasureLedger(env);
   const electionEtlEnabled = flag(env.ELECTION_ETL_ENABLED, false);
   const electionEtlScheduleEnabled = flag(env.ELECTION_ETL_SCHEDULE_ENABLED, false);
   const electionEtlElectionNumber = optionalPositiveInt(env.ELECTION_ETL_ELECTION_NUMBER, "ELECTION_ETL_ELECTION_NUMBER");
@@ -75,14 +75,15 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env) {
   };
 }
 
-function parseErasureLedger(env: NodeJS.ProcessEnv, required: boolean) {
+function parseErasureLedger(env: NodeJS.ProcessEnv) {
   const endpoint = env.ERASURE_LEDGER_S3_ENDPOINT?.trim(); const accessKey = env.ERASURE_LEDGER_S3_ACCESS_KEY?.trim();
   const secretKey = env.ERASURE_LEDGER_S3_SECRET_KEY; const bucket = env.ERASURE_LEDGER_S3_BUCKET?.trim();
   const region = env.ERASURE_LEDGER_S3_REGION?.trim() || "auto"; const activeVersion = env.ERASURE_LEDGER_ACTIVE_KEY_VERSION?.trim();
   const keys = parseLedgerKeys(env.ERASURE_LEDGER_HMAC_KEYS);
-  if (required && (!endpoint || !accessKey || !secretKey || !bucket || !activeVersion || !keys.size)) throw new Error("Complete ERASURE_LEDGER_S3 and ERASURE_LEDGER_HMAC configuration is required in production");
-  if (endpoint) { let parsed: URL; try { parsed = new URL(endpoint); } catch { throw new Error("ERASURE_LEDGER_S3_ENDPOINT must be a valid URL"); } if (!parsed.protocol.startsWith("http") || (required && parsed.protocol !== "https:") || parsed.username || parsed.password || parsed.search || parsed.hash) throw new Error("ERASURE_LEDGER_S3_ENDPOINT must be a valid S3 URL"); }
-  if (bucket !== undefined && (!bucket || bucket.length > 63 || !/^[a-z0-9][a-z0-9.-]*[a-z0-9]$/.test(bucket))) throw new Error("ERASURE_LEDGER_S3_BUCKET is invalid");
+  const any = Boolean(endpoint || accessKey || secretKey || bucket || activeVersion || keys.size);
+  if (any && (!endpoint || !accessKey || !secretKey || !bucket || !activeVersion || !keys.size)) throw new Error("Incomplete ERASURE_LEDGER_S3 / ERASURE_LEDGER_HMAC configuration");
+  if (endpoint) { let parsed: URL; try { parsed = new URL(endpoint); } catch { throw new Error("ERASURE_LEDGER_S3_ENDPOINT must be a valid URL"); } if (!parsed.protocol.startsWith("http") || parsed.username || parsed.password || parsed.search || parsed.hash) throw new Error("ERASURE_LEDGER_S3_ENDPOINT must be a valid S3 URL"); }
+  if (bucket !== undefined && bucket !== "" && (!bucket || bucket.length > 63 || !/^[a-z0-9][a-z0-9.-]*[a-z0-9]$/.test(bucket))) throw new Error("ERASURE_LEDGER_S3_BUCKET is invalid");
   if (activeVersion && !keys.has(activeVersion)) throw new Error("ERASURE_LEDGER_ACTIVE_KEY_VERSION must name a configured HMAC key");
   return { endpoint, accessKey, secretKey, bucket, region, activeVersion, keys };
 }

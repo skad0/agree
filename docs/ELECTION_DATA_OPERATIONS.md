@@ -37,8 +37,8 @@ node dist/scripts/elections.js report
 
 1. Deploy with ETL flags **false** (Blueprint defaults). Migrations `016`/`017` apply at boot; imported recipients stay unpublished until an accepted publication is activated deliberately.
 2. Confirm `/health`, seven locale homes, `/en/request` (and one RTL locale), `/admin` via Access.
-3. Do **not** set `ELECTION_ETL_ENABLED=true` until: election number confirmed; CEC/newer and finance contracts closed in the manifest; a complete dry-run against fixtures passes; backup/restore still works with the new tables.
-4. Artifact directory under `/data` only. Keep within the disk budget alongside `app.db` and backups.
+3. Do **not** set `ELECTION_ETL_ENABLED=true` until: election number confirmed; CEC/newer and finance contracts closed in the manifest; a complete dry-run against fixtures passes; the SQLite disk still has headroom with the new tables.
+4. Artifact directory under `/data` only. Keep within the disk budget alongside `app.db`.
 5. After any future publication activation, verify rollback to the previous publication version and that old single-recipient links still resolve.
 
 ## What this deploy does **not** do

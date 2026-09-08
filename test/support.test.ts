@@ -9,6 +9,7 @@ test("support submission does not overwrite a verified supporter", async () => {
   const dir = mkdtempSync(join(tmpdir(), "agree-support-integrity-"));
   try {
     const runtime = createApp({ sqlitePath: join(dir, "app.db"), env: { NODE_ENV: "test", SESSION_SECRET: "test-secret" } });
+    runtime.db.prepare("UPDATE campaigns SET support_enabled = 1 WHERE id = 1").run();
     runtime.db.prepare(`INSERT INTO supporters
       (email_normalized, name, city, locale, public_name_allowed, privacy_consent_at, created_at, email_verified_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
@@ -51,6 +52,7 @@ test("re-registering a pending supporter invalidates the old token", async () =>
   const dir = mkdtempSync(join(tmpdir(), "agree-pending-integrity-"));
   try {
     const runtime = createApp({ sqlitePath: join(dir, "app.db"), env: { NODE_ENV: "test", SESSION_SECRET: "test-secret" } });
+    runtime.db.prepare("UPDATE campaigns SET support_enabled = 1 WHERE id = 1").run();
     const first = await submit(runtime.app, { email: "pending@example.org", name: "Original Name" });
     const second = await submit(runtime.app, { email: "pending@example.org", name: "Current Name" });
     const pending = runtime.db.prepare("SELECT last_active_at, email_verified_at FROM supporters WHERE email_normalized = ?").get("pending@example.org") as { last_active_at: string | null; email_verified_at: string | null };

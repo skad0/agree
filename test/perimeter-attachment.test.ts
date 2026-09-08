@@ -5,7 +5,7 @@ import { createApp } from "../src/app.js";
 import { loadConfig } from "../src/config.js";
 import { createRateLimiter } from "../src/security.js";
 import { locales, t } from "../src/i18n.js";
-const productionLedger = { ERASURE_LEDGER_S3_ENDPOINT: "https://ledger.example", ERASURE_LEDGER_S3_ACCESS_KEY: "key", ERASURE_LEDGER_S3_SECRET_KEY: "secret", ERASURE_LEDGER_S3_BUCKET: "ledger", ERASURE_LEDGER_HMAC_KEYS: `v1:${Buffer.alloc(32, 7).toString("base64url")}`, ERASURE_LEDGER_ACTIVE_KEY_VERSION: "v1" };
+const productionBase = { NODE_ENV: "production", SESSION_SECRET: "secret", TRUSTED_PROXY: "cloudflare", TRUSTED_PROXY_SECRET: "edge-secret-012345678901234567890123", APP_BASE_URL: "https://example.org", PRIVACY_CONTACT_EMAIL: "privacy@example.org" };
 
 test("client identity ignores spoofed forwarding headers unless Cloudflare is explicitly trusted", async () => {
   const make = (trusted: string | undefined) => {
@@ -18,16 +18,16 @@ test("client identity ignores spoofed forwarding headers unless Cloudflare is ex
 });
 
 test("production configuration fails closed without the exact proxy contract", () => {
-  assert.throws(() => loadConfig({ ...productionLedger, NODE_ENV: "production", SESSION_SECRET: "secret" }), /TRUSTED_PROXY/);
-  assert.throws(() => loadConfig({ ...productionLedger, NODE_ENV: "production", SESSION_SECRET: "secret", TRUSTED_PROXY: "xff" }), /TRUSTED_PROXY/);
-  assert.throws(() => loadConfig({ ...productionLedger, NODE_ENV: "production", SESSION_SECRET: "secret", TRUSTED_PROXY: "cloudflare", TRUSTED_PROXY_SECRET: "edge-secret-012345678901234567890123" }), /APP_BASE_URL/);
-  assert.throws(() => loadConfig({ ...productionLedger, NODE_ENV: "production", SESSION_SECRET: "secret", TRUSTED_PROXY: "cloudflare", TRUSTED_PROXY_SECRET: "edge-secret-012345678901234567890123", APP_BASE_URL: "http://origin.example" }), /HTTPS/);
-  assert.throws(() => loadConfig({ ...productionLedger, NODE_ENV: "production", TRUSTED_PROXY: "cloudflare", TRUSTED_PROXY_SECRET: "edge-secret-012345678901234567890123", APP_BASE_URL: "https://example.org" }), /SESSION_SECRET/);
-  assert.equal(loadConfig({ ...productionLedger, NODE_ENV: "production", SESSION_SECRET: "session-secret", TRUSTED_PROXY: "cloudflare", TRUSTED_PROXY_SECRET: "edge-secret-012345678901234567890123", APP_BASE_URL: "https://example.org", PRIVACY_CONTACT_EMAIL: "privacy@example.org" }).trustedProxy, "cloudflare");
+  assert.throws(() => loadConfig({ NODE_ENV: "production", SESSION_SECRET: "secret" }), /TRUSTED_PROXY/);
+  assert.throws(() => loadConfig({ NODE_ENV: "production", SESSION_SECRET: "secret", TRUSTED_PROXY: "xff" }), /TRUSTED_PROXY/);
+  assert.throws(() => loadConfig({ NODE_ENV: "production", SESSION_SECRET: "secret", TRUSTED_PROXY: "cloudflare", TRUSTED_PROXY_SECRET: "edge-secret-012345678901234567890123" }), /APP_BASE_URL/);
+  assert.throws(() => loadConfig({ NODE_ENV: "production", SESSION_SECRET: "secret", TRUSTED_PROXY: "cloudflare", TRUSTED_PROXY_SECRET: "edge-secret-012345678901234567890123", APP_BASE_URL: "http://origin.example" }), /HTTPS/);
+  assert.throws(() => loadConfig({ NODE_ENV: "production", TRUSTED_PROXY: "cloudflare", TRUSTED_PROXY_SECRET: "edge-secret-012345678901234567890123", APP_BASE_URL: "https://example.org" }), /SESSION_SECRET/);
+  assert.equal(loadConfig(productionBase).trustedProxy, "cloudflare");
 });
 
 test("production requires an operational privacy contact and policy renders it", async () => {
-  const base = { ...productionLedger, NODE_ENV: "production", SESSION_SECRET: "session-secret", TRUSTED_PROXY: "cloudflare", TRUSTED_PROXY_SECRET: "edge-secret-012345678901234567890123", APP_BASE_URL: "https://example.org" } as const;
+  const base = { NODE_ENV: "production", SESSION_SECRET: "session-secret", TRUSTED_PROXY: "cloudflare", TRUSTED_PROXY_SECRET: "edge-secret-012345678901234567890123", APP_BASE_URL: "https://example.org" } as const;
   assert.throws(() => loadConfig(base), /PRIVACY_CONTACT_EMAIL/);
   assert.throws(() => loadConfig({ ...base, PRIVACY_CONTACT_EMAIL: "[CAMPAIGN OPERATOR CONTACT TO BE ADDED BEFORE PRODUCTION]" }), /PRIVACY_CONTACT_EMAIL/);
   const config = loadConfig({ ...base, PRIVACY_CONTACT_EMAIL: "privacy@example.org" });

@@ -207,7 +207,7 @@ test("document surfaces preserve canonical routes and server-render all content 
     const about = await (await app.request("/en/about")).text();
     const methodology = await (await app.request("/en/methodology")).text();
     assert.match(about, /independent civic platform/);
-    assert.match(methodology, /Every figure is counted and published separately/);
+    assert.match(methodology, /Public pages do not show campaign progress counters/);
     assert.match(methodology, /This does not mean it was sent/);
 
     for (const locale of ["en", "he"] as const) {
@@ -217,7 +217,7 @@ test("document surfaces preserve canonical routes and server-render all content 
     }
     close();
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    try { rmSync(dir, { recursive: true, force: true }); } catch { /* Windows may briefly lock SQLite sidecars */ }
   }
 });
 
@@ -329,7 +329,8 @@ test("Amharic pages deliver hashed Ethiopic fonts with scoped metric rules", asy
 test("every locale has every key used by the templates", async () => {
   const dir = mkdtempSync(join(tmpdir(), "agree-i18n-"));
   try {
-    const { app, close } = createApp({ sqlitePath: join(dir, "app.db") });
+    const { app, db, close } = createApp({ sqlitePath: join(dir, "app.db") });
+    db.prepare("UPDATE campaigns SET support_enabled = 1 WHERE id = 1").run();
     const paths = ["", "/standard", "/coalition-agreement", "/first-100-days", "/government-model", "/about", "/methodology", "/support", "/request", "/responses/new", "/privacy"];
     for (const locale of ["he", "ar", "yi", "ru", "uk", "en", "am"]) {
       for (const path of paths) {
@@ -345,10 +346,32 @@ test("every locale has every key used by the templates", async () => {
   }
 });
 
+test("home and nav are action-only without support or public counters", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "agree-action-only-home-"));
+  try {
+    const runtime = createApp({ sqlitePath: join(dir, "app.db"), env: { NODE_ENV: "test", SESSION_SECRET: "test-secret" } });
+    assert.equal(runtime.db.prepare("SELECT support_enabled FROM campaigns WHERE id = 1").get()?.support_enabled, 0);
+    const page = await runtime.app.request("/en");
+    assert.equal(page.status, 200);
+    const html = await page.text();
+    assert.doesNotMatch(html, /href="\/en\/support"/);
+    assert.doesNotMatch(html, /class="metrics"/);
+    assert.doesNotMatch(html, /proof-count/);
+    assert.match(html, /href="\/en\/request"/);
+    assert.match(html, /href="\/en\/responses\/new"/);
+    const disabled = await runtime.app.request("/en/support");
+    assert.equal(disabled.status, 503);
+    runtime.close();
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("support verification invalidates pending tokens and counts once for a normalized email", async () => {
   const dir = mkdtempSync(join(tmpdir(), "agree-support-"));
   try {
     const runtime = createApp({ sqlitePath: join(dir, "app.db"), env: { NODE_ENV: "test", SESSION_SECRET: "test-secret" } });
+    enableSupport(runtime.db);
     const first = await submitSupport(runtime.app, " Citizen@Example.org ");
     const second = await submitSupport(runtime.app, "citizen@example.org");
     await verifySupport(runtime.app, first.token, 400);
@@ -512,6 +535,7 @@ test("secondary public pages preserve localized forms, private states, and error
   try {
     const runtime = createApp({ sqlitePath: join(dir, "app.db"), env: { NODE_ENV: "test", SESSION_SECRET: "test-secret" } });
 
+    enableSupport(runtime.db);
     const support = await getForm(runtime.app, "/he/support?lang=1");
     assert.match(support.html, /<html lang="he" dir="rtl"/);
     assert.match(support.cookie, /^locale=he$/);
@@ -890,6 +914,7 @@ test("privacy deletion queues response objects, erases nonce links, and preserve
   globalThis.fetch = async (input, init) => { if (String(input).startsWith("http://ledger.test")) return new Response(null, { status: 200 }); if (String(input).startsWith("http://storage.test") && init?.method === "DELETE") { deleted.push(new URL(String(input)).pathname); responseCountAtDelete = Number(runtime?.db.prepare("SELECT count(*) count FROM submitted_responses").get()?.count ?? -1); return new Response(null, { status: 204 }); } return originalFetch(input, init); };
   try {
     runtime = createApp({ sqlitePath: join(dir, "app.db"), env: { NODE_ENV: "test", SESSION_SECRET: "test-secret", R2_ACCOUNT_ID: "test", R2_ACCESS_KEY_ID: "key", R2_SECRET_ACCESS_KEY: "secret", R2_BUCKET: "bucket", R2_ENDPOINT: "http://storage.test", ERASURE_LEDGER_S3_ENDPOINT: "http://ledger.test", ERASURE_LEDGER_S3_ACCESS_KEY: "ledger-key", ERASURE_LEDGER_S3_SECRET_KEY: "ledger-secret", ERASURE_LEDGER_S3_BUCKET: "ledger", ERASURE_LEDGER_HMAC_KEYS: `v1:${Buffer.alloc(32, 7).toString("base64url")}`, ERASURE_LEDGER_ACTIVE_KEY_VERSION: "v1" } });
+    enableSupport(runtime.db);
     const support = await submitSupport(runtime.app, "delete-response@example.org");
     await verifySupport(runtime.app, support.token);
     const matching = Number(runtime.db.prepare(`INSERT INTO submitted_responses (recipient_id, received_at, channel, response_text, submitter_email, consent_at, status, created_at)
@@ -1441,6 +1466,7 @@ test("data deletion requires email-link confirmation and anonymizes matching rec
   globalThis.fetch = async (input, init) => String(input).startsWith("http://ledger.test") ? new Response(null, { status: 200 }) : originalFetch(input, init);
   try {
     const runtime = createApp({ sqlitePath: join(dir, "app.db"), env: { NODE_ENV: "test", SESSION_SECRET: "test-secret", ERASURE_LEDGER_S3_ENDPOINT: "http://ledger.test", ERASURE_LEDGER_S3_ACCESS_KEY: "ledger-key", ERASURE_LEDGER_S3_SECRET_KEY: "ledger-secret", ERASURE_LEDGER_S3_BUCKET: "ledger", ERASURE_LEDGER_HMAC_KEYS: `v1:${Buffer.alloc(32, 7).toString("base64url")}`, ERASURE_LEDGER_ACTIVE_KEY_VERSION: "v1" } });
+    enableSupport(runtime.db);
     const support = await submitSupport(runtime.app, "delete@example.org"); await verifySupport(runtime.app, support.token);
     const request = await getForm(runtime.app, "/en/delete-data");
     const response = await postForm(runtime.app, "/en/delete-data", { csrf: request.csrf, email: "delete@example.org" }, request.cookie);
@@ -1452,6 +1478,10 @@ test("data deletion requires email-link confirmation and anonymizes matching rec
     runtime.close();
   } finally { globalThis.fetch = originalFetch; rmSync(dir, { recursive: true, force: true }); }
 });
+
+function enableSupport(db: ReturnType<typeof createApp>["db"]) {
+  db.prepare("UPDATE campaigns SET support_enabled = 1 WHERE id = 1").run();
+}
 
 async function submitSupport(app: ReturnType<typeof createApp>["app"], email: string) {
   const form = await getForm(app, "/en/support");

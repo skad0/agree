@@ -414,7 +414,7 @@ export function registerAdminRoutes(app: Hono, db: Db, config: Config) {
       <form method="post" class="admin-switches">
         <input type="hidden" name="csrf" value={csrf} />
         {switchRow("campaign", "Campaign", "Off puts the whole site into draft: demands stop being served.", live)}
-        {switchRow("support", "Support form", "Off stops new supporters from signing.", row?.support_enabled === 1)}
+        {switchRow("support", "Support form", "Off by default for the action-only public flow. On re-enables the gated /support routes.", row?.support_enabled === 1)}
         {switchRow("requests", "Request builder", "Off stops supporters generating messages to recipients.", row?.requests_enabled === 1)}
         {switchRow("responses", "Response intake", "Off stops supporters submitting replies they received.", row?.responses_enabled === 1)}
         <p><button>Save switches</button></p>

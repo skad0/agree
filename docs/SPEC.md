@@ -6,13 +6,13 @@ Source: `docs/civic-platform-implementation-plan.html` (Russian PRD → implemen
 
 ## 1. Product Summary
 
-The **Collective Civic Request Platform** enables citizens to coordinate a measurable, public campaign around shared demands directed at political parties and individual politicians. The platform does **not** monitor politicians, guarantee responses, or send mail on users' behalf. It creates a funnel: **support the campaign → generate a personal appeal → send it via the user's own channels → optionally submit any reply received back to the campaign**.
+The **Collective Civic Request Platform** enables citizens to coordinate around shared demands directed at political parties and individual politicians. The platform does **not** monitor politicians, guarantee responses, or send mail on users' behalf. The public funnel is **action-only**: **discover recipients → generate a personal appeal → send it via the user's own channels → optionally submit any reply received back to the campaign**. Account/email support signup and public progress counters are off by default (see [ACTION_ONLY_PRIVACY_PLAN.md](ACTION_ONLY_PRIVACY_PLAN.md)).
 
-**Primary users:** (1) **Citizens/supporters** — browse demands in their language, sign with email verification, pick a recipient, compose a localized message from templates, open mailto/WhatsApp or copy text, mark "I sent it", and submit received responses for moderation. (2) **Administrators** — manage campaign content, recipients, templates, translations, moderation queue, exports, and kill-switches; authenticated via Cloudflare Access (SSO + mandatory 2FA), not a custom login system.
+**Primary users:** (1) **Visitors** — browse demands in their language, pick a recipient (including directory multiselect), compose a localized message from templates, open mailto/WhatsApp or copy text, mark "I sent it", and optionally submit received responses for moderation — without creating an account. (2) **Administrators** — manage campaign content, recipients, templates, translations, moderation queue, exports, and kill-switches; authenticated via Cloudflare Access (SSO + mandatory 2FA), not a custom login system.
 
-**Core flows:** (A) **Support flow** — landing → language selection (cookie) → support form (email, privacy consent, Turnstile; optional name/city/public-name flag) → verification email → verified supporter increments the public counter exactly once per normalized email. (B) **Appeal flow** — choose party/politician (official public contacts only) → select demand items + optional personalization → preview (email subject/body + short WhatsApp version) → action (mailto / WhatsApp deep link / copy) each logged separately → optional "I sent it" → share buttons. (C) **Response flow** — submit received reply (recipient, date, channel, text, optional file ≤10 MB, submitter email, consent) → moderation queue; nothing auto-published. Public metrics stay **separate**: supported / generated / reported sent / responses submitted.
+**Core flows:** (A) **Appeal flow** — choose party/politician (official public contacts only) → select demand items + optional personalization → preview (email subject/body + short WhatsApp version) → action (mailto / WhatsApp deep link / copy) each logged separately → optional "I sent it" → share buttons. (B) **Response flow** — submit received reply (recipient, date, channel, text, optional file ≤10 MB, submitter email, consent) → moderation queue; nothing auto-published. (C) **Support flow** — gated behind `support_enabled` (default off); not linked from public nav/home. Public pages do **not** show supporter/generated/sent/response counters; admin may still view aggregates.
 
-**MVP success hypothesis:** citizens will support demands, send personal appeals, spread the campaign, and return verifiable party responses. Success if any KPI is met (e.g. 10k verified supporters, 2k generated appeals, 1k "reported sent", ≥1 verifiable party response).
+**MVP success hypothesis:** visitors will send personal appeals, spread the campaign, and return verifiable party responses without registration friction.
 
 ---
 
@@ -29,13 +29,13 @@ The **Collective Civic Request Platform** enables citizens to coordinate a measu
 | Database | **SQLite** with WAL on Render **persistent disk** (5 GB) — not Postgres for MVP |
 | Hosting | **Render** web service — 1 instance, 0.5 CPU, 512 MB, bind `0.0.0.0:$PORT` |
 | Edge | **Cloudflare** — CDN cache for public GET, TLS, WAF, **Turnstile**, **Access** on `/admin/*` |
-| Object storage | **Cloudflare R2** or S3-compatible — response upload files |
+| Object storage | **Not used** — SQLite on Render disk only |
 | Email | External transactional email provider — verification messages only |
 | Auth (admin) | Cloudflare Access JWT validation on origin (`Cf-Access-Jwt-Assertion` via JWKS) |
 
-**Explicitly out of scope per plan:** Redis, workers/queues, PostgreSQL, multi-instance, realtime counters, mobile app, journalist API, user accounts.
+**Explicitly out of scope per plan:** Redis, workers/queues, PostgreSQL, multi-instance, realtime counters, mobile app, journalist API, user accounts, external S3/R2 object stores.
 
-**DECISION:** Use `@hono/node-server` or equivalent Node adapter; migrations via a lightweight tool (e.g. `better-sqlite3` + SQL migration files). Backup cron runs as Render cron job or shell script triggered externally.
+**DECISION:** Use `@hono/node-server` or equivalent Node adapter; migrations via a lightweight tool (e.g. `better-sqlite3` + SQL migration files). Persistence is the Render disk; external object-store backups and ledgers are out of the deploy contract.
 
 ---
 
@@ -131,16 +131,16 @@ Phasing follows plan roadmap **E0–E7**. All items below are **Phase 1 / MVP** 
 - **Acceptance:** All 6 locales render; RTL/LTR correct at 320–1440px
 
 **E2 — Public content**
-- Home: problem, solution, demands summary, aggregate counters, CTA
-- Full demands page; counters from DB (cache-TTL at edge, not realtime)
+- Home: problem, solution, demands summary, primary ask CTA (no public counters)
+- Full demands page; content from DB (cache-TTL at edge)
 - Localized share buttons
-- **Acceptance:** Content driven by DB/admin data, not hardcoded
+- **Acceptance:** Content driven by DB/admin data, not hardcoded; home has no supporter/action counters
 
-**E3 — Support + verification**
-- Support form: email, privacy consent, Turnstile; optional name, city, public-name flag
+**E3 — Support + verification (gated, default off)**
+- Support form remains implementable for operators who re-enable `support_enabled`
 - Rate limit `POST /support`; email normalization; verification email; token confirm
-- Counter increments **only** after `email_verified_at` set; dedup via UNIQUE email
-- **Acceptance:** Double-submit and repeat email do not inflate counter
+- Not linked from public nav/home while disabled
+- **Acceptance:** When off, public support returns unavailable; when on, double-submit does not create duplicate verified emails
 
 **E4 — Appeal generator**
 - Recipient list (parties/politicians with official contacts)
@@ -151,12 +151,13 @@ Phasing follows plan roadmap **E0–E7**. All items below are **Phase 1 / MVP** 
 - Public actions: post to X, Facebook, WhatsApp, Telegram, mentioning `{handle}` and linking the campaign
 - Facebook's sharer accepts a URL only, so `shared_facebook` also renders the post text for manual copy
 - "I sent it" → result page + share (WhatsApp, Telegram, Facebook, link)
-- **Acceptance:** Appeals in all 6 languages; eight action types counted separately; personal text not stored in DB
+- **Acceptance:** Appeals in all locales; action types counted separately for operators; personal text not stored in DB
 
 **E5 — Response submission**
-- Form: recipient, received date, channel, text, file (JPG/PNG/WebP/PDF ≤10 MB), email, consent
-- Upload to R2/S3; metadata in DB; status `new`; confirmation page; moderation queue (not public)
-- **Acceptance:** Files never touch app persistent disk; nothing auto-published
+- Form: recipient, received date, channel, text, optional file, email, consent
+- Default deploy: text-only (no object store). File upload returns unavailable until/unless an object store is deliberately reintroduced
+- Metadata in DB; status `new`; confirmation page; moderation queue (not public)
+- **Acceptance:** Nothing auto-published; personal appeal text still never stored
 
 **E6 — Admin**
 - Cloudflare Access on `/admin/*` + origin JWT validation → 403 without valid token (including direct `*.onrender.com`)
@@ -169,10 +170,10 @@ Phasing follows plan roadmap **E0–E7**. All items below are **Phase 1 / MVP** 
 **E7 — Hardening & launch**
 - Cloudflare cache rules (public GET only); strict CSP; configurable rate limits
 - Turnstile on all public forms; CSRF; secure/httpOnly cookies
-- Privacy policy ×6 locales; user data deletion mechanism
-- Daily external SQLite backup (≥7 daily + weekly); tested restore procedure
+- Privacy policy ×7 locales; user data deletion mechanism
+- Persist SQLite on the Render disk (no external object-store requirement)
 - WCAG 2.1 AA targets: Lighthouse a11y ≥95, axe 0 critical/serious
-- Load: 25 rps sustained, 50 rps burst, 10 support POST/s, p95 GET ≤300ms, p95 POST ≤500ms, error rate <1%
+- Load: 25 rps sustained, 50 rps burst, p95 GET ≤300ms, p95 POST ≤500ms, error rate <1%
 - **Acceptance:** All DoD checklist items (plan §08) pass
 
 ### Later Phases (explicitly out of MVP scope)
@@ -251,9 +252,9 @@ Phasing follows plan roadmap **E0–E7**. All items below are **Phase 1 / MVP** 
 | Route | Purpose |
 |-------|---------|
 | `GET /health` | Render health check (no cache) |
-| DECISION: cron endpoint or CLI | SQLite backup to external storage |
+| Optional CLI | Legacy only — not part of deploy |
 
-**Cache policy:** Cloudflare may cache public GET pages and static assets only. Never cache POST, email verify, admin, personalized outputs, or sensitive forms. Public counters may use short TTL cache.
+**Cache policy:** Cloudflare may cache public GET pages and static assets only. Never cache POST, email verify, admin, personalized outputs, or sensitive forms.
 
 ---
 
@@ -282,22 +283,11 @@ Phasing follows plan roadmap **E0–E7**. All items below are **Phase 1 / MVP** 
 | `TURNSTILE_SECRET_KEY` | yes | Server verification | Cloudflare Dashboard → Turnstile |
 | `CF_ACCESS_TEAM_DOMAIN` | yes | JWKS URL host | Cloudflare Zero Trust → Access → team domain |
 | `CF_ACCESS_AUD` | yes | JWT `aud` validation | Cloudflare Access application settings for `/admin/*` |
-| `R2_ACCOUNT_ID` | yes* | S3 API | Cloudflare R2 dashboard |
-| `R2_ACCESS_KEY_ID` | yes* | Object upload | R2 → Manage R2 API tokens |
-| `R2_SECRET_ACCESS_KEY` | yes* | Object upload | Same R2 API token |
-| `R2_BUCKET` | yes* | Bucket name | Create in R2 dashboard |
-| `R2_PUBLIC_URL` | no | Optional public file URL base | R2 custom domain or presigned URLs only (DECISION: admin-only presigned download) |
 | `EMAIL_PROVIDER_API_KEY` | yes | Send verification emails | Resend / SendGrid / Postmark / SES — provider dashboard |
 | `EMAIL_FROM` | yes | From address | Verified sender in email provider |
-| `BACKUP_S3_ENDPOINT` | yes | External backup target | S3/R2/B2 bucket for SQLite dumps |
-| `BACKUP_S3_ACCESS_KEY` | yes | Backup upload | Cloud provider IAM/API keys |
-| `BACKUP_S3_SECRET_KEY` | yes | Backup upload | Same |
-| `BACKUP_S3_BUCKET` | yes | Backup bucket | Create bucket |
 | `RATE_LIMIT_*` | no | Override default limits | Optional env config (plan: configurable without redeploy logic — use env reload) |
 
-\*Use equivalent `S3_*` vars if using AWS S3 instead of R2.
-
-**External services summary:** Render (web + persistent disk + optional cron), Cloudflare (DNS, CDN, Turnstile, Access), R2/S3 (response files + backups), transactional email provider.
+**External services summary:** Render (web + persistent disk), Cloudflare (DNS, CDN, Turnstile, Access), transactional email provider. No S3/R2 buckets.
 
 ---
 
@@ -328,9 +318,9 @@ Phasing follows plan roadmap **E0–E7**. All items below are **Phase 1 / MVP** 
 - HTTPS only for pages, email links, and file handling
 
 ### Performance & reliability
-- Targets: 100k visitors/hour via edge cache; 25 rps dynamic sustained, 50 rps burst; 10 support writes/s; p95 GET ≤300ms, POST ≤500ms; <1% errors under load
-- SQLite: single writer, short transactions; scale to ~1M supporters via cache + WAL without architecture change
-- Daily external SQLite backup, retain ≥7 daily + weekly; tested restore before launch; Render snapshots not sole backup
+- Targets: 100k visitors/hour via edge cache; 25 rps dynamic sustained, 50 rps burst; p95 GET ≤300ms, POST ≤500ms; <1% errors under load
+- SQLite: single writer, short transactions on the Render persistent disk
+- External SQLite object backups are optional; default reliability is the disk (and host snapshots)
 
 ### Accessibility
 - WCAG 2.1 AA: keyboard navigation, visible focus, semantic HTML, real labels, HTMX updates via `aria-live`, skip link, no horizontal scroll at 320px
@@ -339,4 +329,4 @@ Phasing follows plan roadmap **E0–E7**. All items below are **Phase 1 / MVP** 
 ### Moderation
 - Submitted responses enter queue with status workflow; admin review required before any public use (MVP: no public response table)
 
-**Metrics (aggregates only):** verified supporters, generated requests, email/WhatsApp opens, copies, reported sent, submitted responses — by party and locale. **Build order:** E0→E7 sequentially.
+**Metrics (aggregates only, admin):** generated requests, email/WhatsApp opens, copies, reported sent, submitted responses — by party and locale. Public pages must not surface these as campaign counters. **Build order:** E0→E7 sequentially.

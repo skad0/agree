@@ -49,12 +49,6 @@ export function registerPublicRoutes(app: Hono, db: Db, config: Config) {
     if (!publicCampaignActive(db)) return statusPage(context, locale, t(locale, "formDisabled"), 503);
     const demands = demandRows(db, locale);
     const requestsEnabled = publicRequestsEnabled(db);
-    const counts = {
-      supporters: Number(db.prepare("SELECT count(*) AS count FROM supporters WHERE email_verified_at IS NOT NULL AND deleted_at IS NULL").get()?.count ?? 0),
-      generated: Number(db.prepare("SELECT count(*) AS count FROM generated_requests").get()?.count ?? 0),
-      sent: Number(db.prepare("SELECT count(*) AS count FROM request_actions WHERE action_type = 'reported_sent'").get()?.count ?? 0),
-      responses: Number(db.prepare("SELECT count(*) AS count FROM submitted_responses").get()?.count ?? 0)
-    };
     publicCache(context);
     return context.html(<Layout locale={locale} title={t(locale, "homeTitle")} path={context.req.path}>
       <section class="home-hero" aria-labelledby="home-heading">
@@ -67,27 +61,16 @@ export function registerPublicRoutes(app: Hono, db: Db, config: Config) {
           <a href={`/${locale}/coalition-agreement`}>{t(locale, "navCoalition")}</a>
           <a href={`/${locale}/first-100-days`}>{t(locale, "navPlan")}</a>
         </nav>
-        <p class="proof-count"><bdi>{counts.generated}</bdi> {t(locale, "generated")}</p>
       </section>
 
       <Surface class="home-information">
         <p>{t(locale, "problem")}</p>
         <p>{t(locale, "solution")}</p>
         <Callout tone="caution"><p role="note">{t(locale, "neutrality")}</p></Callout>
-        <p><a class="secondary-action" href={`/${locale}/support`}>{t(locale, "cta")}</a></p>
       </Surface>
 
-      <ul class="metrics" aria-label={t(locale, "supporters")}>
-        {counts.supporters > 0 ? <li><strong>{counts.supporters}</strong><span>{t(locale, "supporters")}</span></li> : null}
-        {counts.generated > 0 ? <li><strong>{counts.generated}</strong><span>{t(locale, "generated")}</span></li> : null}
-        {counts.sent > 0 ? <li><strong>{counts.sent}</strong><span>{t(locale, "sent")}</span></li> : null}
-        {counts.responses > 0 ? <li><strong>{counts.responses}</strong><span>{t(locale, "responses")}</span></li> : null}
-      </ul>
-
-      {/* The three actions in the order a supporter performs them, always numbered the same way. */}
       <h2 class="section-label">{t(locale, "howItWorks")}</h2>
       <ol class="journey">
-        <li><a href={`/${locale}/support`}><strong>{t(locale, "navSupport")}</strong><span>{t(locale, "journeySupport")}</span></a></li>
         <li><a href={`/${locale}/request`}><strong>{t(locale, "navRequest")}</strong><span>{t(locale, "journeyRequest")}</span></a></li>
         <li><a href={`/${locale}/responses/new`}><strong>{t(locale, "navResponse")}</strong><span>{t(locale, "journeyResponse")}</span></a></li>
       </ol>

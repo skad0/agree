@@ -1,6 +1,6 @@
 # Action-only public flow (no registration / no counters)
 
-Date: 2026-09-09. Status: **plan only**. Do not implement until the election stack is on `main` and product confirms the cut lines below.
+Date: 2026-09-09. Status: **implemented (slice 1–2 + backup cut)**. Election stack is on `main`. Later slices (supporter table drop; optional responses retirement) remain deferred.
 
 ## Goal
 
@@ -10,30 +10,39 @@ Visitors act (find people, prepare and open a message) without creating an accou
 
 | Surface | What | Keep for action-only? |
 | --- | --- | --- |
-| `/:locale/support` + verify-email | Email (+ optional name/city), double opt-in → `supporters` | **Remove** from public nav/home CTA; gate off or retire routes |
-| Home metrics strip | Live counts (supporters / generated / actions / responses) | **Remove** public counters; admin may keep ops stats |
+| `/:locale/support` + verify-email | Email (+ optional name/city), double opt-in → `supporters` | **Removed** from public nav/home CTA; `support_enabled` defaults off; routes soft-disable when off |
+| Home metrics strip | Live counts (supporters / generated / actions / responses) | **Removed** from public pages; admin keeps ops stats |
 | `generated_requests` | recipient, locale, demand IDs, public id (no appeal text) | **Keep** (needed for result link + aggregate actions) |
-| `request_actions` | opened / copied / reported_sent / shared_* | **Keep** aggregates; stop surfacing totals publicly |
-| `submitted_responses` | Reply text + submitter email + files | **Separate product call**: out of “registration/counter” scope; either keep as optional reply intake or schedule a later cut |
+| `request_actions` | opened / copied / reported_sent / shared_* | **Keep** aggregates; not surfaced as public totals |
+| `submitted_responses` | Reply text + submitter email + files | **Deferred**: still optional reply intake |
 | Preview name/city/context | Template fill only, not persisted | **Keep** |
 | Locale + CSRF cookies, theme localStorage | Preference / security | **Keep** |
 | Turnstile | Bot gate on forms that remain | **Keep** on remaining POSTs |
-| Privacy delete + erasure ledger | Erasure for historical PII | **Keep** while any email/PII tables remain; shrink after support/responses removed |
+| Privacy delete + erasure ledger | Erasure for historical PII | **Keep** live SQLite deletion; **no** remote S3 ledger in the deploy |
+| External `BACKUP_S3` / R2 / ledger buckets | Object storage | **Cut** from deploy — Render disk only |
 
 ## UX alignment (without breaking the scheme)
 
-1. **Home / journey strip.** Drop step “1 Support” as a required beat. Journey becomes Discover → Ask → (optional) Reply later if responses stay. Primary CTA stays `/:locale/request`.
-2. **Nav.** Remove or demote Support. Keep Request, documents, privacy, methodology.
-3. **Copy.** Remove “join / register / count of supporters” framing. Speak in actions: find people, open your own channel, report if you sent.
-4. **Directory → build → preview → action → result.** Unchanged route contracts and sequential multiselect handoffs. Result page still uses public request id; social share stays aggregate-safe.
-5. **Admin.** Retain campaign kill switches and stats for operators. Public pages must not depend on supporter counts for layout.
+1. **Home / journey strip.** No Support step. Journey is Ask → (optional) Reply. Primary CTA stays `/:locale/request`.
+2. **Nav.** Support removed from the actions bar. Keep Request, documents, privacy, methodology.
+3. **Copy.** Action framing: find people, open your own channel, report if you sent. No public “join / register / count of supporters”.
+4. **Directory → build → preview → action → result.** Unchanged route contracts and sequential multiselect handoffs.
+5. **Admin.** Retain campaign kill switches and stats for operators.
 
-## Suggested implementation slices
+## Implementation slices
 
-1. **Public surface cut.** Hide/remove support CTA and home counters; `support_enabled` false by default in seed/settings; 404 or soft-disable public support routes when off. Tests for home/nav. No schema drop yet.
-2. **Copy + journey chrome.** Locale strings and journey intro without registration language. Translation review still required for political text elsewhere.
-3. **Data retirement (later).** Stop writing new `supporters` / verifications; retention already ages inactive rows. Optional migration to drop tables only after admin export and privacy review.
-4. **Responses (optional later).** If “no user data” means no reply intake either, plan a separate cut: disable responses campaign flag, drain object work, then retire routes. Do not bundle with slice 1.
+1. **Public surface cut.** Done: hide support CTA and home counters; `support_enabled` false by default (migration `018`); soft-disable public support when off.
+2. **Copy + journey chrome.** Done: locale/home/nav without registration language (non-English long privacy/about/methodology strings temporarily match English pending translation review).
+3. **Data retirement (later).** Stop writing new `supporters` / verifications when support stays off; retention already ages inactive rows. Optional migration to drop tables only after admin export and privacy review.
+4. **Responses (optional later).** Separate cut if reply intake must go too.
+
+## Deployment / backup reflect
+
+- Do **not** configure `BACKUP_S3_*`, `R2_*`, or `ERASURE_LEDGER_S3_*` for production.
+- Persistence is the Render `/data` disk (and Render disk snapshots as the host offers them).
+- Privacy deletion updates live SQLite without a remote ledger.
+- Reply file uploads stay unavailable without object storage; text replies remain.
+- Legacy CLI helpers may still exist in-tree; they are not part of the deploy contract.
 
 ## Non-goals
 
