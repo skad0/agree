@@ -105,13 +105,16 @@ test("finance summarize keeps coverage tags and refuses blocked source", () => {
   assert.equal(loadFinanceCoverage(financeGate, []).kind, "not_yet_published");
 
   const entries = (JSON.parse(readFileSync(financeFixturePath, "utf8")) as { entries: FinanceFixtureEntry[] }).entries;
-  const totals = summarizeFinanceEntries(entries);
-  assert.equal(totals.grossDonationsMinor, 12000);
-  assert.equal(totals.refundsMinor, 500);
-  assert.equal(totals.netDonationsMinor, 11500);
-  assert.equal(totals.loansMinor, 3000);
-  assert.equal(totals.guaranteesMinor, 9000);
-  assert.equal(totals.foreignShare, 2000 / 12000);
+  const personTotals = summarizeFinanceEntries(entries, "person");
+  assert.equal(personTotals.grossDonationsMinor, 12000);
+  assert.equal(personTotals.refundsMinor, 500);
+  assert.equal(personTotals.netDonationsMinor, 11500);
+  assert.equal(personTotals.loansMinor, 3000);
+  assert.equal(personTotals.guaranteesMinor, 4000);
+  assert.equal(personTotals.foreignShare, 2000 / 12000);
+  const partyTotals = summarizeFinanceEntries(entries, "party");
+  assert.equal(partyTotals.guaranteesMinor, 9000);
+  assert.equal(partyTotals.grossDonationsMinor, 0);
 
   const unknownForeign = summarizeFinanceEntries([
     { kind: "donation", amountMinor: 100, currency: "ILS", sourceEntryKey: "a", isForeign: null, subjectScope: "person" }

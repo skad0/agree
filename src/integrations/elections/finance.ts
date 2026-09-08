@@ -24,18 +24,19 @@ export function gateFinanceSource(sources: readonly ManifestSource[]): SourceGat
   return gateSourceResource(resource);
 }
 
-export function loadFinanceCoverage(gate: SourceGate, entries: readonly FinanceFixtureEntry[] | null): FinanceCoverage {
+export function loadFinanceCoverage(gate: SourceGate, entries: readonly FinanceFixtureEntry[] | null, subjectScope: "person" | "party" = "person"): FinanceCoverage {
   if (!gate.ok) {
     if (gate.code === "blocked") return { kind: "not_yet_published" };
     return { kind: "failed", errorCode: gate.code };
   }
   if (entries === null) return { kind: "missing" };
   if (entries.length === 0) return { kind: "not_applicable" };
-  return { kind: "present", totals: summarizeFinanceEntries(entries) };
+  return { kind: "present", totals: summarizeFinanceEntries(entries, subjectScope) };
 }
 
-export function summarizeFinanceEntries(entries: readonly FinanceFixtureEntry[]): FinanceTotals {
-  if (!entries.length) {
+export function summarizeFinanceEntries(entries: readonly FinanceFixtureEntry[], subjectScope: "person" | "party" = "person"): FinanceTotals {
+  const scoped = entries.filter((entry) => entry.subjectScope === subjectScope);
+  if (!scoped.length) {
     return {
       currency: "ILS",
       grossDonationsMinor: 0,
@@ -46,7 +47,7 @@ export function summarizeFinanceEntries(entries: readonly FinanceFixtureEntry[])
       foreignShare: null
     };
   }
-  const currency = entries[0]!.currency;
+  const currency = scoped[0]!.currency;
   let grossDonationsMinor = 0;
   let refundsMinor = 0;
   let loansMinor = 0;
@@ -55,7 +56,7 @@ export function summarizeFinanceEntries(entries: readonly FinanceFixtureEntry[])
   let foreignDenomKnown = true;
   let donationDenom = 0;
 
-  for (const entry of entries) {
+  for (const entry of scoped) {
     if (entry.currency !== currency) continue;
     switch (entry.kind) {
       case "donation":
@@ -71,8 +72,7 @@ export function summarizeFinanceEntries(entries: readonly FinanceFixtureEntry[])
         loansMinor += entry.amountMinor;
         break;
       case "guarantee":
-        // Party guarantees stay party-scoped; personal summaries never absorb them.
-        if (entry.subjectScope === "party") guaranteesMinor += entry.amountMinor;
+        guaranteesMinor += entry.amountMinor;
         break;
       default: {
         const _exhaustive: never = entry.kind;

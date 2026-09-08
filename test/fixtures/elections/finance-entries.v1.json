@@ -41,7 +41,7 @@
       "kind": "guarantee",
       "amountMinor": 4000,
       "currency": "ILS",
-      "sourceEntryKey": "g-person-ignored",
+      "sourceEntryKey": "g-person",
       "subjectScope": "person"
     }
   ]
