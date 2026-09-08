@@ -33,7 +33,7 @@ Statements of existing Israeli law need the closest reading: the 80-member thres
 
 - **The "Initiator" section was removed from `aboutBody` in all six locales** (2026-07-28). Part X of the package lists the initiator among the things the project publishes. The page currently runs from the introduction straight into Funding, so the operator is not named anywhere on the site. Decide before launch whether to restore the section with a real name or legal entity.
 - **Ukrainian is an implementation draft, not a human-cleared translation.** The Ukrainian campaign/legal records were expanded to preserve the Russian constraints and options, but a named native Ukrainian reviewer with relevant legal/political competence must approve them before public launch. No reviewer or approval is recorded yet.
-- **Action-only privacy cut (2026-09-09).** Non-English `privacyBody` / deletion strings keep their prior localized wording with an action-only lead-in and softened backup language; English `privacyBody` / `aboutBody` / `methodologyBody` were rewritten for the action-only contract. Re-review those keys before launch.
+- **Action-only privacy cut (2026-09-09).** `aboutBody`, `methodologyBody`, `privacyBody`, deletion/report strings, and reply file-availability strings in all seven locales were aligned to the public contract: no account, no public counters, no personal appeal text stored, hosting-disk retention wording (no object-storage deploy claim). Support UI strings remain for admin re-enable only. Re-review those keys before launch.
 
 ## After review
 
