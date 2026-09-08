@@ -5,10 +5,10 @@ import type { Db } from "./db.js";
 import { isLocale, localeNames, locales, t, type Locale } from "./i18n.js";
 import { Layout } from "./layout.js";
 import { Callout, JourneyIntro, PrimaryAction, Surface } from "./components/public-ui.js";
+import { getContactableRecipient, listContactableRecipients, mention, type Recipient } from "./recipients.js";
 import { privateNoStore, rememberLocale } from "./public-state.js";
 import { createRateLimiter, issueCsrf, issueRequestCapability, text, Turnstile, validCsrf, validTurnstile, values, verifyRequestCapability } from "./security.js";
 
-type Recipient = { id: number; type: "party" | "politician"; name: string; email: string | null; whatsapp: string | null; socialHandle: string | null };
 type Template = { channel: "email" | "whatsapp" | "social"; subject: string | null; body: string };
 
 const shareActions = ["shared_x", "shared_facebook", "shared_whatsapp", "shared_telegram"];
@@ -23,7 +23,7 @@ export function registerRequestRoutes(app: Hono, db: Db, config: Config) {
     rememberLocale(context, locale, config);
     privateNoStore(context);
     if (!campaignEnabled(db)) return statusPage(context, locale, t(locale, "formDisabled"), 503);
-    const recipients = recipientRows(db, locale);
+    const recipients = listContactableRecipients(db, locale);
     return context.html(<Layout locale={locale} title={t(locale, "requestTitle")} path={context.req.path}>
       <div class="request-page request-recipient-page">
       <JourneyIntro eyebrow={<>{t(locale, "stepChoose")} · <bdi>1/3</bdi></>} title={t(locale, "chooseRecipient")} />
@@ -42,7 +42,7 @@ export function registerRequestRoutes(app: Hono, db: Db, config: Config) {
     rememberLocale(context, locale, config);
     if (!campaignEnabled(db)) return statusPage(context, locale, t(locale, "formDisabled"), 503);
     const recipientId = positiveInteger(context.req.query("recipient"));
-    const recipient = recipientId ? recipientRows(db, locale).find((row) => row.id === recipientId) : undefined;
+    const recipient = recipientId ? getContactableRecipient(db, locale, recipientId) : undefined;
     if (!recipient) return context.redirect(`/${locale}/request`);
     const demands = db.prepare(`SELECT d.id, dt.title FROM demands d JOIN campaigns c ON c.id = d.campaign_id
       LEFT JOIN demand_translations dt ON dt.demand_id = d.id AND dt.locale = ?
@@ -80,7 +80,7 @@ export function registerRequestRoutes(app: Hono, db: Db, config: Config) {
     const recipientId = positiveInteger(text(body.recipientId));
     const demandIds = values(body.demandId).map(positiveInteger).filter((id): id is number => Boolean(id));
     if (!messageLocale || !recipientId || !demandIds.length) return statusPage(context, pageLocale, t(pageLocale, "invalidForm"), 422);
-    const recipient = recipientRows(db, messageLocale).find((row) => row.id === recipientId);
+    const recipient = getContactableRecipient(db, messageLocale, recipientId);
     const placeholders = demandIds.map(() => "?").join(",");
     const demands = db.prepare(`SELECT dt.title FROM demands d JOIN campaigns c ON c.id = d.campaign_id
       JOIN demand_translations dt ON dt.demand_id = d.id AND dt.locale = ?
@@ -93,7 +93,7 @@ export function registerRequestRoutes(app: Hono, db: Db, config: Config) {
     const fields = {
       recipient: recipient.name,
       demands: demands.map((demand) => `• ${demand.title}`).join("\n"),
-      handle: mention(recipient, messageLocale),
+      handle: mention(recipient),
       link: `${config.appBaseUrl}/${messageLocale}`,
       name: text(body.name).slice(0, 100), city: text(body.city).slice(0, 100), context: text(body.context).slice(0, 500)
     };
@@ -216,7 +216,7 @@ export function registerRequestRoutes(app: Hono, db: Db, config: Config) {
     const demands = placeholders ? db.prepare(`SELECT dt.title FROM demand_translations dt WHERE dt.locale = ? AND dt.demand_id IN (${placeholders}) ORDER BY dt.demand_id`).all(request.locale, ...demandIds) as { title: string }[] : [];
     const social = db.prepare("SELECT body FROM message_templates WHERE locale = ? AND channel = 'social'").get(request.locale) as { body: string } | undefined;
     const recipient = { id: 0, type: request.type, name: request.recipient, email: null, whatsapp: null, socialHandle: request.socialHandle } satisfies Recipient;
-    const message = social ? fill(social.body, { recipient: request.recipient, demands: demands.map((demand) => `• ${demand.title}`).join("\n"), handle: mention(recipient, request.locale), link: `${config.appBaseUrl}/${request.locale}/request/result?request=${request.publicId}`, name: "", city: "", context: "" }) : `${mention(recipient, request.locale)}\n\n${demands.map((demand) => `• ${demand.title}`).join("\n")}`;
+    const message = social ? fill(social.body, { recipient: request.recipient, demands: demands.map((demand) => `• ${demand.title}`).join("\n"), handle: mention(recipient), link: `${config.appBaseUrl}/${request.locale}/request/result?request=${request.publicId}`, name: "", city: "", context: "" }) : `${mention(recipient)}\n\n${demands.map((demand) => `• ${demand.title}`).join("\n")}`;
     const share = encodeURIComponent(message);
     const link = encodeURIComponent(`${config.appBaseUrl}/${request.locale}/request/result?request=${request.publicId}`);
     privateNoStore(context);
@@ -233,15 +233,6 @@ export function registerRequestRoutes(app: Hono, db: Db, config: Config) {
   });
 }
 
-function recipientRows(db: Db, locale: Locale) {
-  return db.prepare(`SELECT r.id, r.type, rt.name, r.email, r.whatsapp, r.social_handle AS socialHandle FROM recipients r
-    JOIN recipient_translations rt ON rt.recipient_id = r.id AND rt.locale = ?
-    WHERE r.is_active = 1 AND (NULLIF(TRIM(r.email), '') IS NOT NULL OR NULLIF(TRIM(r.whatsapp), '') IS NOT NULL) ORDER BY rt.name`).all(locale) as Recipient[];
-}
-function mention(recipient: Recipient, locale: Locale) {
-  if (recipient.socialHandle) return recipient.socialHandle;
-  return recipient.type === "politician" ? `${t(locale, "knesset")} ${recipient.name}` : recipient.name;
-}
 function createGeneratedRequest(db: Db, recipientId: number, locale: Locale, selectedDemands: string) {
   for (;;) {
     const publicId = randomBytes(32).toString("base64url");

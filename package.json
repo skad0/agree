@@ -8,7 +8,7 @@
   },
   "scripts": {
     "dev": "npm run build && node --watch dist/src/server.js",
-    "build": "tsc && mkdir -p dist/src/assets && cp src/assets/*.woff2 dist/src/assets/",
+    "build": "tsc && node scripts/copy-assets.mjs",
     "start": "node dist/src/server.js",
     "typecheck": "tsc --noEmit",
     "test": "npm run build && node --test dist/test/*.test.js",
@@ -16,7 +16,8 @@
     "smoke:pages": "npm run build && node dist/scripts/pages-smoke.js",
     "backup": "npm run build && node dist/scripts/backup.js",
     "restore": "npm run build && node dist/scripts/restore.js",
-    "load": "npm run build && node dist/scripts/load.js"
+    "load": "npm run build && node dist/scripts/load.js",
+    "elections": "npm run build && node dist/scripts/elections.js"
   },
   "dependencies": {
     "@hono/node-server": "1.19.14",

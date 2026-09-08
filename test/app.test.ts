@@ -609,7 +609,7 @@ test("public campaign gates and localized error pages do not leak campaign or un
   }
 });
 
-test("public post text mentions the handle, falls back to Knesset plus name, and builds share links", async () => {
+test("public post text mentions the handle, falls back to the name, and builds share links", async () => {
   const dir = mkdtempSync(join(tmpdir(), "agree-social-"));
   try {
     const runtime = createApp({ sqlitePath: join(dir, "app.db"), env: { NODE_ENV: "test", SESSION_SECRET: "test-secret", APP_BASE_URL: "https://campaign.test" } });
@@ -635,7 +635,8 @@ test("public post text mentions the handle, falls back to Knesset plus name, and
     assert.match(withHandle, /https:\/\/campaign.test\/en/);
 
     const withoutHandle = await preview(3);
-    assert.match(withoutHandle, /Knesset member MK Number 3/);
+    assert.match(withoutHandle, /MK Number 3/);
+    assert.doesNotMatch(withoutHandle, /Knesset member/);
 
     const request = runtime.db.prepare("SELECT id FROM generated_requests ORDER BY id DESC LIMIT 1").get() as { id: number };
     const form = await getForm(runtime.app, "/en/request/build?recipient=3");
@@ -756,23 +757,38 @@ test("ambiguous aborted PUT retains delayed cleanup until a late remote commit i
       const key = new URL(String(input)).pathname.split("/").slice(2).join("/");
       if (init?.method === "DELETE") { deleted.push(key); remoteObjects.delete(key); return new Response(null, { status: 204 }); }
       putSignal = init?.signal as AbortSignal;
-      return new Promise<Response>((_, reject) => putSignal!.addEventListener("abort", () => { remoteObjects.add(key); reject(new DOMException("timed out", "TimeoutError")); }, { once: true }));
+      return new Promise<Response>((_, reject) => {
+        let settled = false;
+        let keepAlive: ReturnType<typeof setTimeout> | undefined;
+        const fail = () => {
+          if (settled) return;
+          settled = true;
+          if (keepAlive !== undefined) clearTimeout(keepAlive);
+          remoteObjects.add(key);
+          reject(new DOMException("timed out", "TimeoutError"));
+        };
+        // AbortSignal.timeout is unref'd; Node 22's test runner cancels if nothing else is pending.
+        keepAlive = setTimeout(fail, 100);
+        putSignal!.addEventListener("abort", fail, { once: true });
+        if (putSignal!.aborted) fail();
+      });
     }
     return originalFetch(input, init);
   };
   try {
-    const runtime = createApp({ sqlitePath: join(dir, "agree.db"), env: { NODE_ENV: "test", SESSION_SECRET: "test-secret", RESPONSE_PUT_TIMEOUT_MS: "5", TURNSTILE_SITE_KEY: "site", TURNSTILE_SECRET_KEY: "secret", R2_ACCOUNT_ID: "test", R2_ACCESS_KEY_ID: "key", R2_SECRET_ACCESS_KEY: "secret", R2_BUCKET: "bucket", R2_ENDPOINT: "http://storage.test" } });
+    const runtime = createApp({ sqlitePath: join(dir, "agree.db"), env: { NODE_ENV: "test", SESSION_SECRET: "test-secret", RESPONSE_PUT_TIMEOUT_MS: "50", TURNSTILE_SITE_KEY: "site", TURNSTILE_SECRET_KEY: "secret", R2_ACCOUNT_ID: "test", R2_ACCESS_KEY_ID: "key", R2_SECRET_ACCESS_KEY: "secret", R2_BUCKET: "bucket", R2_ENDPOINT: "http://storage.test" } });
     const form = await getForm(runtime.app, "/en/responses/new");
     const body = new FormData();
     Object.entries({ csrf: form.csrf, submissionToken: form.html.match(/name="submissionToken" value="([^"]+)"/)?.[1] ?? "", recipientId: "1", receivedAt: "2026-01-01", channel: "email", responseText: "Ambiguous", email: "ambiguous@example.org", consent: "yes", "cf-turnstile-response": "valid" }).forEach(([key, value]) => body.set(key, value));
     body.set("file", new File([Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 9])], "late.png", { type: "image/png" }));
     assert.equal((await runtime.app.request("/en/responses", { method: "POST", headers: { cookie: form.cookie }, body })).status, 303);
+    await drainResponseObjectWork(runtime.db, runtime.config);
     assert.ok(putSignal);
     assert.equal(remoteObjects.size, 1);
     assert.deepEqual(deleted, []);
     assert.equal(runtime.db.prepare("SELECT state FROM response_object_work").get()?.state, "delete_pending");
     const next = Date.parse(String(runtime.db.prepare("SELECT next_attempt_at FROM response_object_work").get()?.next_attempt_at));
-    assert.ok(next > Date.now() + 5_000);
+    assert.ok(next > Date.now() + 50_000);
     assert.equal(runtime.db.prepare("SELECT count(*) count FROM submitted_responses").get()?.count, 0);
     await drainResponseObjectWork(runtime.db, runtime.config, next + 1);
     assert.equal(deleted.length, 1);
@@ -790,13 +806,14 @@ test("TypeError PUT failures are also retained as delayed ambiguous cleanup", as
     return originalFetch(input, init);
   };
   try {
-    const runtime = createApp({ sqlitePath: join(dir, "agree.db"), env: { NODE_ENV: "test", SESSION_SECRET: "test-secret", RESPONSE_PUT_TIMEOUT_MS: "5", TURNSTILE_SITE_KEY: "site", TURNSTILE_SECRET_KEY: "secret", R2_ACCOUNT_ID: "test", R2_ACCESS_KEY_ID: "key", R2_SECRET_ACCESS_KEY: "secret", R2_BUCKET: "bucket", R2_ENDPOINT: "http://storage.test" } });
+    const runtime = createApp({ sqlitePath: join(dir, "agree.db"), env: { NODE_ENV: "test", SESSION_SECRET: "test-secret", RESPONSE_PUT_TIMEOUT_MS: "50", TURNSTILE_SITE_KEY: "site", TURNSTILE_SECRET_KEY: "secret", R2_ACCOUNT_ID: "test", R2_ACCESS_KEY_ID: "key", R2_SECRET_ACCESS_KEY: "secret", R2_BUCKET: "bucket", R2_ENDPOINT: "http://storage.test" } });
     const form = await getForm(runtime.app, "/en/responses/new"); const body = new FormData();
     Object.entries({ csrf: form.csrf, submissionToken: form.html.match(/name="submissionToken" value="([^"]+)"/)?.[1] ?? "", recipientId: "1", receivedAt: "2026-01-01", channel: "email", responseText: "Transport failure", email: "transport@example.org", consent: "yes", "cf-turnstile-response": "valid" }).forEach(([key, value]) => body.set(key, value));
     body.set("file", new File([Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 3])], "transport.png", { type: "image/png" }));
     assert.equal((await runtime.app.request("/en/responses", { method: "POST", headers: { cookie: form.cookie }, body })).status, 303);
+    await drainResponseObjectWork(runtime.db, runtime.config);
     const next = Date.parse(String(runtime.db.prepare("SELECT next_attempt_at FROM response_object_work").get()?.next_attempt_at));
-    assert.ok(next > Date.now() + 5_000);
+    assert.ok(next > Date.now() + 50_000);
     assert.equal(deletes, 0);
     await drainResponseObjectWork(runtime.db, runtime.config, next + 1);
     assert.equal(deletes, 1);

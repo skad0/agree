@@ -6,7 +6,7 @@ const STALE_UPLOAD_MS = 60 * 60 * 1000;
 const MAX_ERROR_LENGTH = 160;
 const MAX_BACKOFF_MS = 60 * 60 * 1000;
 const RETENTION_BATCH_SIZE = 100;
-let drainRunning = false;
+let drainRunning: Promise<void> | null = null;
 
 export function queueResponseObjectDelete(db: Db, objectKey: string, now = new Date().toISOString()) {
   db.prepare(`INSERT INTO response_object_work (object_key, state, next_attempt_at, created_at, updated_at)
@@ -15,10 +15,9 @@ export function queueResponseObjectDelete(db: Db, objectKey: string, now = new D
 }
 
 export async function drainResponseObjectWork(db: Db, config: Config, now = Date.now()) {
-  if (drainRunning) return;
-  drainRunning = true;
-  try { await drainResponseObjectWorkInternal(db, config, now); }
-  finally { drainRunning = false; }
+  if (drainRunning) return drainRunning;
+  drainRunning = drainResponseObjectWorkInternal(db, config, now).finally(() => { drainRunning = null; });
+  return drainRunning;
 }
 
 async function drainResponseObjectWorkInternal(db: Db, config: Config, now: number) {
