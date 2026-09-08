@@ -64,6 +64,20 @@
           "reason": "Official newer CEC candidate page returned HTTP 403; candidates-lists package covers elections 19-24 only."
         }
       ]
+    },
+    {
+      "id": "comptroller-finance",
+      "kind": "finance",
+      "status": "blocked",
+      "hosts": ["data.gov.il"],
+      "reason": "Comptroller finance export contract unverified; ingestion stays fail-closed until a reviewed resourceId exists.",
+      "resources": [
+        {
+          "id": "finance-public-donations",
+          "status": "blocked",
+          "reason": "No verified machine-readable finance resource yet."
+        }
+      ]
     }
   ]
 }

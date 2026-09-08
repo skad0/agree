@@ -271,6 +271,66 @@ function insertDirectoryFixture(db: ReturnType<typeof openDatabase>) {
   return { demandId, oldVersionId, currentVersionId, personId, unlinkedPersonId, partyId, personRecipientId, partyRecipientId };
 }
 
+test("party membership stances scope to the active directory publication election", () => {
+  const dir = mkdtempSync(join(tmpdir(), "agree-stance-election-scope-"));
+  const db = openDatabase(join(dir, "app.db"));
+  try {
+    const now = "2026-09-08T00:00:00.000Z";
+    const demandId = Number((db.prepare("SELECT id FROM demands WHERE document = 'standard' ORDER BY sort_order, id LIMIT 1").get() as { id: number }).id);
+    const version = saveQuestionVersion(db, { demandId, semanticVersion: "2.0.0", reviewed: true });
+    assert.equal(version.ok, true);
+    const versionId = version.ok ? version.id : 0;
+
+    const personId = Number((db.prepare("INSERT INTO people (display_name, created_at) VALUES ('Scoped', ?) RETURNING id").get(now) as { id: number }).id);
+    const activePartyId = Number((db.prepare("INSERT INTO parties (name_he) VALUES ('Active Party') RETURNING id").get() as { id: number }).id);
+    const otherPartyId = Number((db.prepare("INSERT INTO parties (name_he) VALUES ('Other Election Party') RETURNING id").get() as { id: number }).id);
+    const activeElectionId = Number((db.prepare("INSERT INTO elections (number, publication_status) VALUES (26, 'announced') RETURNING id").get() as { id: number }).id);
+    const otherElectionId = Number((db.prepare("INSERT INTO elections (number, publication_status) VALUES (25, 'historical') RETURNING id").get() as { id: number }).id);
+    const activeListId = Number((db.prepare("INSERT INTO electoral_lists (election_id, title_he) VALUES (?, 'Active List') RETURNING id").get(activeElectionId) as { id: number }).id);
+    const otherListId = Number((db.prepare("INSERT INTO electoral_lists (election_id, title_he) VALUES (?, 'Other List') RETURNING id").get(otherElectionId) as { id: number }).id);
+    const activeCandidacyId = Number((db.prepare("INSERT INTO candidacies (election_id, list_id, person_id, status) VALUES (?, ?, ?, 'active') RETURNING id")
+      .get(activeElectionId, activeListId, personId) as { id: number }).id);
+    const otherCandidacyId = Number((db.prepare("INSERT INTO candidacies (election_id, list_id, person_id, status) VALUES (?, ?, ?, 'active') RETURNING id")
+      .get(otherElectionId, otherListId, personId) as { id: number }).id);
+    db.prepare("INSERT INTO candidacy_party_memberships (candidacy_id, party_id, review_state) VALUES (?, ?, 'accepted')").run(activeCandidacyId, activePartyId);
+    db.prepare("INSERT INTO candidacy_party_memberships (candidacy_id, party_id, review_state) VALUES (?, ?, 'accepted')").run(otherCandidacyId, otherPartyId);
+    db.prepare("INSERT INTO directory_publications (election_id, version, status, activated_at) VALUES (?, 1, 'active', ?)").run(activeElectionId, now);
+
+    const recipientId = 9301;
+    db.prepare("INSERT INTO recipients (id, type, email, is_active) VALUES (?, 'politician', 'scoped@example.org', 1)").run(recipientId);
+    db.prepare("INSERT INTO recipient_translations (recipient_id, locale, name) VALUES (?, 'en', 'Scoped')").run(recipientId);
+    db.prepare("INSERT INTO recipient_entity_links (recipient_id, person_id, review_state, created_at) VALUES (?, ?, 'accepted', ?)").run(recipientId, personId, now);
+
+    saveStance(db, {
+      subject: { kind: "party", partyId: otherPartyId },
+      questionVersionId: versionId,
+      classification: "opposes",
+      summary: "Other election party only.",
+      sourceUrl: "https://example.org/other",
+      statementAt: "2026-01-01"
+    }, "published");
+    assert.equal(displayStanceForRecipient(db, recipientId, versionId, "en").state, "unknown");
+
+    saveStance(db, {
+      subject: { kind: "party", partyId: activePartyId },
+      questionVersionId: versionId,
+      classification: "supports",
+      summary: "Active election party.",
+      sourceUrl: "https://example.org/active",
+      statementAt: "2026-08-01"
+    }, "published");
+    const scoped = displayStanceForRecipient(db, recipientId, versionId, "en");
+    assert.equal(scoped.state, "published");
+    if (scoped.state === "published") {
+      assert.equal(scoped.attribution, "party");
+      assert.equal(scoped.summary, "Active election party.");
+    }
+  } finally {
+    db.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 async function getForm(app: ReturnType<typeof createApp>["app"], path: string, headers: Record<string, string> = {}) {
   const response = await app.request(path, { headers });
   assert.equal(response.status, 200, path);

@@ -13,10 +13,11 @@ export function DocumentSurface({ children }: { children: Child }) {
   return <div class="document-surface">{children}</div>;
 }
 
-export function AskPanel({ locale }: { locale: Locale }) {
+export function AskPanel({ locale, demandId }: { locale: Locale; demandId?: number }) {
+  const href = demandId ? `/${locale}/request?demand=${demandId}` : `/${locale}/request`;
   return <div class="document-ask">
     <div><h2>{t(locale, "navRequest")}</h2><p>{t(locale, "subtitle")}</p></div>
-    <PrimaryAction href={`/${locale}/request`}>{t(locale, "navRequest")}</PrimaryAction>
+    <PrimaryAction href={href}>{t(locale, "navRequest")}</PrimaryAction>
   </div>;
 }
 

@@ -186,11 +186,18 @@ export function displayStancesForRecipients(db: Db, recipientIds: number[], ques
   const links = db.prepare(`SELECT recipient_id AS recipientId, person_id AS personId, party_id AS partyId
     FROM recipient_entity_links WHERE review_state = 'accepted' AND recipient_id IN (${placeholders})`).all(...recipientIds) as RecipientLink[];
   const personIds = [...new Set(links.flatMap((row) => row.personId ? [row.personId] : []))];
+  const activeElection = db.prepare(`SELECT election_id AS electionId FROM directory_publications WHERE status = 'active' ORDER BY id DESC LIMIT 1`)
+    .get() as { electionId: number } | undefined;
   const memberships = personIds.length
-    ? db.prepare(`SELECT c.person_id AS personId, cpm.party_id AS partyId
-        FROM candidacies c
-        JOIN candidacy_party_memberships cpm ON cpm.candidacy_id = c.id AND cpm.review_state = 'accepted'
-        WHERE c.person_id IN (${personIds.map(() => "?").join(",")})`).all(...personIds) as { personId: number; partyId: number }[]
+    ? activeElection
+      ? db.prepare(`SELECT c.person_id AS personId, cpm.party_id AS partyId
+          FROM candidacies c
+          JOIN candidacy_party_memberships cpm ON cpm.candidacy_id = c.id AND cpm.review_state = 'accepted'
+          WHERE c.election_id = ? AND c.person_id IN (${personIds.map(() => "?").join(",")})`).all(activeElection.electionId, ...personIds) as { personId: number; partyId: number }[]
+      : db.prepare(`SELECT c.person_id AS personId, cpm.party_id AS partyId
+          FROM candidacies c
+          JOIN candidacy_party_memberships cpm ON cpm.candidacy_id = c.id AND cpm.review_state = 'accepted'
+          WHERE c.person_id IN (${personIds.map(() => "?").join(",")})`).all(...personIds) as { personId: number; partyId: number }[]
     : [];
   const partyByPerson = new Map<number, number[]>();
   for (const row of memberships) {

@@ -16,9 +16,18 @@ test("openDatabase applies election directory schema with clean foreign keys", (
     const db = openDatabase(join(dir, "app.db"));
     const applied = db.prepare("SELECT 1 FROM schema_migrations WHERE name = '016_election_directory.sql'").get();
     assert.ok(applied);
-    assert.equal(db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'finance_reports'").get(), undefined);
+    assert.ok(db.prepare("SELECT 1 FROM schema_migrations WHERE name = '017_election_finance.sql'").get());
+    assert.ok(db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'finance_reports'").get());
+    assert.ok(db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'finance_entries'").get());
+    assert.ok(db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'finance_summaries'").get());
     const fk = db.prepare("PRAGMA foreign_key_check").all();
     assert.deepEqual(fk, []);
+    assert.throws(() => db.prepare(`INSERT INTO finance_reports
+      (source_report_key, report_status) VALUES ('r1', 'reported')`).run());
+    db.prepare("INSERT INTO people (created_at) VALUES ('2026-09-08T00:00:00.000Z')").run();
+    db.prepare(`INSERT INTO finance_reports (person_id, source_report_key, report_status) VALUES (1, 'r1', 'reported')`).run();
+    db.prepare(`INSERT INTO finance_entries (report_id, source_entry_key, entry_kind, amount_minor, currency)
+      VALUES (1, 'e1', 'donation', 100, 'ILS')`).run();
     const snapshotId = insertSourceSnapshot(db, {
       source: "cec",
       resourceId: "597e0059-099e-4200-9131-b3ba645bc685",
@@ -68,6 +77,7 @@ test("source manifest loads verified CEC 19-24 ids and fails closed on invalid c
   assert.deepEqual(verified.map((resource) => resource.electionNumber), [19, 20, 21, 22, 23, 24]);
   assert.equal(verified.find((resource) => resource.electionNumber === 21)?.resourceId, "597e0059-099e-4200-9131-b3ba645bc685");
   assert.equal(cec?.resources.find((resource) => resource.electionNumber === 25)?.status, "blocked");
+  assert.equal(manifest.sources.find((source) => source.kind === "finance")?.status, "blocked");
   assert.throws(() => parseSourceManifest({}), /version/);
   assert.throws(() => parseSourceManifest({
     version: 1, parserVersion: "1", limits: { timeoutMs: 1, maxBytes: 1, maxRecords: 1 },

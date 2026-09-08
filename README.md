@@ -85,6 +85,7 @@ The product contract and route inventory are in [docs/SPEC.md](docs/SPEC.md). Cr
 4. Proxy the production domain through Cloudflare. Cache only public `GET` pages/assets for a short TTL. Bypass cache for every `POST`, `/admin/*`, `/verify-email`, support/request/response/delete forms, and any response carrying `Set-Cookie`.
 5. Protect `/admin*` with a Cloudflare Access application whose audience equals `CF_ACCESS_AUD`; require SSO and 2FA in its policy.
 6. Set the production perimeter contract described in [docs/SECRETS.md](docs/SECRETS.md): `SESSION_SECRET`, `TRUSTED_PROXY=cloudflare`, a generated `TRUSTED_PROXY_SECRET`, and an HTTPS `APP_BASE_URL`. The server refuses to boot when any required value is absent or malformed.
+7. Leave election ETL disabled (`ELECTION_ETL_ENABLED=false`, `ELECTION_ETL_SCHEDULE_ENABLED=false`). Put artifacts only under `/data` if you later enable tooling. Follow [docs/ELECTION_DATA_OPERATIONS.md](docs/ELECTION_DATA_OPERATIONS.md) before any import or schedule enablement.
 
 Render disks require a paid instance and prevent horizontal scaling. Only data under `/data` survives deploys. External SQLite backups remain mandatory even though Render also snapshots disks.
 

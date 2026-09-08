@@ -42,3 +42,9 @@ services:
         sync: false
       - key: ERASURE_LEDGER_ACTIVE_KEY_VERSION
         sync: false
+      - key: ELECTION_ETL_ENABLED
+        value: "false"
+      - key: ELECTION_ETL_SCHEDULE_ENABLED
+        value: "false"
+      - key: ELECTION_ETL_ARTIFACT_DIR
+        value: /data/election-artifacts

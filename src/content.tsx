@@ -13,23 +13,24 @@ type PlanItem = { id: number; dayFrom: number; dayTo: number; title: string | nu
 const PLAN_HORIZON = 100;
 
 export function registerContentRoutes(app: Hono, db: Db, config: Config) {
-  const page = (path: string, titleKey: string, ledeKey: string, render: (locale: Locale) => any) =>
+  const page = (path: string, titleKey: string, ledeKey: string, render: (locale: Locale, askEnabled: boolean) => any) =>
     app.get(`/:locale/${path}`, (context) => {
       const locale = localeParam(context.req.param("locale"));
       if (!locale) return context.notFound();
       rememberLocale(context, locale, config);
       if (!publicCampaignActive(db)) return statusPage(context, locale, t(locale, "formDisabled"), 503);
       publicCache(context);
+      const askEnabled = publicRequestsEnabled(db);
       return context.html(<Layout locale={locale} title={t(locale, titleKey)} path={context.req.path}>
         <DocumentIntro title={t(locale, titleKey)} lede={t(locale, ledeKey)} />
-        {render(locale)}
+        {render(locale, askEnabled)}
         <p class="neutrality" role="note">{t(locale, "neutrality")}</p>
-        {publicRequestsEnabled(db) ? <AskPanel locale={locale} /> : null}
+        {askEnabled ? <AskPanel locale={locale} /> : null}
       </Layout>);
     });
 
-  page("standard", "standardTitle", "standardLede", (locale) => clauseList(locale, clauses(db, locale, "standard")));
-  page("coalition-agreement", "coalitionTitle", "coalitionLede", (locale) => clauseList(locale, clauses(db, locale, "coalition")));
+  page("standard", "standardTitle", "standardLede", (locale, askEnabled) => clauseList(locale, clauses(db, locale, "standard"), askEnabled));
+  page("coalition-agreement", "coalitionTitle", "coalitionLede", (locale, askEnabled) => clauseList(locale, clauses(db, locale, "coalition"), askEnabled));
   page("first-100-days", "planTitle", "planLede", (locale) => timeline(locale, planItems(db, locale)));
   page("government-model", "modelTitle", "modelLede", (locale) => portfolioGrid(locale, portfolios(db, locale)));
   page("about", "aboutTitle", "slogan", (locale) => prose(t(locale, "aboutBody")));
@@ -56,7 +57,7 @@ function statusPage(context: any, locale: Locale, message: string, status = 200)
  * One clause of a political document. The four fields always appear in the same order with the
  * same labels, so a reader who has seen one clause can skim every other one by position alone.
  */
-function clauseList(locale: Locale, rows: Clause[]) {
+function clauseList(locale: Locale, rows: Clause[], askEnabled = false) {
   if (!rows.length) return <p role="status">{t(locale, "unavailable")}</p>;
   return <ol class="document-clause-list">{rows.map((row) => <li class="document-clause" id={`clause-${row.sortOrder}`}>
     <span aria-hidden="true" dir="ltr"><span class="document-clause-number"><bdi>{String(row.sortOrder).padStart(2, "0")}</bdi></span></span>
@@ -72,6 +73,7 @@ function clauseList(locale: Locale, rows: Clause[]) {
         {row.verification ? <div class="callout how"><p class="clause-label">{t(locale, "verification")}</p>{splitList(row.verification)}</div> : null}
         {row.exceptions ? <div class="callout except"><p class="clause-label">{t(locale, "exceptions")}</p><p>{row.exceptions}</p></div> : null}
       </details> : null}
+      {askEnabled ? <p class="clause-ask"><a href={`/${locale}/request?demand=${row.id}`}>{t(locale, "navRequest")}</a></p> : null}
     </> : <p role="status">{t(locale, "unavailable")}</p>}
   </li>)}</ol>;
 }
