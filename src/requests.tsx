@@ -177,11 +177,15 @@ export function registerRequestRoutes(app: Hono, db: Db, config: Config) {
     const recipientId = positiveInteger(context.req.query("recipient"));
     const recipient = recipientId ? getContactableRecipient(db, locale, recipientId) : undefined;
     if (!recipient) return context.redirect(`/${locale}/request`);
-    const questionVersionId = positiveInteger(context.req.query("questionVersion")) ?? currentQuestionVersionForDemand(db, positiveInteger(context.req.query("demand")));
+    const demandId = positiveInteger(context.req.query("demand"));
+    const questionVersionId = positiveInteger(context.req.query("questionVersion")) ?? currentQuestionVersionForDemand(db, demandId);
     const csrf = issueCsrf(context, config);
     privateNoStore(context);
-    const languageQuery = questionVersionId ? `recipient=${recipient.id}&questionVersion=${questionVersionId}` : `recipient=${recipient.id}`;
-    return context.html(buildDocument(locale, context.req.path, csrf, db, recipient, config, "", null, languageQuery, questionVersionId));
+    const languageParts = [`recipient=${recipient.id}`];
+    if (questionVersionId) languageParts.push(`questionVersion=${questionVersionId}`);
+    if (demandId) languageParts.push(`demand=${demandId}`);
+    const selectedDemands = demandId ? [demandId] : null;
+    return context.html(buildDocument(locale, context.req.path, csrf, db, recipient, config, "", selectedDemands, languageParts.join("&"), questionVersionId));
   });
 
   app.post("/:locale/request/preview", async (context) => {
@@ -489,7 +493,8 @@ function buildDocument(locale: Locale, path: string, csrf: string, db: Db, recip
   const demands = db.prepare(`SELECT d.id, dt.title, dt.body, dt.rationale FROM demands d JOIN campaigns c ON c.id = d.campaign_id
     LEFT JOIN demand_translations dt ON dt.demand_id = d.id AND dt.locale = ?
     WHERE c.status = 'active' AND d.is_active = 1 AND d.document = 'standard' ORDER BY d.sort_order`).all(locale) as { id: number; title: string | null; body: string | null; rationale: string | null }[];
-  const checked = new Set(selectedDemands ?? []);
+  const translatedIds = demands.flatMap((demand) => demand.title ? [demand.id] : []);
+  const checked = new Set(selectedDemands === null ? translatedIds : selectedDemands);
   const questions = listSelectableQuestions(db, locale);
   const selectedQuestion = questions.find((row) => row.versionId === questionVersionId);
   const stance = displayStanceForRecipient(db, recipient.id, questionVersionId, locale);

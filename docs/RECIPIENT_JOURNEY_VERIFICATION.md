@@ -1,6 +1,6 @@
 # Recipient discovery, selection and question journey
 
-Date: 2026-09-07. Status: slice 4 adds reviewed public stances, admin-only publication/retraction, and question-context display. ETL publication, finance, and party-fallback destinations remain later. Single-recipient `GET /:locale/request/build?recipient=` links still work.
+Date: 2026-09-08. Status: slice 5 adds finance schema scaffolding, enrichment/matching/contact/job lease modules, CLI dry-run (no active publication writes), build-page demand defaults/`?demand=` pre-check, AskPanel/clause deep links, and stance party membership scoped to the active directory publication election. ETL publication activation, live finance ingestion, and party-fallback send destinations remain later. Single-recipient `GET /:locale/request/build?recipient=` links still work; `?demand=` pre-checks that demand only.
 
 The earlier single-recipient restriction is now an implementation milestone, not the final product scope. Existing single-recipient links and privacy guarantees remain compatible. The new scope also permits a separately reviewed public stance projection; it does not make private submitted responses public.
 
