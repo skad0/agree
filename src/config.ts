@@ -46,12 +46,12 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env) {
     accessTeamDomain: env.CF_ACCESS_TEAM_DOMAIN,
     accessAud: env.CF_ACCESS_AUD,
     accessTestJwks: env.NODE_ENV === "test" ? env.CF_ACCESS_TEST_JWKS : undefined,
-    r2AccountId: env.R2_ACCOUNT_ID,
-    r2AccessKeyId: env.R2_ACCESS_KEY_ID,
-    r2SecretAccessKey: env.R2_SECRET_ACCESS_KEY,
-    r2Bucket: env.R2_BUCKET,
-    r2Endpoint: env.R2_ENDPOINT,
-    r2Region: env.R2_REGION ?? "auto",
+    r2AccountId: trim(env.R2_ACCOUNT_ID),
+    r2AccessKeyId: trim(env.R2_ACCESS_KEY_ID),
+    r2SecretAccessKey: trim(env.R2_SECRET_ACCESS_KEY),
+    r2Bucket: trim(env.R2_BUCKET),
+    r2Endpoint: trim(env.R2_ENDPOINT),
+    r2Region: trim(env.R2_REGION) || "auto",
     emailApiKey: env.EMAIL_PROVIDER_API_KEY,
     emailFrom: env.EMAIL_FROM,
     backupEndpoint: env.BACKUP_S3_ENDPOINT,
@@ -114,3 +114,4 @@ function flag(value: string | undefined, fallback: boolean): boolean {
 }
 
 function isEmail(value: string) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value); }
+function trim(value: string | undefined) { const next = value?.trim(); return next || undefined; }

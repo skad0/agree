@@ -1,9 +1,18 @@
 import assert from "node:assert/strict";
 import { createHash, createHmac } from "node:crypto";
 import test from "node:test";
-import { listStoreObjects, type Store } from "../src/s3.js";
+import { loadConfig } from "../src/config.js";
+import { hasObjectStorage, listStoreObjects, type Store } from "../src/s3.js";
 
 const store: Store = { endpoint: "http://s3.test", accessKey: "access", secretKey: "secret", bucket: "ledger", region: "auto" };
+
+test("object storage is enabled with either account id or explicit endpoint", () => {
+  const base = { NODE_ENV: "test", SESSION_SECRET: "test-secret", R2_ACCESS_KEY_ID: "key", R2_SECRET_ACCESS_KEY: "secret", R2_BUCKET: "bucket" };
+  assert.equal(hasObjectStorage(loadConfig({ ...base, R2_ACCOUNT_ID: "account" })), true);
+  assert.equal(hasObjectStorage(loadConfig({ ...base, R2_ENDPOINT: "https://s3.example.test" })), true);
+  assert.equal(hasObjectStorage(loadConfig(base)), false);
+  assert.equal(hasObjectStorage(loadConfig({ ...base, R2_ACCOUNT_ID: "  ", R2_ENDPOINT: " https://s3.example.test " })), true);
+});
 
 test("ListObjectsV2 signs RFC3986 sorted queries across pages", async () => {
   const original = globalThis.fetch; const requests: URL[] = []; let page = 0;

@@ -4,7 +4,8 @@ import type { Config } from "./config.js";
 export const RESPONSE_PUT_TIMEOUT_MS = 30_000;
 
 export function hasObjectStorage(config: Config) {
-  return Boolean(config.r2AccountId && config.r2AccessKeyId && config.r2SecretAccessKey && config.r2Bucket);
+  // Cloudflare R2 can use account id (default endpoint); AWS/other S3-compatible stores use an explicit endpoint.
+  return Boolean(config.r2AccessKeyId && config.r2SecretAccessKey && config.r2Bucket && (config.r2AccountId || config.r2Endpoint));
 }
 
 export type Store = { endpoint?: string; accountId?: string; accessKey: string; secretKey: string; bucket: string; region: string };

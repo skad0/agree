@@ -11,7 +11,7 @@ import { Callout, JourneyIntro } from "./components/public-ui.js";
 import { privateNoStore } from "./public-state.js";
 
 export function createApp(options: { sqlitePath?: string; env?: NodeJS.ProcessEnv } = {}) {
-  const config = loadConfig(options.env);
+  const config = loadConfig(options.env ?? process.env);
   configureSecurity(config);
   const db = openDatabase(options.sqlitePath ?? config.sqlitePath);
   const app = new Hono();

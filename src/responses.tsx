@@ -33,7 +33,9 @@ export function registerResponseRoutes(app: Hono, db: Db, config: Config) {
         <label>{t(locale, "receivedDate")}<input type="date" name="receivedAt" required max={new Date().toISOString().slice(0, 10)} /></label>
         <label>{t(locale, "channel")}<input name="channel" required maxLength={50} /></label>
         <label>{t(locale, "responseText")}<textarea name="responseText" required maxLength={20000}></textarea></label>
-        <label>{t(locale, "fileHelp")}<input type="file" name="file" accept="image/jpeg,image/png,image/webp,application/pdf" /></label>
+        {hasObjectStorage(config)
+          ? <label>{t(locale, "fileHelp")}<input type="file" name="file" accept="image/jpeg,image/png,image/webp,application/pdf" /></label>
+          : <p class="note" role="note">{t(locale, "storageUnavailable")}</p>}
         <label>{t(locale, "email")}<input type="email" name="email" required maxLength={254} /></label>
         <label><input type="checkbox" name="consent" value="yes" required /> {t(locale, "consent")}</label>
         <Turnstile config={config} /><button type="submit">{t(locale, "submit")}</button>
