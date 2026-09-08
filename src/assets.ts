@@ -280,10 +280,23 @@ footer.wrap { display: flex; flex-wrap: wrap; gap: .25rem 1.5rem; }
 .public-site .journey-intro h1 { margin-block: 0; }
 .public-site .journey-intro .eyebrow { margin-block-end: .6rem; }
 .public-site .request-recipient-page .surface { max-inline-size: 58.75rem; }
-.public-site .recipient-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem; list-style: none; padding: 0; margin: 0; }
-.public-site .recipient-list li { list-style: none; }
-.public-site .recipient-list a { display: flex; align-items: center; min-block-size: 5.5rem; padding-inline: 1.25rem; border: 1px solid var(--rule); border-radius: 3px; background: var(--card); color: var(--ink); text-decoration: none; font-size: 1.15rem; }
-.public-site .recipient-list a:hover { border-color: var(--seal); color: var(--seal-deep); }
+.public-site .directory-search { display: grid; gap: .75rem; margin-block-end: 1.25rem; }
+.public-site .directory-search label { display: block; font-weight: 700; }
+.public-site .directory-search input[type=search], .public-site .directory-search select { display: block; inline-size: 100%; margin-block-start: .5rem; min-block-size: 3.75rem; }
+.public-site .directory-search-actions, .public-site .directory-pager { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
+.public-site .directory-search-actions button, .public-site .directory-pager button { min-block-size: 2.75rem; }
+.public-site .directory-filter-note, .public-site .directory-status, .public-site .directory-chip, .public-site .recipient-meta { color: var(--mute); margin: 0; }
+.public-site .directory-suggest { list-style: none; margin: 0; padding: 0; border: 1px solid var(--rule); background: var(--card); }
+.public-site .directory-suggest[hidden] { display: none; }
+.public-site .directory-suggest [role=option] { display: flex; flex-wrap: wrap; gap: .35rem 1rem; align-items: baseline; min-block-size: 2.75rem; padding: .5rem 1rem; cursor: pointer; }
+.public-site .directory-suggest [role=option][aria-selected=true], .public-site .directory-suggest [role=option]:hover { background: var(--paper); color: var(--seal-deep); }
+.public-site .recipient-list { display: grid; gap: .5rem; list-style: none; padding: 0; margin: 0; }
+.public-site .recipient-list li, .public-site .recipient-row { list-style: none; }
+.public-site .recipient-row { display: flex; flex-wrap: wrap; gap: .5rem 1rem; align-items: center; justify-content: space-between; padding: .85rem 1.1rem; border: 1px solid var(--rule); border-radius: 3px; background: var(--card); }
+.public-site .recipient-copy { flex: 1 1 12rem; }
+.public-site .recipient-name { font-size: 1.05rem; }
+.public-site .recipient-ask { display: inline-flex; align-items: center; min-block-size: 2.75rem; padding-inline: 1rem; border: 1px solid var(--seal); border-radius: 3px; color: var(--seal); text-decoration: none; font-weight: 700; }
+.public-site .recipient-ask:hover { background: var(--seal); color: var(--paper); }
 .public-site .request-recipient-line { margin-block: 0 1.5rem; font-size: 1.1rem; }
 .public-site .request-form { max-inline-size: 48rem; }
 .public-site .request-form fieldset { border: 0; padding: 0; }
@@ -291,10 +304,21 @@ footer.wrap { display: flex; flex-wrap: wrap; gap: .25rem 1.5rem; }
 .public-site .request-form label { display: block; margin-block: 1rem; }
 .public-site .request-form input:not([type=checkbox]), .public-site .request-form select, .public-site .request-form textarea { margin-block-start: .5rem; }
 .public-site .request-form input:not([type=checkbox]), .public-site .request-form select { min-block-size: 3.75rem; }
-.public-site .demand-fieldset { display: grid; gap: .5rem; margin-block-end: 1.5rem; }
+.public-site .demand-fieldset { display: grid; gap: .75rem; margin-block-end: 1.5rem; }
 .public-site .demand-fieldset legend { margin-block-end: .25rem; }
+.public-site .demand-option { display: grid; gap: .15rem; }
 .public-site .demand-fieldset label { display: flex; align-items: flex-start; gap: .75rem; min-block-size: 2.75rem; margin: 0; padding-block: .4rem; font-weight: 500; }
 .public-site .demand-fieldset input[type=checkbox] { flex: none; margin-block-start: .2rem; }
+.public-site .question-help { position: relative; }
+.public-site .question-help summary { cursor: pointer; color: var(--seal); font-weight: 600; min-block-size: 2.75rem; display: inline-flex; align-items: center; }
+.public-site .question-help-panel { max-inline-size: 70ch; color: var(--mute); }
+.public-site .question-help-tooltip { display: none; }
+html.js .question-help:has(summary:is(:hover, :focus-visible)):not(:has([open])) .question-help-tooltip,
+html.js .question-help-tooltip:hover {
+  display: block; position: absolute; z-index: 2; inset-inline-start: 0; inset-block-start: 100%;
+  max-inline-size: min(24rem, calc(100vw - 2rem)); padding: .75rem 1rem;
+  border: 1px solid var(--rule); background: var(--paper); color: var(--ink);
+}
 .public-site .letter-ready-form { max-inline-size: 58.75rem; }
 .public-site .letter-ready-form > label { max-inline-size: 58.75rem; }
 .public-site .request-actions { margin-block: 1rem 1.5rem; }
@@ -671,6 +695,148 @@ function mark() {
   }
 }
 mark();
+directorySearch();
+questionHelp();
+function directorySearch() {
+  const form = document.querySelector('[data-directory-search]');
+  const input = form?.querySelector('#directory-q');
+  const list = form?.querySelector('#directory-suggest');
+  const endpoint = form?.dataset?.suggest;
+  if (!form || !input || !list || !endpoint) return;
+  let timer = 0;
+  let seq = 0;
+  let active = -1;
+  let composing = false;
+  let abort = null;
+  const options = () => [...list.querySelectorAll('[role=option]')];
+  function close() {
+    list.hidden = true;
+    list.innerHTML = '';
+    active = -1;
+    input.setAttribute('aria-expanded', 'false');
+    input.removeAttribute('aria-activedescendant');
+  }
+  function paint(items, unavailable) {
+    list.innerHTML = '';
+    active = -1;
+    if (unavailable) {
+      const empty = document.createElement('li');
+      empty.setAttribute('role', 'status');
+      empty.textContent = form.dataset.suggestUnavailable || '';
+      list.append(empty);
+      list.hidden = false;
+      input.setAttribute('aria-expanded', 'true');
+      return;
+    }
+    if (!items.length) { close(); return; }
+    for (const item of items) {
+      const row = document.createElement('li');
+      row.id = 'directory-opt-' + item.kind + '-' + item.id;
+      row.setAttribute('role', 'option');
+      row.setAttribute('aria-selected', 'false');
+      row.dataset.kind = item.kind;
+      row.dataset.id = String(item.id);
+      const label = document.createElement('span');
+      label.textContent = item.label;
+      const meta = document.createElement('span');
+      meta.className = 'recipient-meta';
+      meta.textContent = [item.typeLabel, item.context, item.statusLabel].filter(Boolean).join(' · ');
+      row.append(label, meta);
+      list.append(row);
+    }
+    list.hidden = false;
+    input.setAttribute('aria-expanded', 'true');
+  }
+  function highlight(next) {
+    const rows = options();
+    if (!rows.length) return;
+    active = (next + rows.length) % rows.length;
+    rows.forEach((row, index) => {
+      row.setAttribute('aria-selected', String(index === active));
+      if (index === active) input.setAttribute('aria-activedescendant', row.id);
+    });
+  }
+  function accept(row) {
+    if (!row) return;
+    const kind = row.dataset.kind;
+    const id = row.dataset.id;
+    close();
+    if (kind === 'person') {
+      let person = form.querySelector('[name=personId]');
+      if (!person) {
+        person = document.createElement('input');
+        person.type = 'hidden';
+        person.name = 'personId';
+        form.append(person);
+      }
+      person.value = id;
+      input.value = '';
+    } else if (kind === 'party') {
+      const select = form.querySelector('[name=partyId]');
+      if (select) select.value = id;
+    } else if (kind === 'list') {
+      const select = form.querySelector('[name=listId]');
+      if (select) select.value = id;
+    }
+    const search = form.querySelector('[name=page][value="1"]') || form.querySelector('[type=submit]');
+    form.requestSubmit(search);
+  }
+  function lookup() {
+    const q = input.value.trim();
+    if (!q) { close(); return; }
+    seq += 1;
+    const current = seq;
+    if (abort) abort.abort();
+    abort = new AbortController();
+    const body = new URLSearchParams();
+    body.set('csrf', form.querySelector('[name=csrf]')?.value || '');
+    body.set('q', q);
+    const listId = form.querySelector('[name=listId]')?.value;
+    const partyId = form.querySelector('[name=partyId]')?.value;
+    if (listId) body.set('listId', listId);
+    if (partyId) body.set('partyId', partyId);
+    fetch(endpoint, { method: 'POST', body, credentials: 'same-origin', signal: abort.signal })
+      .then((response) => response.json().then((data) => ({ response, data })))
+      .then(({ response, data }) => {
+        if (current !== seq) return;
+        if (!response.ok || data.suggestions == null) paint([], true);
+        else paint(data.suggestions, false);
+      })
+      .catch((error) => {
+        if (error.name === 'AbortError' || current !== seq) return;
+        paint([], true);
+      });
+  }
+  input.addEventListener('compositionstart', () => { composing = true; });
+  input.addEventListener('compositionend', () => { composing = false; lookup(); });
+  input.addEventListener('input', () => {
+    if (composing) return;
+    window.clearTimeout(timer);
+    timer = window.setTimeout(lookup, 200);
+  });
+  input.addEventListener('keydown', (event) => {
+    if (list.hidden) return;
+    if (event.key === 'ArrowDown') { event.preventDefault(); highlight(active + 1); }
+    else if (event.key === 'ArrowUp') { event.preventDefault(); highlight(active - 1); }
+    else if (event.key === 'Enter' && active >= 0) { event.preventDefault(); accept(options()[active]); }
+    else if (event.key === 'Escape') { event.preventDefault(); close(); }
+    else if (event.key === 'Tab') close();
+  });
+  list.addEventListener('mousedown', (event) => {
+    const row = event.target.closest('[role=option]');
+    if (!row) return;
+    event.preventDefault();
+    accept(row);
+  });
+  input.addEventListener('blur', () => { window.setTimeout(close, 0); });
+}
+function questionHelp() {
+  document.addEventListener('keydown', (event) => {
+    if (event.key !== 'Escape') return;
+    const help = event.target.closest?.('.question-help');
+    if (help) help.querySelector('details')?.removeAttribute('open');
+  });
+}
 `.trim();
 
 /** Content-hashed so a deploy actually reaches browsers; the old URL simply stops being referenced. */

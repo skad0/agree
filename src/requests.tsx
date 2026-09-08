@@ -4,8 +4,20 @@ import type { Config } from "./config.js";
 import type { Db } from "./db.js";
 import { isLocale, localeNames, locales, t, type Locale } from "./i18n.js";
 import { Layout } from "./layout.js";
-import { Callout, JourneyIntro, PrimaryAction, Surface } from "./components/public-ui.js";
-import { getContactableRecipient, listContactableRecipients, mention, type Recipient } from "./recipients.js";
+import { Callout, JourneyIntro, Surface } from "./components/public-ui.js";
+import {
+  getContactableRecipient,
+  listDirectoryBrowse,
+  mention,
+  parseDirectoryQuery,
+  searchDirectory,
+  suggestDirectory,
+  type DirectoryBrowseItem,
+  type DirectoryPage,
+  type DirectoryQuery,
+  type DirectorySuggestion,
+  type Recipient
+} from "./recipients.js";
 import { privateNoStore, rememberLocale } from "./public-state.js";
 import { createRateLimiter, issueCsrf, issueRequestCapability, text, Turnstile, validCsrf, validTurnstile, values, verifyRequestCapability } from "./security.js";
 
@@ -23,17 +35,40 @@ export function registerRequestRoutes(app: Hono, db: Db, config: Config) {
     rememberLocale(context, locale, config);
     privateNoStore(context);
     if (!campaignEnabled(db)) return statusPage(context, locale, t(locale, "formDisabled"), 503);
-    const recipients = listContactableRecipients(db, locale);
-    return context.html(<Layout locale={locale} title={t(locale, "requestTitle")} path={context.req.path}>
-      <div class="request-page request-recipient-page">
-      <JourneyIntro eyebrow={<>{t(locale, "stepChoose")} · <bdi>1/3</bdi></>} title={t(locale, "chooseRecipient")} />
-      {/* Same card treatment as the rest of the site: bare links here were below the 24px target. */}
-      <Surface class="recipient-panel">
-        <ul class="recipient-list">{recipients.map((recipient) =>
-          <li><a href={`/${locale}/request/build?recipient=${recipient.id}`}><strong>{recipient.name}</strong></a></li>)}</ul>
-      </Surface>
-      </div>
-    </Layout>);
+    const csrf = issueCsrf(context, config);
+    const items = listDirectoryBrowse(db, locale);
+    const query = parseDirectoryQuery({});
+    return context.html(directoryDocument(locale, context.req.path, csrf, query, searchDirectory(items, query), items));
+  });
+
+  app.post("/:locale/request", async (context) => {
+    const locale = localeParam(context.req.param("locale"));
+    if (!locale) return context.notFound();
+    privateNoStore(context);
+    const body = await context.req.parseBody();
+    if (!rateLimit(context, "directory-search", 60, 3600)) return statusPage(context, locale, "Too many requests", 429);
+    if (!validCsrf(context, config, body)) return statusPage(context, locale, t(locale, "invalidForm"), 403);
+    if (!campaignEnabled(db)) return statusPage(context, locale, t(locale, "formDisabled"), 503);
+    const csrf = issueCsrf(context, config);
+    const items = listDirectoryBrowse(db, locale);
+    const query = parseDirectoryQuery({
+      q: text(body.q), listId: text(body.listId), partyId: text(body.partyId),
+      personId: text(body.personId), page: text(body.page), clear: text(body.clear)
+    });
+    return context.html(directoryDocument(locale, context.req.path, csrf, query, searchDirectory(items, query), items));
+  });
+
+  app.post("/:locale/request/suggest", async (context) => {
+    const locale = localeParam(context.req.param("locale"));
+    if (!locale) return context.notFound();
+    privateNoStore(context);
+    const body = await context.req.parseBody();
+    if (!rateLimit(context, "directory-suggest", 60, 60)) return context.json({ suggestions: null, error: "unavailable", publicationId: null }, 429);
+    if (!validCsrf(context, config, body)) return context.json({ suggestions: null, error: "unavailable", publicationId: null }, 403);
+    if (!campaignEnabled(db)) return context.json({ suggestions: null, error: "unavailable", publicationId: null }, 503);
+    const query = parseDirectoryQuery({ q: text(body.q), listId: text(body.listId), partyId: text(body.partyId) });
+    const suggestions = suggestDirectory(listDirectoryBrowse(db, locale), query).map((row) => publicSuggestion(locale, row));
+    return context.json({ suggestions, publicationId: null });
   });
 
   app.get("/:locale/request/build", (context) => {
@@ -44,9 +79,9 @@ export function registerRequestRoutes(app: Hono, db: Db, config: Config) {
     const recipientId = positiveInteger(context.req.query("recipient"));
     const recipient = recipientId ? getContactableRecipient(db, locale, recipientId) : undefined;
     if (!recipient) return context.redirect(`/${locale}/request`);
-    const demands = db.prepare(`SELECT d.id, dt.title FROM demands d JOIN campaigns c ON c.id = d.campaign_id
+    const demands = db.prepare(`SELECT d.id, dt.title, dt.body, dt.rationale FROM demands d JOIN campaigns c ON c.id = d.campaign_id
       LEFT JOIN demand_translations dt ON dt.demand_id = d.id AND dt.locale = ?
-      WHERE c.status = 'active' AND d.is_active = 1 AND d.document = 'standard' ORDER BY d.sort_order`).all(locale) as { id: number; title: string | null }[];
+      WHERE c.status = 'active' AND d.is_active = 1 AND d.document = 'standard' ORDER BY d.sort_order`).all(locale) as { id: number; title: string | null; body: string | null; rationale: string | null }[];
     const csrf = issueCsrf(context, config);
     privateNoStore(context);
     return context.html(<Layout locale={locale} title={t(locale, "buildTitle")} path={context.req.path} languageQuery={`recipient=${recipient.id}`}>
@@ -56,7 +91,10 @@ export function registerRequestRoutes(app: Hono, db: Db, config: Config) {
       <form class="request-form wording-panel" method="post" action={`/${locale}/request/preview`} aria-labelledby="build-heading">
         <input type="hidden" name="csrf" value={csrf} /><input type="hidden" name="recipientId" value={recipient.id} />
         <fieldset class="demand-fieldset"><legend>{t(locale, "selectDemand")}</legend>{demands.map((demand) => demand.title
-          ? <label><input type="checkbox" name="demandId" value={demand.id} /> {demand.title}</label>
+          ? <div class="demand-option">
+              <label><input type="checkbox" name="demandId" value={demand.id} /> {demand.title}</label>
+              <QuestionHelp locale={locale} body={demand.body} rationale={demand.rationale} />
+            </div>
           : <p role="status">{t(locale, "unavailable")}</p>)}</fieldset>
         <label>{t(locale, "messageLanguage")}<select name="messageLocale">{locales.map((option) => <option value={option} selected={option === locale} lang={option}>{localeNames[option]}</option>)}</select></label>
         <label>{t(locale, "name")}<input name="name" maxLength={100} /></label>
@@ -231,6 +269,94 @@ export function registerRequestRoutes(app: Hono, db: Db, config: Config) {
       </div>
     </Layout>);
   });
+}
+
+function directoryDocument(locale: Locale, path: string, csrf: string, query: DirectoryQuery, page: DirectoryPage, items: DirectoryBrowseItem[]) {
+  const selected = query.personId ? items.find((item) => item.id === query.personId) : undefined;
+  return <Layout locale={locale} title={t(locale, "requestTitle")} path={path}>
+    <div class="request-page request-recipient-page">
+      <JourneyIntro eyebrow={<>{t(locale, "stepChoose")} · <bdi>1/3</bdi></>} title={t(locale, "directoryTitle")} />
+      <Callout tone="muted"><p>{t(locale, "directoryNoElection")}</p></Callout>
+      <Surface class="recipient-panel">
+        <form class="directory-search" method="post" action={`/${locale}/request`} data-directory-search data-suggest={`/${locale}/request/suggest`} data-suggest-unavailable={t(locale, "directorySuggestUnavailable")}>
+          <input type="hidden" name="csrf" value={csrf} />
+          {query.personId ? <input type="hidden" name="personId" value={query.personId} /> : null}
+          <label>{t(locale, "directorySearchLabel")}
+            <input id="directory-q" name="q" type="search" value={query.q} maxLength={100} autoComplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="directory-suggest" />
+          </label>
+          <ul id="directory-suggest" class="directory-suggest" role="listbox" hidden></ul>
+          {page.filters.lists.length ? <label>{t(locale, "directoryListFilter")}
+            <select name="listId"><option value="">{t(locale, "directoryFilterAll")}</option>
+              {page.filters.lists.map((option) => <option value={option.id} selected={option.id === query.listId}>{option.label}{option.ballotLetters ? ` (${option.ballotLetters})` : ""}</option>)}
+            </select>
+          </label> : null}
+          {page.filters.parties.length ? <label>{t(locale, "directoryPartyFilter")}
+            <select name="partyId"><option value="">{t(locale, "directoryFilterAll")}</option>
+              {page.filters.parties.map((option) => <option value={option.id} selected={option.id === query.partyId}>{option.label}</option>)}
+            </select>
+          </label> : null}
+          {!page.filters.lists.length && !page.filters.parties.length ? <p class="directory-filter-note">{t(locale, "directoryFiltersUnavailable")}</p> : null}
+          <div class="directory-search-actions">
+            <button type="submit" name="page" value="1">{t(locale, "directorySearch")}</button>
+            {query.q || query.personId || query.listId || query.partyId ? <button type="submit" name="clear" value="1">{t(locale, "directoryClear")}</button> : null}
+          </div>
+          {selected ? <p class="directory-chip">{selected.name}</p> : null}
+          <p class="directory-status" role="status">{page.total} {t(locale, "directoryMatches")}{page.pageCount > 1 ? ` · ${t(locale, "directoryPage")} ${page.page}` : ""}</p>
+          {page.rows.length ? <ul class="recipient-list">{page.rows.map((item) => <li class="recipient-row">
+            <div class="recipient-copy">
+              <strong class="recipient-name">{item.name}</strong>
+              <p class="recipient-meta">{item.type === "party" ? t(locale, "directoryRoleParty") : t(locale, "directoryRolePerson")}
+                {item.list ? ` · ${item.list.label}${item.list.ballotLetters ? ` (${item.list.ballotLetters})` : ""}` : ""}
+                {item.party ? ` · ${item.party.label}` : ""}
+                {" · "}{item.contactable ? t(locale, "directoryContactable") : t(locale, "directoryNotContactable")}
+              </p>
+            </div>
+            {item.contactable ? <a class="recipient-ask" href={`/${locale}/request/build?recipient=${item.id}`}>{t(locale, "directoryAsk")}</a> : null}
+          </li>)}</ul> : <p>{t(locale, "directoryEmpty")}</p>}
+          {page.pageCount > 1 ? <div class="directory-pager">
+            {page.page > 1 ? <button type="submit" name="page" value={page.page - 1}>{t(locale, "directoryPrevious")}</button> : null}
+            {page.page < page.pageCount ? <button type="submit" name="page" value={page.page + 1}>{t(locale, "next")}</button> : null}
+          </div> : null}
+        </form>
+      </Surface>
+    </div>
+  </Layout>;
+}
+
+function QuestionHelp({ locale, body, rationale }: { locale: Locale; body: string | null; rationale: string | null }) {
+  const explanation = body
+    ? <><p><strong>{t(locale, "directoryQuestionWhat")}</strong> {body}</p>{rationale ? <p><strong>{t(locale, "directoryQuestionAnswer")}</strong> {rationale}</p> : null}</>
+    : <p>{t(locale, "unavailable")}</p>;
+  return <div class="question-help">
+    <details>
+      <summary>{t(locale, "directoryQuestionHelp")}</summary>
+      <div class="question-help-panel">{explanation}</div>
+    </details>
+    {body ? <div class="question-help-tooltip" role="tooltip" aria-hidden="true"><p>{body}</p>{rationale ? <p>{rationale}</p> : null}</div> : null}
+  </div>;
+}
+
+function publicSuggestion(locale: Locale, suggestion: DirectorySuggestion) {
+  switch (suggestion.kind) {
+    case "person":
+      return {
+        kind: suggestion.kind,
+        id: suggestion.id,
+        label: suggestion.label,
+        context: suggestion.context,
+        contactable: suggestion.contactable,
+        typeLabel: suggestion.role === "party" ? t(locale, "directorySuggestParty") : t(locale, "directorySuggestPerson"),
+        statusLabel: suggestion.contactable ? null : t(locale, "directoryNotContactable")
+      };
+    case "party":
+      return { kind: suggestion.kind, id: suggestion.id, label: suggestion.label, context: suggestion.context, typeLabel: t(locale, "directorySuggestParty") };
+    case "list":
+      return { kind: suggestion.kind, id: suggestion.id, label: suggestion.label, context: suggestion.context, typeLabel: t(locale, "directorySuggestList") };
+    default: {
+      const _never: never = suggestion;
+      return _never;
+    }
+  }
 }
 
 function createGeneratedRequest(db: Db, recipientId: number, locale: Locale, selectedDemands: string) {

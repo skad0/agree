@@ -429,8 +429,19 @@ test("single-recipient request flow keeps RTL form, action, and result contracts
     assert.equal(chooser.headers.get("cache-control"), "private, no-store");
     const chooserHtml = await chooser.text();
     assert.match(chooserHtml, /<html lang="he" dir="rtl"/);
-    assert.match(chooserHtml, /\/he\/request\/build\?recipient=1/);
+    assert.match(chooserHtml, /name="q"/);
+    assert.match(chooserHtml, /directory-search/);
+    assert.match(chooserHtml, /\/he\/request\/build\?recipient=/);
     assert.doesNotMatch(chooserHtml, /name="recipientId"/);
+    assert.doesNotMatch(chooserHtml, /חבר\/ת הכנסת/);
+
+    const chooserCsrf = chooserHtml.match(/name="csrf" value="([^"]+)"/)?.[1];
+    assert.ok(chooserCsrf);
+    const search = await postForm(runtime.app, "/he/request", { csrf: chooserCsrf, q: "המשרד", page: "1" }, chooser.headers.get("set-cookie")?.split(";")[0] ?? "");
+    assert.equal(search.status, 200);
+    const searchHtml = await search.text();
+    assert.match(searchHtml, /\/he\/request\/build\?recipient=1/);
+    assert.doesNotMatch(searchHtml, /[?&]q=/);
 
     const build = await runtime.app.request("/he/request/build?recipient=1");
     assert.equal(build.status, 200);
@@ -1105,7 +1116,7 @@ test("request preview, action, and result are private; result shares the handle 
   }
 });
 
-test("contactless recipients are excluded and unavailable direct actions are not persisted", async () => {
+test("contactless recipients stay visible without send links and unavailable direct actions are not persisted", async () => {
   const dir = mkdtempSync(join(tmpdir(), "agree-contactless-recipient-"));
   try {
     const runtime = createApp({ sqlitePath: join(dir, "app.db"), env: { NODE_ENV: "test", SESSION_SECRET: "test-secret" } });
@@ -1115,8 +1126,10 @@ test("contactless recipients are excluded and unavailable direct actions are not
 
     const list = await runtime.app.request("/en/request");
     const listHtml = await list.text();
-    assert.doesNotMatch(listHtml, /No Contact Recipient/);
+    assert.match(listHtml, /No Contact Recipient/);
     assert.match(listHtml, /Email Recipient/);
+    assert.doesNotMatch(listHtml, /\/en\/request\/build\?recipient=7/);
+    assert.match(listHtml, /\/en\/request\/build\?recipient=8/);
     assert.equal((await runtime.app.request("/en/request/build?recipient=7")).headers.get("location"), "/en/request");
 
     const emailForm = await getForm(runtime.app, "/en/request/build?recipient=8");
@@ -1137,6 +1150,59 @@ test("contactless recipients are excluded and unavailable direct actions are not
     assert.equal(runtime.db.prepare("SELECT count(*) AS count FROM request_actions WHERE generated_request_id = ?").get(requestId)?.count, 0);
     runtime.close();
   } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("directory search, suggest bounds, question help, and legacy build links", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "agree-directory-ui-"));
+  const runtime = createApp({ sqlitePath: join(dir, "app.db"), env: { NODE_ENV: "test", SESSION_SECRET: "test-secret" } });
+  try {
+    const page = await getForm(runtime.app, "/en/request");
+    assert.match(page.html, /Name, party, list or ballot letters/);
+    assert.match(page.html, /\/en\/request\/build\?recipient=1/);
+    assert.match(page.html, /Direct contact available/);
+    assert.doesNotMatch(page.html, /Knesset member/);
+    assert.doesNotMatch(page.html, /name="listId"|name="partyId"/);
+
+    const suggest = await postForm(runtime.app, "/en/request/suggest", { csrf: page.csrf, q: "Public" }, page.cookie);
+    assert.equal(suggest.status, 200);
+    assert.equal(suggest.headers.get("cache-control"), "private, no-store");
+    const payload = await suggest.json() as { publicationId: null; suggestions: { kind: string; id: number; email?: string }[] };
+    assert.equal(payload.publicationId, null);
+    assert.ok(payload.suggestions.some((row) => row.kind === "person" && row.id === 1));
+    assert.equal(payload.suggestions.some((row) => "email" in row), false);
+
+    const short = await postForm(runtime.app, "/en/request/suggest", { csrf: page.csrf, q: "P" }, page.cookie);
+    assert.deepEqual(await short.json(), { suggestions: [], publicationId: null });
+
+    const denied = await postForm(runtime.app, "/en/request/suggest", { csrf: "nope", q: "Public" }, page.cookie);
+    assert.equal(denied.status, 403);
+    const deniedBody = await denied.json() as { suggestions: null };
+    assert.equal(deniedBody.suggestions, null);
+
+    const found = await postForm(runtime.app, "/en/request", { csrf: page.csrf, q: "Public Service", page: "1" }, page.cookie);
+    assert.equal(found.status, 200);
+    const foundHtml = await found.text();
+    assert.match(foundHtml, /\/en\/request\/build\?recipient=1/);
+    assert.match(foundHtml, /value="Public Service"/);
+    assert.doesNotMatch(foundHtml, /[?&]q=/);
+
+    const foundCsrf = foundHtml.match(/name="csrf" value="([^"]+)"/)?.[1] ?? "";
+    const foundCookie = found.headers.get("set-cookie")?.split(";")[0] ?? page.cookie;
+    const empty = await postForm(runtime.app, "/en/request", { csrf: foundCsrf, q: "no-such-recipient-zzz", page: "1" }, foundCookie);
+    assert.match(await empty.text(), /No matching people/);
+
+    const build = await runtime.app.request("/en/request/build?recipient=1");
+    const buildHtml = await build.text();
+    assert.match(buildHtml, /name="recipientId" value="1"/);
+    assert.match(buildHtml, /About this question/);
+    assert.match(buildHtml, /What is being asked\?/);
+    const label = buildHtml.match(/<label><input type="checkbox" name="demandId"[^>]*>[^<]*<\/label>/)?.[0] ?? "";
+    assert.match(label, /demandId/);
+    assert.doesNotMatch(label, /summary|details|About this question/);
+  } finally {
+    runtime.close();
     rmSync(dir, { recursive: true, force: true });
   }
 });
