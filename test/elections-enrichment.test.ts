@@ -147,14 +147,14 @@ test("pipeline refuses blocked sources and never activates publications", () => 
   try {
     const db = openDatabase(join(dir, "app.db"));
     const manifest = loadSourceManifest(manifestPath);
-    const blocked = manifest.sources.flatMap((source) => source.resources).find((resource) => resource.id === "cec-newer");
+    const blocked = manifest.sources.flatMap((source) => source.resources).find((resource) => resource.id === "cec-knesset-26");
     assert.ok(blocked);
     const gate = gateSourceResource(blocked!);
     assert.equal(gate.ok, false);
     const refused = runEnrichmentPipeline(db, {
       manifest,
       resource: blocked!,
-      dedupeKey: "blocked-cec-newer"
+      dedupeKey: "blocked-cec-knesset-26"
     });
     assert.equal(refused.ok, false);
     assert.equal(refused.publicationActivated, false);

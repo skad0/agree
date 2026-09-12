@@ -25,7 +25,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env) {
   const erasureLedger = parseErasureLedger(env);
   const electionEtlEnabled = flag(env.ELECTION_ETL_ENABLED, false);
   const electionEtlScheduleEnabled = flag(env.ELECTION_ETL_SCHEDULE_ENABLED, false);
+  // Autumn 2026 cycle = 26th Knesset (evidence in docs/ELECTION_TARGET.md). Overridable; required explicitly when ETL is enabled.
   const electionEtlElectionNumber = optionalPositiveInt(env.ELECTION_ETL_ELECTION_NUMBER, "ELECTION_ETL_ELECTION_NUMBER");
+  const electionTargetElectionNumber = electionEtlElectionNumber ?? 26;
   const electionEtlSourceManifest = env.ELECTION_ETL_SOURCE_MANIFEST?.trim() ?? "";
   if (electionEtlEnabled && electionEtlElectionNumber === undefined) throw new Error("ELECTION_ETL_ELECTION_NUMBER is required when ELECTION_ETL_ENABLED=true");
   if (electionEtlEnabled && !electionEtlSourceManifest) throw new Error("ELECTION_ETL_SOURCE_MANIFEST is required when ELECTION_ETL_ENABLED=true");
@@ -69,6 +71,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env) {
     erasureLedgerPutTimeoutMs: Math.min(integer(env.ERASURE_LEDGER_PUT_TIMEOUT_MS, 10_000), 30_000),
     electionEtlEnabled,
     electionEtlElectionNumber,
+    electionTargetElectionNumber,
     electionEtlScheduleEnabled,
     electionEtlSourceManifest,
     electionEtlArtifactDir: env.ELECTION_ETL_ARTIFACT_DIR?.trim() || "data/election-artifacts"
