@@ -164,6 +164,7 @@
   "directoryUnavailablePerson": "ይህን ሰው ማግኘት አሁን አይቻልም።",
   "directoryDirectEmail": "ኢሜይል",
   "directoryDirectWhatsapp": "ዋትስአፕ",
+  "directoryPartyFallbackEmail": "የፓርቲ ኢሜይል (አማራጭ)",
   "directorySharedMailbox": "{n} ሰዎች፣ 1 የጋራ የፓርቲ አድራሻ",
   "stancePositionOn": "አቋም በዚህ ጥያቄ",
   "stanceNone": "ጥያቄ አልተመረጠም",

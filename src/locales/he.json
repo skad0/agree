@@ -164,6 +164,7 @@
   "directoryUnavailablePerson": "אין יותר אפשרות לפנות לאדם הזה.",
   "directoryDirectEmail": "דוא״ל",
   "directoryDirectWhatsapp": "וואטסאפ",
+  "directoryPartyFallbackEmail": "דוא״ל מפלגה (חלופי)",
   "directorySharedMailbox": "{n} אנשים, כתובת מפלגה משותפת אחת",
   "stancePositionOn": "עמדה בנושא",
   "stanceNone": "לא נבחרה שאלה",

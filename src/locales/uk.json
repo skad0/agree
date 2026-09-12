@@ -164,6 +164,7 @@
   "directoryUnavailablePerson": "З цією людиною більше не можна зв’язатися.",
   "directoryDirectEmail": "Ел. пошта",
   "directoryDirectWhatsapp": "WhatsApp",
+  "directoryPartyFallbackEmail": "Ел. пошта партії (запасна)",
   "directorySharedMailbox": "{n} людини, 1 спільна партійна адреса",
   "stancePositionOn": "Позиція щодо",
   "stanceNone": "Запитання не вибрано",

@@ -554,17 +554,46 @@ function buildDocument(locale: Locale, path: string, csrf: string, db: Db, recip
 
 function reviewPeople(db: Db, locale: Locale, ids: number[]): ContactDestination[] {
   const named = recipientsByIds(db, locale, ids);
-  const sendable = new Set(listContactableRecipients(db, locale).map((row) => row.id));
-  return named.map((row) => ({
-    id: row.id,
-    name: row.name,
-    email: row.email,
-    whatsapp: row.whatsapp,
-    contactable: sendable.has(row.id)
-  }));
+  const sendable = new Map(listContactableRecipients(db, locale).map((row) => [row.id, row]));
+  return named.map((row) => {
+    const contact = sendable.get(row.id);
+    const directEmail = row.email?.trim() || null;
+    const directWhatsapp = row.whatsapp?.trim() || null;
+    if (directEmail || directWhatsapp) {
+      return {
+        id: row.id,
+        name: row.name,
+        email: directEmail,
+        whatsapp: directWhatsapp,
+        contactable: true,
+        channel: "direct" as const
+      };
+    }
+    if (contact?.email?.trim()) {
+      return {
+        id: row.id,
+        name: row.name,
+        email: contact.email.trim(),
+        whatsapp: null,
+        contactable: true,
+        channel: "party_fallback" as const
+      };
+    }
+    return {
+      id: row.id,
+      name: row.name,
+      email: null,
+      whatsapp: null,
+      contactable: false,
+      channel: "none" as const
+    };
+  });
 }
 
 function destinationLine(locale: Locale, person: ContactDestination) {
+  if (person.channel === "party_fallback" && person.email?.trim()) {
+    return `${t(locale, "directoryPartyFallbackEmail")}: ${person.email.trim()}`;
+  }
   if (person.email?.trim()) return `${t(locale, "directoryDirectEmail")}: ${person.email.trim()}`;
   if (person.whatsapp?.trim()) return `${t(locale, "directoryDirectWhatsapp")}: ${person.whatsapp.trim()}`;
   return t(locale, "directoryUnavailablePerson");

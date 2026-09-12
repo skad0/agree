@@ -1,6 +1,6 @@
 # Election directory operations (deployment)
 
-Status: schema, directory journey, stances, fail-closed enrichment scaffolding, and admin directory activate/rollback are in the application tree. Production import and schedule remain **off** until the target election and source contracts are confirmed. Activation is an explicit admin POST on an **accepted** publication only; dry-run/import never activate.
+Status: schema, directory journey, stances, fail-closed enrichment scaffolding, admin directory activate/rollback, and **draft-only** CEC closed-list artifact import are in the application tree. Target election for autumn 2026 is Knesset **26** (see `docs/ELECTION_TARGET.md`). Production ETL and schedule remain **off**. Activation is an explicit admin POST on an **accepted** publication only; dry-run/import never activate.
 
 ## Runtime shape
 
@@ -13,7 +13,7 @@ Status: schema, directory journey, stances, fail-closed enrichment scaffolding, 
 | Variable | Production default | Notes |
 | --- | --- | --- |
 | `ELECTION_ETL_ENABLED` | `false` | Required `true` only after election number + verified manifest resources exist. |
-| `ELECTION_ETL_ELECTION_NUMBER` | unset | Required when ETL is enabled. |
+| `ELECTION_ETL_ELECTION_NUMBER` | `26` in `.env.example` | Configurable target; **required** when ETL is enabled. Code default target is also 26 when unset. |
 | `ELECTION_ETL_SCHEDULE_ENABLED` | `false` | Requires ETL enabled. Leave false until polling budgets are proven. |
 | `ELECTION_ETL_SOURCE_MANIFEST` | unset | Absolute or repo-relative path to the versioned manifest JSON. |
 | `ELECTION_ETL_ARTIFACT_DIR` | `/data/election-artifacts` in production | Must live on the persistent disk. Cap total size; do not store unnecessary raw payloads. |
@@ -26,20 +26,22 @@ Boot fails closed if ETL is enabled without election number or manifest path. Se
 npm run build
 node dist/scripts/elections.js source-check [manifest]
 node dist/scripts/elections.js dry-run [manifest] [fixture]
+node dist/scripts/elections.js import-artifact <closed-list.json>
 node dist/scripts/elections.js report
 ```
 
 - `source-check` loads the manifest; live probe only when `ELECTION_ETL_ENABLED=true`.
 - `dry-run` refuses blocked/unverified resources and **never** activates a directory publication.
-- `report` prints local coverage counts from SQLite.
+- `import-artifact` stages official/fixture closed-list JSON into a **draft** `directory_publications` row for the configured target election. Refuses election mismatch. Never activates.
+- `report` prints local coverage counts from SQLite (includes target election number).
 
 ## Deploy checklist (election stack)
 
 1. Deploy with ETL flags **false** (Blueprint defaults). Migrations `016`/`017` apply at boot; imported recipients stay unpublished until an accepted publication is activated deliberately.
 2. Confirm `/health`, seven locale homes, `/en/request` (and one RTL locale), `/admin` via Access.
-3. Do **not** set `ELECTION_ETL_ENABLED=true` until: election number confirmed; CEC/newer and finance contracts closed in the manifest; a complete dry-run against fixtures passes; the SQLite disk still has headroom with the new tables.
-4. Artifact directory under `/data` only. Keep within the disk budget alongside `app.db`.
-5. After any future publication activation (Admin → Directory), verify rollback to the previous publication version and that old single-recipient links still resolve. Confirm list/party filters only appear for reviewed affiliations (joint-list candidates need `candidacy_party_memberships`).
+3. Do **not** set `ELECTION_ETL_ENABLED=true` until: CEC/finance machine contracts are closed in the manifest (Knesset 26 CKAN resource still **blocked** as of 2026-09-12); a complete dry-run against fixtures passes; the SQLite disk still has headroom with the new tables.
+4. Artifact directory under `/data` only. Keep within the disk budget alongside `app.db`. Official closed lists may be staged via `import-artifact` into draft; do not activate unreviewed imports.
+5. After any future publication activation (Admin → Directory), verify rollback to the previous publication version and that old single-recipient links still resolve. Confirm list/party filters only appear for reviewed affiliations (joint-list candidates need `candidacy_party_memberships`). Party-fallback send uses verified `candidate_contact_resolutions` only — never invents addresses.
 
 ## What this deploy does **not** do
 

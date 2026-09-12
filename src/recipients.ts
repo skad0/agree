@@ -1,5 +1,9 @@
 import type { Db } from "./db.js";
 import type { Locale } from "./i18n.js";
+import {
+  partyFallbackEmailForRecipient,
+  partyFallbackEmailsByRecipient
+} from "./integrations/elections/contacts.js";
 import { normalizeHebrew } from "./integrations/elections/normalize-hebrew.js";
 
 export type RecipientType = "party" | "politician";
@@ -78,11 +82,27 @@ export function listNamedRecipients(db: Db, locale: Locale): Recipient[] {
 }
 
 export function listContactableRecipients(db: Db, locale: Locale): ContactableRecipient[] {
-  return db.prepare(`${namedRecipientSql} AND ${sendableChannelSql} ORDER BY rt.name`).all(locale) as ContactableRecipient[];
+  const direct = db.prepare(`${namedRecipientSql} AND ${sendableChannelSql} ORDER BY rt.name`).all(locale) as ContactableRecipient[];
+  const byId = new Map(direct.map((row) => [row.id, row]));
+  const named = listNamedRecipients(db, locale);
+  const fallbacks = partyFallbackEmailsByRecipient(db, named.map((row) => row.id));
+  for (const row of named) {
+    if (byId.has(row.id)) continue;
+    const email = fallbacks.get(row.id);
+    if (!email) continue;
+    byId.set(row.id, { ...row, email, whatsapp: null });
+  }
+  return [...byId.values()].sort((a, b) => compareText(a.name, b.name) || a.id - b.id);
 }
 
 export function getContactableRecipient(db: Db, locale: Locale, id: number): ContactableRecipient | undefined {
-  return db.prepare(`${namedRecipientSql} AND r.id = ? AND ${sendableChannelSql}`).get(locale, id) as ContactableRecipient | undefined;
+  const direct = db.prepare(`${namedRecipientSql} AND r.id = ? AND ${sendableChannelSql}`).get(locale, id) as ContactableRecipient | undefined;
+  if (direct) return direct;
+  const named = db.prepare(`${namedRecipientSql} AND r.id = ?`).get(locale, id) as ContactableRecipient | undefined;
+  if (!named) return undefined;
+  const email = partyFallbackEmailForRecipient(db, id);
+  if (!email) return undefined;
+  return { ...named, email, whatsapp: null };
 }
 
 export function hasSendableChannel(recipient: Pick<Recipient, "email" | "whatsapp">): boolean {
@@ -90,11 +110,13 @@ export function hasSendableChannel(recipient: Pick<Recipient, "email" | "whatsap
 }
 
 export function listDirectoryBrowse(db: Db, locale: Locale): DirectoryBrowseItem[] {
-  const base = listNamedRecipients(db, locale).map((row) => ({
+  const named = listNamedRecipients(db, locale);
+  const fallbacks = partyFallbackEmailsByRecipient(db, named.map((row) => row.id));
+  const base = named.map((row) => ({
     id: row.id,
     name: row.name,
     type: row.type,
-    contactable: hasSendableChannel(row),
+    contactable: hasSendableChannel(row) || fallbacks.has(row.id),
     list: null as DirectoryListOption | null,
     party: null as DirectoryPartyOption | null
   }));

@@ -164,6 +164,7 @@
   "directoryUnavailablePerson": "لم يعد بالإمكان التواصل مع هذا الشخص.",
   "directoryDirectEmail": "البريد",
   "directoryDirectWhatsapp": "واتساب",
+  "directoryPartyFallbackEmail": "بريد الحزب (بديل)",
   "directorySharedMailbox": "{n} أشخاص، عنوان حزب مشترك واحد",
   "stancePositionOn": "الموقف من",
   "stanceNone": "لم يُختر سؤال",

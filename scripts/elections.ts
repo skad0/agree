@@ -5,6 +5,8 @@ import {
   electionCoverage,
   fetchBounded,
   gateSourceResource,
+  importCecClosedListArtifact,
+  loadCecClosedListArtifact,
   loadSourceManifest,
   runEnrichmentPipeline
 } from "../src/integrations/elections/index.js";
@@ -19,10 +21,17 @@ switch (command) {
   case "dry-run":
     dryRun(config.electionEtlSourceManifest || process.argv[3], process.argv[4]);
     break;
+  case "import-artifact":
+    importArtifact(process.argv[3]);
+    break;
   case "report": {
     const db = openDatabase(config.sqlitePath);
-    try { console.log(JSON.stringify(electionCoverage(db))); }
-    finally { db.close(); }
+    try {
+      console.log(JSON.stringify({
+        targetElectionNumber: config.electionTargetElectionNumber,
+        coverage: electionCoverage(db)
+      }));
+    } finally { db.close(); }
     break;
   }
   default: {
@@ -31,10 +40,38 @@ switch (command) {
   }
 }
 
-function parseCommand(value: string | undefined): "source-check" | "dry-run" | "report" {
-  if (value === "source-check" || value === "dry-run" || value === "report") return value;
-  console.error("usage: elections source-check|dry-run|report");
+function parseCommand(value: string | undefined): "source-check" | "dry-run" | "import-artifact" | "report" {
+  if (value === "source-check" || value === "dry-run" || value === "import-artifact" || value === "report") return value;
+  console.error("usage: elections source-check|dry-run|import-artifact|report");
   process.exit(1);
+}
+
+
+function importArtifact(artifactPath: string | undefined) {
+  if (!artifactPath) {
+    console.error("usage: elections import-artifact <path-to-closed-list-json>");
+    process.exit(1);
+  }
+  const artifact = loadCecClosedListArtifact(artifactPath);
+  const db = openDatabase(config.sqlitePath);
+  try {
+    const beforeActive = electionCoverage(db).activePublications;
+    const result = importCecClosedListArtifact(db, artifact, {
+      targetElectionNumber: config.electionTargetElectionNumber,
+      artifactRef: artifactPath
+    });
+    const afterActive = electionCoverage(db).activePublications;
+    console.log(JSON.stringify({
+      targetElectionNumber: config.electionTargetElectionNumber,
+      result,
+      activePublicationsBefore: beforeActive,
+      activePublicationsAfter: afterActive,
+      activatedPublication: afterActive > beforeActive
+    }));
+    if (afterActive > beforeActive) process.exit(2);
+  } finally {
+    db.close();
+  }
 }
 
 function dryRun(manifestPath: string | undefined, fixturePath: string | undefined) {
@@ -71,6 +108,7 @@ function dryRun(manifestPath: string | undefined, fixturePath: string | undefine
       : { ok: false as const, stage: "acquire" as const, code: "no_verified_resource", publicationActivated: false as const };
     const afterActive = electionCoverage(db).activePublications;
     console.log(JSON.stringify({
+      targetElectionNumber: config.electionTargetElectionNumber,
       parserVersion: manifest.parserVersion,
       refusedBlockedOrUnavailable: refused,
       verifiedResources: verified.length,
@@ -92,7 +130,8 @@ async function sourceCheck(manifestPath: string | undefined, probe: boolean) {
   }
   const manifest = loadSourceManifest(manifestPath);
   const resources = manifest.sources.flatMap((source) => source.resources);
-  const payload: { parserVersion: string; verifiedResources: number; blockedOrUnavailable: number; probed: boolean; status?: number; bytes?: number } = {
+  const payload: { targetElectionNumber: number; parserVersion: string; verifiedResources: number; blockedOrUnavailable: number; probed: boolean; status?: number; bytes?: number } = {
+    targetElectionNumber: config.electionTargetElectionNumber,
     parserVersion: manifest.parserVersion,
     verifiedResources: resources.filter((resource) => resource.status === "verified").length,
     blockedOrUnavailable: resources.filter((resource) => resource.status !== "verified").length,

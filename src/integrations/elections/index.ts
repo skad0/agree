@@ -1,5 +1,17 @@
-export { normalizeEmail, resolveContact } from "./contacts.js";
+export {
+  normalizeEmail,
+  partyFallbackEmailForRecipient,
+  partyFallbackEmailsByRecipient,
+  resolveContact
+} from "./contacts.js";
 export type { ResolveContactInput } from "./contacts.js";
+export {
+  CEC_ARTIFACT_PARSER_VERSION,
+  importCecClosedListArtifact,
+  loadCecClosedListArtifact,
+  parseCecClosedListArtifact
+} from "./cec-artifact.js";
+export type { CecArtifactImportResult, CecArtifactRow, CecClosedListArtifact } from "./cec-artifact.js";
 export { FINANCE_CALCULATION_VERSION, gateFinanceSource, gateSourceResource, loadFinanceCoverage, summarizeFinanceEntries } from "./finance.js";
 export { fetchBounded } from "./http.js";
 export { acquireJobLease, checkpointJob, ensureEtlJob, releaseJobLease, verifyLeaseToken } from "./jobs.js";

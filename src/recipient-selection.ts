@@ -35,6 +35,8 @@ export type ContactDestination = {
   email: string | null;
   whatsapp: string | null;
   contactable: boolean;
+  /** How the address was chosen for send/review. Direct recipient fields win over party fallback. */
+  channel: "direct" | "party_fallback" | "none";
 };
 
 export type SharedMailboxGroup = {

@@ -164,6 +164,7 @@
   "directoryUnavailablePerson": "This person is no longer available to contact.",
   "directoryDirectEmail": "Email",
   "directoryDirectWhatsapp": "WhatsApp",
+  "directoryPartyFallbackEmail": "Party email (fallback)",
   "directorySharedMailbox": "{n} people, 1 shared party address",
   "stancePositionOn": "Position on",
   "stanceNone": "No question selected",
