@@ -128,6 +128,7 @@
   "directorySearchLabel": "Name, party, list or ballot letters",
   "directorySearch": "Search",
   "directoryNoElection": "This page shows the current contact directory. An approved election candidate list is not published here yet.",
+  "directoryElectionActive": "Election {n} · published directory · {date}",
   "directoryFiltersUnavailable": "Electoral list and party filters appear when those fields are in the published directory. They are not available for the current records.",
   "directoryListFilter": "Electoral list",
   "directoryPartyFilter": "Party",

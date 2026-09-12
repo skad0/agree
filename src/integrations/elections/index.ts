@@ -9,13 +9,15 @@ export { ALGORITHM_VERSION, normalizeHebrew } from "./normalize-hebrew.js";
 export { runEnrichmentPipeline } from "./pipeline.js";
 export type { PipelineInput } from "./pipeline.js";
 export {
+  activateDirectoryPublication,
   electionCoverage,
   getDirectoryPublication,
   getElectionByNumber,
   getSourceSnapshot,
   insertDirectoryPublication,
   insertElection,
-  insertSourceSnapshot
+  insertSourceSnapshot,
+  rollbackDirectoryPublication
 } from "./repository.js";
 export { loadSourceManifest, parseSourceManifest } from "./source-manifest.js";
 export type {

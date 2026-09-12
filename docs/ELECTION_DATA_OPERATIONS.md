@@ -1,6 +1,6 @@
 # Election directory operations (deployment)
 
-Status: schema, directory journey, stances, and fail-closed enrichment scaffolding are in the application tree. Production import and schedule remain **off** until the target election and source contracts are confirmed.
+Status: schema, directory journey, stances, fail-closed enrichment scaffolding, and admin directory activate/rollback are in the application tree. Production import and schedule remain **off** until the target election and source contracts are confirmed. Activation is an explicit admin POST on an **accepted** publication only; dry-run/import never activate.
 
 ## Runtime shape
 
@@ -39,7 +39,7 @@ node dist/scripts/elections.js report
 2. Confirm `/health`, seven locale homes, `/en/request` (and one RTL locale), `/admin` via Access.
 3. Do **not** set `ELECTION_ETL_ENABLED=true` until: election number confirmed; CEC/newer and finance contracts closed in the manifest; a complete dry-run against fixtures passes; the SQLite disk still has headroom with the new tables.
 4. Artifact directory under `/data` only. Keep within the disk budget alongside `app.db`.
-5. After any future publication activation, verify rollback to the previous publication version and that old single-recipient links still resolve.
+5. After any future publication activation (Admin → Directory), verify rollback to the previous publication version and that old single-recipient links still resolve. Confirm list/party filters only appear for reviewed affiliations (joint-list candidates need `candidacy_party_memberships`).
 
 ## What this deploy does **not** do
 

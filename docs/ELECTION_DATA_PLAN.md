@@ -1,7 +1,7 @@
 # Israeli election enrichment: verified architecture and implementation plan
 
-Status: slice 5 lands finance schema (reports/entries/summaries), enrichment modules (matching/contacts/finance/jobs/pipeline), CLI `dry-run`, journey demand pre-check deep links, and election-scoped party membership for stance display. Finance and newer CEC sources remain blocked in the manifest. Election number still unconfirmed. No production import, no imported recipients activated, and no production stance seeds. Remaining gates: confirm the target election; close newer CEC and finance source contracts; import one complete CEC snapshot; parliamentary/contact enrichment; reviewed directory publication; participant UX and translation review.
-Audit date: 2026-09-07. Repository baseline: `e3254ae`.
+Status: slices 1–5 merged; slice 6 verification hardening landed (publication-aware directory affiliations, suggest `publicationId`, admin activate/rollback, backup/restore + privacy checks). Finance and newer CEC sources remain blocked in the manifest. Election number still unconfirmed. No production import, no unreviewed imported recipients activated, and no production stance seeds. Remaining gates: confirm the target election; close newer CEC and finance source contracts; import one complete CEC snapshot; parliamentary/contact enrichment with party-fallback send destinations; participant UX/a11y and translation review.
+Audit date: 2026-09-12. Repository baseline includes merged PRs #2–#6 plus slice-6 verification.
 
 This adapts the supplied mission to the existing civic platform. Build a repeatable, source-attributed candidate directory, parliamentary enrichment, explicit contact resolution, and election-scoped financial transparency. Coverage must be measurable; missing data must remain missing rather than being inferred as fact.
 

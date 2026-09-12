@@ -128,6 +128,7 @@
   "directorySearchLabel": "שם, מפלגה, רשימה או אותיות",
   "directorySearch": "חיפוש",
   "directoryNoElection": "העמוד מציג את ספריית אנשי הקשר הנוכחית. רשימת מועמדים מאושרת לבחירות עדיין אינה מפורסמת כאן.",
+  "directoryElectionActive": "בחירות {n} · מדריך מפורסם · {date}",
   "directoryFiltersUnavailable": "מסנני רשימה ומפלגה מופיעים כשהשדות האלה קיימים בספרייה המפורסמת. ברשומות הנוכחיות הם אינם זמינים.",
   "directoryListFilter": "רשימה",
   "directoryPartyFilter": "מפלגה",

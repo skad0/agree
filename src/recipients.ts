@@ -52,6 +52,13 @@ export type DirectoryPage = {
   filters: { lists: DirectoryListOption[]; parties: DirectoryPartyOption[] };
 };
 
+export type ActiveDirectoryMeta = {
+  electionId: number;
+  electionNumber: number;
+  publicationId: number;
+  activatedAt: string | null;
+};
+
 export type DirectorySuggestion =
   | { kind: "person"; id: number; label: string; context: string | null; contactable: boolean; role: RecipientType }
   | { kind: "party"; id: number; label: string; context: string | null }
@@ -83,14 +90,32 @@ export function hasSendableChannel(recipient: Pick<Recipient, "email" | "whatsap
 }
 
 export function listDirectoryBrowse(db: Db, locale: Locale): DirectoryBrowseItem[] {
-  return listNamedRecipients(db, locale).map((row) => ({
+  const base = listNamedRecipients(db, locale).map((row) => ({
     id: row.id,
     name: row.name,
     type: row.type,
     contactable: hasSendableChannel(row),
-    list: null,
-    party: null
+    list: null as DirectoryListOption | null,
+    party: null as DirectoryPartyOption | null
   }));
+  const publication = directoryPublicationRef(db);
+  if (!publication) return base;
+  const affiliations = loadPublishedAffiliations(db, publication.electionId);
+  return base.map((row) => {
+    const affiliation = affiliations.get(row.id);
+    if (!affiliation) return row;
+    return { ...row, list: affiliation.list, party: affiliation.party };
+  });
+}
+
+export function activeDirectoryMeta(db: Db): ActiveDirectoryMeta | null {
+  const row = db.prepare(`SELECT p.id AS publicationId, p.election_id AS electionId, p.activated_at AS activatedAt,
+      e.number AS electionNumber
+    FROM directory_publications p
+    JOIN elections e ON e.id = p.election_id
+    WHERE p.status = 'active'
+    ORDER BY p.id DESC LIMIT 1`).get() as ActiveDirectoryMeta | undefined;
+  return row ?? null;
 }
 
 export function parseDirectoryQuery(fields: {
@@ -164,9 +189,58 @@ export function selectedHiddenByFilter(items: DirectoryBrowseItem[], query: Dire
 }
 
 export function directoryPublicationRef(db: Db): { electionId: number; publicationId: number } | null {
-  const row = db.prepare(`SELECT id AS publicationId, election_id AS electionId FROM directory_publications WHERE status = 'active' ORDER BY id DESC LIMIT 1`)
-    .get() as { publicationId: number; electionId: number } | undefined;
-  return row ?? null;
+  const meta = activeDirectoryMeta(db);
+  return meta ? { electionId: meta.electionId, publicationId: meta.publicationId } : null;
+}
+
+type PublishedAffiliation = {
+  list: DirectoryListOption | null;
+  party: DirectoryPartyOption | null;
+};
+
+/** Affiliations come only from accepted person links + candidacies in the active election publication.
+ *  Joint-list party membership requires a reviewed candidacy_party_memberships row — list-party links alone never fill party. */
+function loadPublishedAffiliations(db: Db, electionId: number): Map<number, PublishedAffiliation> {
+  const byRecipient = new Map<number, PublishedAffiliation>();
+  const personRows = db.prepare(`SELECT rel.recipient_id AS recipientId,
+      el.id AS listId, el.title_he AS listLabel, el.ballot_letters AS ballotLetters,
+      party.id AS partyId, party.name_he AS partyLabel
+    FROM recipient_entity_links rel
+    JOIN candidacies c ON c.person_id = rel.person_id AND c.election_id = ? AND c.status = 'active'
+    JOIN electoral_lists el ON el.id = c.list_id
+    LEFT JOIN candidacy_party_memberships cpm ON cpm.candidacy_id = c.id AND cpm.review_state = 'accepted'
+      AND (cpm.effective_to IS NULL OR cpm.effective_to = '')
+    LEFT JOIN parties party ON party.id = cpm.party_id
+    WHERE rel.review_state = 'accepted' AND rel.person_id IS NOT NULL`).all(electionId) as {
+    recipientId: number;
+    listId: number;
+    listLabel: string;
+    ballotLetters: string | null;
+    partyId: number | null;
+    partyLabel: string | null;
+  }[];
+  for (const row of personRows) {
+    byRecipient.set(row.recipientId, {
+      list: { id: row.listId, label: row.listLabel, ballotLetters: row.ballotLetters },
+      party: row.partyId && row.partyLabel ? { id: row.partyId, label: row.partyLabel } : null
+    });
+  }
+  const partyOnly = db.prepare(`SELECT rel.recipient_id AS recipientId, p.id AS partyId, p.name_he AS partyLabel
+    FROM recipient_entity_links rel
+    JOIN parties p ON p.id = rel.party_id
+    WHERE rel.review_state = 'accepted' AND rel.party_id IS NOT NULL`).all() as {
+    recipientId: number;
+    partyId: number;
+    partyLabel: string;
+  }[];
+  for (const row of partyOnly) {
+    if (byRecipient.has(row.recipientId)) continue;
+    byRecipient.set(row.recipientId, {
+      list: null,
+      party: { id: row.partyId, label: row.partyLabel }
+    });
+  }
+  return byRecipient;
 }
 
 export function recipientsByIds(db: Db, locale: Locale, ids: number[]): Recipient[] {
