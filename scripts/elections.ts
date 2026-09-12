@@ -56,18 +56,36 @@ function importArtifact(artifactPath: string | undefined) {
   const db = openDatabase(config.sqlitePath);
   try {
     const beforeActive = electionCoverage(db).activePublications;
+    const beforeDrafts = Number((db.prepare(
+      `SELECT count(*) AS n FROM directory_publications dp
+       JOIN elections e ON e.id = dp.election_id
+       WHERE e.number = ? AND dp.status = 'draft'`
+    ).get(config.electionTargetElectionNumber) as { n: number }).n);
     const result = importCecClosedListArtifact(db, artifact, {
       targetElectionNumber: config.electionTargetElectionNumber,
-      artifactRef: artifactPath
+      artifactRef: artifactPath,
+      replaceDraft: true
     });
     const afterActive = electionCoverage(db).activePublications;
+    const afterDrafts = Number((db.prepare(
+      `SELECT count(*) AS n FROM directory_publications dp
+       JOIN elections e ON e.id = dp.election_id
+       WHERE e.number = ? AND dp.status = 'draft'`
+    ).get(config.electionTargetElectionNumber) as { n: number }).n);
+    const sampleLists = db.prepare(
+      `SELECT official_list_key AS officialListKey, ballot_letters AS ballotLetters, title_he AS titleHe
+       FROM electoral_lists WHERE election_id = ? ORDER BY id LIMIT 5`
+    ).all(result.electionId);
     console.log(JSON.stringify({
       targetElectionNumber: config.electionTargetElectionNumber,
       result,
+      draftPublicationsBefore: beforeDrafts,
+      draftPublicationsAfter: afterDrafts,
       activePublicationsBefore: beforeActive,
       activePublicationsAfter: afterActive,
-      activatedPublication: afterActive > beforeActive
-    }));
+      activatedPublication: afterActive > beforeActive,
+      sampleLists
+    }, null, 2));
     if (afterActive > beforeActive) process.exit(2);
   } finally {
     db.close();

@@ -40,6 +40,7 @@ test("importCecClosedListArtifact stages draft publication and never activates",
     });
     assert.equal(result.ok, true);
     assert.equal(result.publicationStatus, "draft");
+    assert.equal(result.unchanged, false);
     assert.equal(result.listCount, 2);
     assert.equal(result.candidacyCount, 3);
     assert.equal(getDirectoryPublication(db, result.publicationId)?.status, "draft");
@@ -50,6 +51,92 @@ test("importCecClosedListArtifact stages draft publication and never activates",
     );
     assert.equal(activateDirectoryPublication(db, result.publicationId), false);
     assert.equal(electionCoverage(db).activePublications, before);
+    db.close();
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("re-import replaces draft, is content-hash idempotent, and leaves active untouched", () => {
+  const dir = mkdtempSync(join(tmpdir(), "agree-cec-reimport-"));
+  try {
+    const db = openDatabase(join(dir, "app.db"));
+    const artifact = loadCecClosedListArtifact(fixturePath);
+    const first = importCecClosedListArtifact(db, artifact, {
+      targetElectionNumber: 26,
+      artifactRef: fixturePath
+    });
+    assert.equal(first.unchanged, false);
+    assert.equal(first.publicationStatus, "draft");
+
+    // Separate accepted→active publication; draft refresh must not touch it.
+    const accepted = insertDirectoryPublication(db, {
+      electionId: first.electionId,
+      version: 100,
+      status: "accepted",
+      snapshotId: first.snapshotId,
+      previousPublicationId: first.publicationId
+    });
+    assert.equal(activateDirectoryPublication(db, accepted), true);
+    const activeBefore = electionCoverage(db).activePublications;
+    assert.equal(activeBefore, 1);
+
+    // Identical file while matching draft exists → no-op.
+    const noop = importCecClosedListArtifact(db, artifact, {
+      targetElectionNumber: 26,
+      artifactRef: fixturePath
+    });
+    assert.equal(noop.unchanged, true);
+    assert.equal(noop.publicationId, first.publicationId);
+    assert.equal(getDirectoryPublication(db, accepted)?.status, "active");
+    assert.equal(electionCoverage(db).activePublications, activeBefore);
+
+    // Changed artifact replaces the draft and reuses list/rank identities.
+    const updated = {
+      ...artifact,
+      source: { ...artifact.source, notes: "operator refresh" },
+      rows: [
+        ...artifact.rows,
+        {
+          listTitleHe: "רשימת בדיקה ב",
+          ballotLetters: "ב",
+          rank: 2,
+          familyNameHe: "פרץ",
+          givenNameHe: "אורי",
+          officialListKey: "fixture-list-b",
+          status: "listed" as const
+        }
+      ]
+    };
+    const second = importCecClosedListArtifact(db, updated, {
+      targetElectionNumber: 26,
+      artifactRef: "refresh.json"
+    });
+    assert.equal(second.unchanged, false);
+    assert.equal(second.publicationStatus, "draft");
+    assert.ok(second.replacedDraftPublicationIds.includes(first.publicationId));
+    assert.equal(second.activePublicationId, accepted);
+    assert.equal(getDirectoryPublication(db, accepted)?.status, "active");
+    assert.equal(getDirectoryPublication(db, first.publicationId)?.status, "rolled_back");
+    assert.equal(electionCoverage(db).activePublications, activeBefore);
+    assert.equal(second.listCount, 2);
+    assert.equal(second.candidacyCount, 4);
+    assert.equal(second.listsUpdated, 2);
+    assert.equal(second.candidaciesReused, 3);
+
+    const third = importCecClosedListArtifact(db, updated, {
+      targetElectionNumber: 26,
+      artifactRef: "refresh.json"
+    });
+    assert.equal(third.unchanged, true);
+    assert.equal(third.publicationId, second.publicationId);
+    assert.equal(electionCoverage(db).activePublications, activeBefore);
+
+    const lists = db.prepare(
+      `SELECT official_list_key AS k, ballot_letters AS b FROM electoral_lists WHERE election_id = ? ORDER BY k`
+    ).all(first.electionId) as { k: string; b: string | null }[];
+    assert.deepEqual(lists.map((row) => row.k), ["fixture-list-a", "fixture-list-b"]);
+    assert.deepEqual(lists.map((row) => row.b), ["א", "ב"]);
     db.close();
   } finally {
     rmSync(dir, { recursive: true, force: true });
