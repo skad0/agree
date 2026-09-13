@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from "node:crypto";
 import type { Hono } from "hono";
-import type { Config } from "./config.js";
+import { publicPrivacyContactDisplay, type Config } from "./config.js";
 import type { Db } from "./db.js";
 import { sendEmail } from "./email.js";
 import { isLocale, t, type Locale } from "./i18n.js";
@@ -13,7 +13,14 @@ import { createRateLimiter, issueCsrf, text, Turnstile, validCsrf, validTurnstil
 
 export function registerPrivacyRoutes(app: Hono, db: Db, config: Config) {
   const rateLimit = createRateLimiter();
-  app.get("/:locale/privacy", (context) => { const locale = localeParam(context.req.param("locale")); if (!locale) return context.notFound(); rememberLocale(context, locale, config); const body = t(locale, "privacyBody").replaceAll("{{PRIVACY_CONTACT_EMAIL}}", config.privacyContactEmail); return context.html(<Layout locale={locale} title={t(locale, "privacyTitle")} path={context.req.path}><div class="privacy-page"><JourneyIntro title={t(locale, "privacyTitle")} /><Surface class="privacy-surface"><div class="privacy-copy">{privacyParagraphs(body)}<p><a href={`/${locale}/delete-data`}>{t(locale, "deleteTitle")}</a></p></div></Surface></div></Layout>); });
+  app.get("/:locale/privacy", (context) => {
+    const locale = localeParam(context.req.param("locale"));
+    if (!locale) return context.notFound();
+    rememberLocale(context, locale, config);
+    const contact = publicPrivacyContactDisplay(config.privacyContactEmail, t(locale, "privacyContactFallback"));
+    const body = t(locale, "privacyBody").replaceAll("{{PRIVACY_CONTACT_EMAIL}}", contact);
+    return context.html(<Layout locale={locale} title={t(locale, "privacyTitle")} path={context.req.path}><div class="privacy-page"><JourneyIntro title={t(locale, "privacyTitle")} /><Surface class="privacy-surface"><div class="privacy-copy">{privacyParagraphs(body)}<p><a href={`/${locale}/delete-data`}>{t(locale, "deleteTitle")}</a></p></div></Surface></div></Layout>);
+  });
   app.get("/:locale/delete-data", (context) => { const locale = localeParam(context.req.param("locale")); if (!locale) return context.notFound(); rememberLocale(context, locale, config); const csrf = issueCsrf(context, config); const token = context.req.query("token"); privateNoStore(context); return context.html(<Layout locale={locale} title={t(locale, "deleteTitle")} path={context.req.path} languageQuery={token ? `token=${encodeURIComponent(token)}` : ""}><div class="privacy-page"><JourneyIntro title={t(locale, "deleteTitle")} /><Surface class="delete-form-surface"><p>{t(locale, "deleteBody")}</p><form class="public-form" method="post"><input type="hidden" name="csrf" value={csrf} />{token ? <><input type="hidden" name="token" value={token} /><Turnstile config={config} /><button type="submit">{t(locale, "deleteConfirm")}</button></> : <><label>{t(locale, "email")}<input type="email" name="email" required /></label><Turnstile config={config} /><button type="submit">{t(locale, "submit")}</button></>}</form></Surface></div></Layout>); });
   app.post("/:locale/delete-data", async (context) => {
     const locale = localeParam(context.req.param("locale")); if (!locale) return context.notFound(); privateNoStore(context); const body = await context.req.parseBody();

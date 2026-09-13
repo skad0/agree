@@ -16,6 +16,11 @@ import {
   saveQuestionVersion,
   saveStance
 } from "./stances.js";
+import {
+  activateDirectoryPublication,
+  electionCoverage,
+  rollbackDirectoryPublication
+} from "./integrations/elections/repository.js";
 
 type Admin = { id: number; email: string; role: "admin" | "moderator" };
 type Row = Record<string, unknown>;
@@ -30,6 +35,7 @@ const navigation = [
   { href: "/admin/demands", label: "Demands", moderator: false },
   { href: "/admin/recipients", label: "Recipients", moderator: false },
   { href: "/admin/stances", label: "Stances", moderator: false },
+  { href: "/admin/directory", label: "Directory", moderator: false },
   { href: "/admin/templates", label: "Templates", moderator: false },
   { href: "/admin/supporters", label: "Supporters", moderator: false },
   { href: "/admin/audit", label: "Audit", moderator: false },
@@ -201,6 +207,31 @@ export function registerAdminRoutes(app: Hono, db: Db, config: Config) {
   });
 
   app.get("/admin/stances", (context) => stanceAdminPage(context, db, config));
+
+  app.get("/admin/directory", (context) => directoryAdminPage(context, db, config));
+
+  app.post("/admin/directory", async (context) => {
+    const body = await context.req.parseBody();
+    if (!validCsrf(context, config, body)) return context.text("Forbidden", 403);
+    const action = text(body.action);
+    const publicationId = positiveInteger(body.publicationId);
+    if (!publicationId || (action !== "activate" && action !== "rollback")) {
+      return directoryAdminPage(context, db, config, "Choose a publication and a valid action.", 422);
+    }
+    const admin = currentAdmin(context);
+    const audit = { action, publicationId };
+    try {
+      mutate(db, admin, action, "directory_publication", audit, () => {
+        const ok = action === "activate"
+          ? activateDirectoryPublication(db, publicationId)
+          : rollbackDirectoryPublication(db, publicationId);
+        if (!ok) throw new Error("publication_gate");
+      });
+    } catch {
+      return directoryAdminPage(context, db, config, "Publication change refused. Activate only accepted versions; rollback only the active one.", 422);
+    }
+    return context.redirect("/admin/directory", 303);
+  });
 
   app.post("/admin/stances", async (context) => {
     const body = await context.req.parseBody();
@@ -447,6 +478,30 @@ async function accessEmail(context: any, config: Config) {
 }
 
 function currentAdmin(context: any) { return context.get("admin") as Admin; }
+function directoryAdminPage(context: any, db: Db, config: Config, error?: string, status = 200) {
+  const csrf = issueCsrf(context, config);
+  const coverage = electionCoverage(db);
+  const publications = db.prepare(`SELECT p.id, e.number AS election, p.version, p.status, p.activated_at AS activatedAt,
+      p.previous_publication_id AS previousId
+    FROM directory_publications p
+    JOIN elections e ON e.id = p.election_id
+    ORDER BY p.id DESC LIMIT 100`).all() as Row[];
+  return adminPage(context, "Directory", <>
+    <h1>Directory publications</h1>
+    <p class="lede">Activate only after a complete reviewed CEC snapshot. Dry-run and import never activate. Imported recipients stay unpublished until an accepted version is activated here.</p>
+    {error ? <p class="admin-error" role="alert">{error}</p> : null}
+    <p class="note">Coverage: elections {String(coverage.elections)}, lists {String(coverage.electoralLists)}, people {String(coverage.people)}, candidacies {String(coverage.candidacies)}, active publications {String(coverage.activePublications)}.</p>
+    {dataTable(publications, "No directory publications yet.")}
+    <form method="post" action="/admin/directory" class="admin-form">
+      <input type="hidden" name="csrf" value={csrf} />
+      <label>Publication ID<input name="publicationId" type="number" min="1" required /></label>
+      <div class="admin-actions">
+        <button type="submit" name="action" value="activate">Activate accepted</button>
+        <button type="submit" name="action" value="rollback">Rollback active</button>
+      </div>
+    </form>
+  </>, status);
+}
 function stanceAdminPage(context: any, db: Db, config: Config, error?: string, status = 200) {
   const csrf = issueCsrf(context, config);
   const editingId = positiveInteger(context.req.query("id"));
@@ -651,7 +706,7 @@ function formValue(value: unknown) { return typeof value === "number" && Number.
 function has(body: Record<string, unknown>, key: string) { return Object.prototype.hasOwnProperty.call(body, key); }
 function csv(context: any, headers: string[], rows: any[]) { context.header("Content-Type", "text/csv; charset=utf-8"); context.header("Content-Disposition", "attachment"); return context.body([headers, ...rows.map((row) => headers.map((header) => row[header]))].map((row) => row.map(csvCell).join(",")).join("\n")); }
 function csvCell(value: unknown) { const string = String(value ?? ""); const safe = /^[=+\-@\t\r]/.test(string) ? `'${string}` : string; return `"${safe.replaceAll('"', '""')}"`; }
-const auditKeys = new Set(["id", "locale", "channel", "action", "document", "sortOrder", "isActive", "type", "status", "campaign", "support", "requests", "responses", "stanceId", "questionVersionId", "personId", "partyId", "listId", "demandId", "classification", "publicationState", "semanticVersion", "subjectKind", "subjectId"]);
+const auditKeys = new Set(["id", "locale", "channel", "action", "document", "sortOrder", "isActive", "type", "status", "campaign", "support", "requests", "responses", "stanceId", "questionVersionId", "personId", "partyId", "listId", "demandId", "classification", "publicationState", "semanticVersion", "subjectKind", "subjectId", "publicationId", "electionId", "runId", "decisionId", "version"]);
 function withoutSecrets(payload: unknown) { if (!payload || typeof payload !== "object" || Array.isArray(payload)) return {}; return Object.fromEntries(Object.entries(payload).filter(([key, value]) => auditKeys.has(key) && typeof value !== "object" && String(value).length <= 120)); }
 
 function moderatorPath(path: string) {

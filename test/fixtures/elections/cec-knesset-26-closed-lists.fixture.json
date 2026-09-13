@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "electionNumber": 26,
+  "source": {
+    "publisher": "Central Elections Committee (fixture)",
+    "title": "Synthetic closed-list fragment for Knesset 26 parser tests",
+    "retrievedAt": "2026-09-12T00:00:00.000Z",
+    "publishedAt": null,
+    "sourceUrl": null,
+    "artifactKind": "fixture",
+    "notes": "FIXTURE ONLY — not official CEC data. Used to exercise draft staging. Do not activate."
+  },
+  "rows": [
+    {
+      "listTitleHe": "רשימת בדיקה א",
+      "ballotLetters": "א",
+      "rank": 1,
+      "familyNameHe": "כהן",
+      "givenNameHe": "נועה",
+      "officialListKey": "fixture-list-a",
+      "status": "listed"
+    },
+    {
+      "listTitleHe": "רשימת בדיקה א",
+      "ballotLetters": "א",
+      "rank": 2,
+      "familyNameHe": "לוי",
+      "givenNameHe": "יוסף",
+      "officialListKey": "fixture-list-a",
+      "status": "listed"
+    },
+    {
+      "listTitleHe": "רשימת בדיקה ב",
+      "ballotLetters": "ב",
+      "rank": 1,
+      "familyNameHe": "מזרחי",
+      "givenNameHe": "דנה",
+      "officialListKey": "fixture-list-b",
+      "status": "listed"
+    }
+  ]
+}

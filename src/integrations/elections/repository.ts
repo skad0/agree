@@ -67,6 +67,30 @@ export function getDirectoryPublication(db: Db, id: number): DirectoryPublicatio
     FROM directory_publications WHERE id = ?`).get(id) as DirectoryPublicationRow | undefined;
 }
 
+/** Explicit audited activation only — never called from import/dry-run. Caller supplies the transaction. */
+export function activateDirectoryPublication(db: Db, publicationId: number, activatedAt = new Date().toISOString()): boolean {
+  const target = getDirectoryPublication(db, publicationId);
+  if (!target || target.status !== "accepted") return false;
+  db.prepare(`UPDATE directory_publications SET status = 'rolled_back'
+    WHERE election_id = ? AND status = 'active'`).run(target.election_id);
+  db.prepare(`UPDATE directory_publications SET status = 'active', activated_at = ? WHERE id = ?`)
+    .run(activatedAt, publicationId);
+  return true;
+}
+
+/** Caller supplies the transaction (e.g. admin mutate). */
+export function rollbackDirectoryPublication(db: Db, publicationId: number): boolean {
+  const target = getDirectoryPublication(db, publicationId);
+  if (!target || target.status !== "active") return false;
+  const previousId = target.previous_publication_id;
+  db.prepare(`UPDATE directory_publications SET status = 'rolled_back' WHERE id = ?`).run(publicationId);
+  if (previousId) {
+    db.prepare(`UPDATE directory_publications SET status = 'active' WHERE id = ? AND status IN ('accepted', 'rolled_back')`)
+      .run(previousId);
+  }
+  return true;
+}
+
 export function electionCoverage(db: Db): ElectionCoverage {
   const count = (sql: string) => Number((db.prepare(sql).get() as { n: number }).n);
   return {

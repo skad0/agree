@@ -134,3 +134,40 @@ function writeResolution(db: Db, candidacyId: number, resolution: ContactResolut
     resolvedAt
   );
 }
+
+/**
+ * Verified party/faction fallback email for a recipient linked to a person with an
+ * active candidacy in the active directory publication. Never invents addresses.
+ */
+export function partyFallbackEmailForRecipient(db: Db, recipientId: number): string | null {
+  const row = db.prepare(`SELECT cp.value_normalized AS email
+    FROM recipient_entity_links rel
+    JOIN directory_publications dp ON dp.status = 'active'
+    JOIN candidacies c ON c.person_id = rel.person_id AND c.election_id = dp.election_id AND c.status = 'active'
+    JOIN candidate_contact_resolutions ccr ON ccr.candidacy_id = c.id
+      AND ccr.contact_level = 'party_fallback' AND ccr.status = 'verified'
+    JOIN contact_points cp ON cp.id = ccr.contact_point_id AND cp.channel = 'email'
+    WHERE rel.recipient_id = ? AND rel.review_state = 'accepted' AND rel.person_id IS NOT NULL
+    ORDER BY ccr.id DESC
+    LIMIT 1`).get(recipientId) as { email: string } | undefined;
+  return row?.email ?? null;
+}
+
+/** Batch lookup of verified party-fallback emails for recipient ids (active publication only). */
+export function partyFallbackEmailsByRecipient(db: Db, recipientIds: readonly number[]): Map<number, string> {
+  const result = new Map<number, string>();
+  if (!recipientIds.length) return result;
+  const placeholders = recipientIds.map(() => "?").join(", ");
+  const rows = db.prepare(`SELECT rel.recipient_id AS recipientId, cp.value_normalized AS email, MAX(ccr.id) AS resolutionId
+    FROM recipient_entity_links rel
+    JOIN directory_publications dp ON dp.status = 'active'
+    JOIN candidacies c ON c.person_id = rel.person_id AND c.election_id = dp.election_id AND c.status = 'active'
+    JOIN candidate_contact_resolutions ccr ON ccr.candidacy_id = c.id
+      AND ccr.contact_level = 'party_fallback' AND ccr.status = 'verified'
+    JOIN contact_points cp ON cp.id = ccr.contact_point_id AND cp.channel = 'email'
+    WHERE rel.review_state = 'accepted' AND rel.person_id IS NOT NULL
+      AND rel.recipient_id IN (${placeholders})
+    GROUP BY rel.recipient_id`).all(...recipientIds) as { recipientId: number; email: string }[];
+  for (const row of rows) result.set(row.recipientId, row.email);
+  return result;
+}

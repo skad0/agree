@@ -6,6 +6,7 @@ import { isLocale, localeNames, locales, t, type Locale } from "./i18n.js";
 import { Layout } from "./layout.js";
 import { Callout, JourneyIntro, PrimaryAction, Surface } from "./components/public-ui.js";
 import {
+  activeDirectoryMeta,
   directoryPublicationRef,
   getContactableRecipient,
   listContactableRecipients,
@@ -161,12 +162,13 @@ export function registerRequestRoutes(app: Hono, db: Db, config: Config) {
     if (!locale) return context.notFound();
     privateNoStore(context);
     const body = await context.req.parseBody();
-    if (!rateLimit(context, "directory-suggest", 60, 60)) return context.json({ suggestions: null, error: "unavailable", publicationId: null }, 429);
-    if (!validCsrf(context, config, body)) return context.json({ suggestions: null, error: "unavailable", publicationId: null }, 403);
-    if (!campaignEnabled(db)) return context.json({ suggestions: null, error: "unavailable", publicationId: null }, 503);
+    const publicationId = directoryPublicationRef(db)?.publicationId ?? null;
+    if (!rateLimit(context, "directory-suggest", 60, 60)) return context.json({ suggestions: null, error: "unavailable", publicationId }, 429);
+    if (!validCsrf(context, config, body)) return context.json({ suggestions: null, error: "unavailable", publicationId }, 403);
+    if (!campaignEnabled(db)) return context.json({ suggestions: null, error: "unavailable", publicationId }, 503);
     const query = parseDirectoryQuery({ q: text(body.q), listId: text(body.listId), partyId: text(body.partyId) });
     const suggestions = suggestDirectory(listDirectoryBrowse(db, locale), query).map((row) => publicSuggestion(locale, row));
-    return context.json({ suggestions, publicationId: null });
+    return context.json({ suggestions, publicationId });
   });
 
   app.get("/:locale/request/build", (context) => {
@@ -393,19 +395,24 @@ function directoryPage(locale: Locale, path: string, csrf: string, db: Db, query
   const page = searchDirectory(items, query);
   const questions = listSelectableQuestions(db, locale);
   const stances = displayStancesForRecipients(db, page.rows.map((row) => row.id), query.questionVersionId, locale);
-  return directoryDocument(locale, path, csrf, query, page, items, basket, token, questions, stances, notice);
+  return directoryDocument(locale, path, csrf, query, page, items, basket, token, questions, stances, notice, activeDirectoryMeta(db));
 }
 
-function directoryDocument(locale: Locale, path: string, csrf: string, query: DirectoryQuery, page: DirectoryPage, items: DirectoryBrowseItem[], basket: SelectionBasket, token: string, questions: QuestionChoice[], stances: Map<number, StanceDisplay>, notice?: string) {
+function directoryDocument(locale: Locale, path: string, csrf: string, query: DirectoryQuery, page: DirectoryPage, items: DirectoryBrowseItem[], basket: SelectionBasket, token: string, questions: QuestionChoice[], stances: Map<number, StanceDisplay>, notice?: string, directoryMeta: ReturnType<typeof activeDirectoryMeta> = null) {
   const selected = query.personId ? items.find((item) => item.id === query.personId) : undefined;
   const selectedIds = new Set(basket.ids);
   const selectedPeople = basket.ids.map((id) => items.find((item) => item.id === id));
   const hidden = selectedHiddenByFilter(items, query, basket.ids);
   const selectedQuestion = questions.find((row) => row.versionId === query.questionVersionId);
+  const electionNotice = directoryMeta
+    ? t(locale, "directoryElectionActive")
+      .replace("{n}", String(directoryMeta.electionNumber))
+      .replace("{date}", directoryMeta.activatedAt ? directoryMeta.activatedAt.slice(0, 10) : "—")
+    : t(locale, "directoryNoElection");
   return <Layout locale={locale} title={t(locale, "requestTitle")} path={path}>
     <div class="request-page request-recipient-page">
       <JourneyIntro eyebrow={<>{t(locale, "stepChoose")} · <bdi>1/3</bdi></>} title={t(locale, "directoryTitle")} />
-      <Callout tone="muted"><p>{t(locale, "directoryNoElection")}</p></Callout>
+      <Callout tone="muted"><p>{electionNotice}</p></Callout>
       {notice ? <Callout tone="caution"><p role="status">{notice}</p></Callout> : null}
       <Surface class="recipient-panel">
         <form class="directory-search" method="post" action={`/${locale}/request`} data-directory-search data-suggest={`/${locale}/request/suggest`} data-suggest-unavailable={t(locale, "directorySuggestUnavailable")}>
@@ -547,17 +554,46 @@ function buildDocument(locale: Locale, path: string, csrf: string, db: Db, recip
 
 function reviewPeople(db: Db, locale: Locale, ids: number[]): ContactDestination[] {
   const named = recipientsByIds(db, locale, ids);
-  const sendable = new Set(listContactableRecipients(db, locale).map((row) => row.id));
-  return named.map((row) => ({
-    id: row.id,
-    name: row.name,
-    email: row.email,
-    whatsapp: row.whatsapp,
-    contactable: sendable.has(row.id)
-  }));
+  const sendable = new Map(listContactableRecipients(db, locale).map((row) => [row.id, row]));
+  return named.map((row) => {
+    const contact = sendable.get(row.id);
+    const directEmail = row.email?.trim() || null;
+    const directWhatsapp = row.whatsapp?.trim() || null;
+    if (directEmail || directWhatsapp) {
+      return {
+        id: row.id,
+        name: row.name,
+        email: directEmail,
+        whatsapp: directWhatsapp,
+        contactable: true,
+        channel: "direct" as const
+      };
+    }
+    if (contact?.email?.trim()) {
+      return {
+        id: row.id,
+        name: row.name,
+        email: contact.email.trim(),
+        whatsapp: null,
+        contactable: true,
+        channel: "party_fallback" as const
+      };
+    }
+    return {
+      id: row.id,
+      name: row.name,
+      email: null,
+      whatsapp: null,
+      contactable: false,
+      channel: "none" as const
+    };
+  });
 }
 
 function destinationLine(locale: Locale, person: ContactDestination) {
+  if (person.channel === "party_fallback" && person.email?.trim()) {
+    return `${t(locale, "directoryPartyFallbackEmail")}: ${person.email.trim()}`;
+  }
   if (person.email?.trim()) return `${t(locale, "directoryDirectEmail")}: ${person.email.trim()}`;
   if (person.whatsapp?.trim()) return `${t(locale, "directoryDirectWhatsapp")}: ${person.whatsapp.trim()}`;
   return t(locale, "directoryUnavailablePerson");

@@ -56,9 +56,9 @@ test("signed baskets reject tampering, expiry, capability tokens, and a sixth ad
 
 test("shared mailbox groups keep distinct people on one destination", () => {
   const groups = sharedMailboxGroups([
-    { id: 11, name: "Ada", email: "party@example.org", whatsapp: null, contactable: true },
-    { id: 12, name: "Bo", email: "PARTY@example.org", whatsapp: "1", contactable: true },
-    { id: 13, name: "Cal", email: "other@example.org", whatsapp: null, contactable: true }
+    { id: 11, name: "Ada", email: "party@example.org", whatsapp: null, contactable: true, channel: "direct" },
+    { id: 12, name: "Bo", email: "PARTY@example.org", whatsapp: "1", contactable: true, channel: "direct" },
+    { id: 13, name: "Cal", email: "other@example.org", whatsapp: null, contactable: true, channel: "direct" }
   ]);
   assert.equal(groups.length, 1);
   assert.equal(groups[0]?.count, 2);

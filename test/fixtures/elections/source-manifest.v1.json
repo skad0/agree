@@ -58,10 +58,16 @@
           "status": "verified"
         },
         {
-          "id": "cec-newer",
+          "id": "cec-knesset-25",
           "electionNumber": 25,
           "status": "blocked",
-          "reason": "Official newer CEC candidate page returned HTTP 403; candidates-lists package covers elections 19-24 only."
+          "reason": "candidates-lists CKAN package still covers elections 19-24 only; no verified DataStore resource for Knesset 25."
+        },
+        {
+          "id": "cec-knesset-26",
+          "electionNumber": 26,
+          "status": "blocked",
+          "reason": "Autumn 2026 target (26th Knesset). No CKAN/DataStore resource verified as of 2026-09-12; gov.il collector election-candidates26 returned HTTP 403. Use official closed-list artifact import (CLI import-artifact) into draft publication only."
         }
       ]
     },

@@ -4,7 +4,7 @@ import { dirOf, isLocale, t, type Locale } from "./i18n.js";
 import { Layout } from "./layout.js";
 import { markdown } from "./markdown.js";
 import { AskPanel, DocumentIntro, DocumentSurface } from "./components/public-ui.js";
-import type { Config } from "./config.js";
+import { publicPrivacyContactDisplay, type Config } from "./config.js";
 import { privateNoStore, publicCache, publicCampaignActive, publicRequestsEnabled, rememberLocale } from "./public-state.js";
 
 type Clause = { id: number; sortOrder: number; title: string | null; body: string | null; rationale: string | null; verification: string | null; exceptions: string | null };
@@ -36,7 +36,7 @@ export function registerContentRoutes(app: Hono, db: Db, config: Config) {
   page("about", "aboutTitle", "slogan", (locale) => prose(t(locale, "aboutBody")));
   page("methodology", "methodologyTitle", "slogan", (locale) => <>
     {prose(t(locale, "methodologyBody"))}
-    {prose(t(locale, "methodologyStance").replaceAll("{{PRIVACY_CONTACT_EMAIL}}", config.privacyContactEmail))}
+    {prose(t(locale, "methodologyStance").replaceAll("{{PRIVACY_CONTACT_EMAIL}}", publicPrivacyContactDisplay(config.privacyContactEmail, t(locale, "privacyContactFallback"))))}
   </>);
 
   // The old placeholder route keeps working so existing links do not break.
