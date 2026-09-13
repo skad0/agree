@@ -1,11 +1,13 @@
 import assert from "node:assert/strict";
+import { readdirSync, readFileSync, statSync } from "node:fs";
+import { join } from "node:path";
 import test from "node:test";
 import { Hono } from "hono";
 import { createApp } from "../src/app.js";
 import { loadConfig, publishablePrivacyContactEmail } from "../src/config.js";
 import { createRateLimiter } from "../src/security.js";
 import { locales, t } from "../src/i18n.js";
-const productionBase = { NODE_ENV: "production", SESSION_SECRET: "secret", TRUSTED_PROXY: "cloudflare", TRUSTED_PROXY_SECRET: "edge-secret-012345678901234567890123", APP_BASE_URL: "https://example.org", PRIVACY_CONTACT_EMAIL: "privacy@example.org" };
+const productionBase = { NODE_ENV: "production", SESSION_SECRET: "secret", TRUSTED_PROXY: "cloudflare", TRUSTED_PROXY_SECRET: "edge-secret-012345678901234567890123", APP_BASE_URL: "https://example.org", PRIVACY_CONTACT_EMAIL: "privacy@ops.test" };
 
 test("client identity ignores spoofed forwarding headers unless Cloudflare is explicitly trusted", async () => {
   const make = (trusted: string | undefined) => {
@@ -29,10 +31,12 @@ test("production configuration fails closed without the exact proxy contract", (
 test("production requires an operational privacy contact and policy renders it", async () => {
   const base = { NODE_ENV: "production", SESSION_SECRET: "session-secret", TRUSTED_PROXY: "cloudflare", TRUSTED_PROXY_SECRET: "edge-secret-012345678901234567890123", APP_BASE_URL: "https://example.org" } as const;
   assert.throws(() => loadConfig(base), /PRIVACY_CONTACT_EMAIL/);
+  assert.throws(() => loadConfig({ ...base, PRIVACY_CONTACT_EMAIL: "privacy@example.com" }), /PRIVACY_CONTACT_EMAIL/);
+  assert.throws(() => loadConfig({ ...base, PRIVACY_CONTACT_EMAIL: "privacy@example.org" }), /PRIVACY_CONTACT_EMAIL/);
   assert.throws(() => loadConfig({ ...base, PRIVACY_CONTACT_EMAIL: "[CAMPAIGN OPERATOR CONTACT TO BE ADDED BEFORE PRODUCTION]" }), /PRIVACY_CONTACT_EMAIL/);
-  const config = loadConfig({ ...base, PRIVACY_CONTACT_EMAIL: "privacy@example.org" });
-  assert.equal(config.privacyContactEmail, "privacy@example.org");
-  const runtime = createApp({ sqlitePath: ":memory:", env: { NODE_ENV: "test", PRIVACY_CONTACT_EMAIL: "privacy@example.org" } });
+  const config = loadConfig({ ...base, PRIVACY_CONTACT_EMAIL: "privacy@ops.test" });
+  assert.equal(config.privacyContactEmail, "privacy@ops.test");
+  const runtime = createApp({ sqlitePath: ":memory:", env: { NODE_ENV: "test", PRIVACY_CONTACT_EMAIL: "privacy@ops.test" } });
   try {
     const requiredTerms: Record<string, string[]> = {
       en: ["email", "recipient", "event-level", "Cloudflare", "Turnstile", "cookies"],
@@ -43,14 +47,24 @@ test("production requires an operational privacy contact and policy renders it",
       am: ["ኢሜይል", "ተቀባዩ", "ክስተት", "Cloudflare", "Turnstile", "ኩኪ"],
       yi: ["בליצפּאָסט", "אַדרעסאַט", "געשעעניש", "Cloudflare", "Turnstile", "קיכלעך"]
     };
+    const bannedOwnerFraming: Record<string, RegExp> = {
+      en: /\bcontroller'?s\b/i,
+      he: /בעל השליטה/,
+      ar: /المسؤول عن التحكم/,
+      ru: /оператора,\s*отвечающего за обработку/,
+      uk: /контролера/,
+      am: /ተቆጣጣሪ/,
+      yi: /קאָנטראָלער/
+    };
     for (const locale of locales) {
       const response = await runtime.app.request(`/${locale}/privacy`);
       const html = await response.text();
       assert.equal(response.status, 200);
-      assert.match(html, /privacy@example\.org/);
+      assert.match(html, /privacy@ops\.test/);
       assert.equal(t(locale, "privacyBody").split("\n\n").length, 7);
       assert.match(t(locale, "privacyBody"), /\{\{PRIVACY_CONTACT_EMAIL\}\}/);
       assert.ok(t(locale, "privacyContactFallback").length > 0);
+      assert.doesNotMatch(t(locale, "privacyBody"), bannedOwnerFraming[locale]!);
       for (const term of requiredTerms[locale]!) assert.match(t(locale, "privacyBody"), new RegExp(term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), `${locale} missing ${term}`);
       assert.match(t(locale, "privacyBody"), /24/);
       assert.match(t(locale, "privacyBody"), /12/);
@@ -62,7 +76,9 @@ test("production requires an operational privacy contact and policy renders it",
 
 test("personal consumer privacy mailboxes are not published on public pages", async () => {
   assert.equal(publishablePrivacyContactEmail("kriant@hey.com"), null);
-  assert.equal(publishablePrivacyContactEmail("privacy@example.org"), "privacy@example.org");
+  assert.equal(publishablePrivacyContactEmail("privacy@example.com"), null);
+  assert.equal(publishablePrivacyContactEmail("privacy@example.org"), null);
+  assert.equal(publishablePrivacyContactEmail("privacy@ops.test"), "privacy@ops.test");
   const runtime = createApp({ sqlitePath: ":memory:", env: { NODE_ENV: "test", PRIVACY_CONTACT_EMAIL: "kriant@hey.com" } });
   try {
     for (const path of ["/en/privacy", "/en/methodology", "/he/privacy"]) {
@@ -74,9 +90,7 @@ test("personal consumer privacy mailboxes are not published on public pages", as
   } finally { runtime.close(); }
 });
 
-test("repository sources never hardcode the owner personal mailbox", async () => {
-  const { readdirSync, readFileSync, statSync } = await import("node:fs");
-  const { join } = await import("node:path");
+test("repository sources never hardcode the personal hey.com mailbox", async () => {
   const roots = ["src", "test", "docs", "migrations", "scripts"];
   const skip = new Set(["node_modules", "dist", "data", ".git"]);
   const hits: string[] = [];

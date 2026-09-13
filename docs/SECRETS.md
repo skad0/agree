@@ -26,8 +26,7 @@ Production must have all of these values before the process will listen:
 - `APP_BASE_URL`: explicitly set to the public `https://` URL, with no credentials, query, or fragment.
 - `TRUSTED_PROXY=cloudflare`.
 - `TRUSTED_PROXY_SECRET`: a separate generated secret of at least 32 characters.
-- `PRIVACY_CONTACT_EMAIL`: a real **campaign/role** mailbox for privacy, access, correction, and deletion (not the development placeholder, and not a personal consumer address such as `@hey.com` / Gmail). Public privacy and methodology pages publish this value only when it is an operational address; personal mailboxes are suppressed and replaced with a generic campaign-contact fallback so an owner personal email never appears on the site. Erasure still uses the verified on-site confirmation flow.
-
+- `PRIVACY_CONTACT_EMAIL`: a real operational campaign/role mailbox for privacy, access, correction, and deletion (not `privacy@example.com` / `@example.org` development placeholders, and not a personal consumer address such as `@hey.com` / Gmail). Public privacy and methodology pages publish this value only when it is an operational address; personal mailboxes are suppressed and replaced with a generic privacy-contact fallback so a personal email never appears on the site. Erasure still uses the verified on-site confirmation flow.
 The application never uses `X-Forwarded-For`. It honors `CF-Connecting-IP` only when the request also contains an exact, constant-time-checked `X-Edge-Proxy-Proof` value equal to `TRUSTED_PROXY_SECRET`; otherwise all requests share the in-process fallback identity.
 
 ## Cloudflare edge-to-origin proof
