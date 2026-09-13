@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { Hono } from "hono";
 import { createApp } from "../src/app.js";
-import { loadConfig } from "../src/config.js";
+import { loadConfig, publishablePrivacyContactEmail } from "../src/config.js";
 import { createRateLimiter } from "../src/security.js";
 import { locales, t } from "../src/i18n.js";
 const productionBase = { NODE_ENV: "production", SESSION_SECRET: "secret", TRUSTED_PROXY: "cloudflare", TRUSTED_PROXY_SECRET: "edge-secret-012345678901234567890123", APP_BASE_URL: "https://example.org", PRIVACY_CONTACT_EMAIL: "privacy@example.org" };
@@ -50,12 +50,52 @@ test("production requires an operational privacy contact and policy renders it",
       assert.match(html, /privacy@example\.org/);
       assert.equal(t(locale, "privacyBody").split("\n\n").length, 7);
       assert.match(t(locale, "privacyBody"), /\{\{PRIVACY_CONTACT_EMAIL\}\}/);
+      assert.ok(t(locale, "privacyContactFallback").length > 0);
       for (const term of requiredTerms[locale]!) assert.match(t(locale, "privacyBody"), new RegExp(term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), `${locale} missing ${term}`);
       assert.match(t(locale, "privacyBody"), /24/);
       assert.match(t(locale, "privacyBody"), /12/);
       assert.doesNotMatch(html, /pre-production|placeholder|заполнитель|заповнювач|عنصر نائب/i);
+      assert.doesNotMatch(html, /kriant@hey\.com/i);
     }
   } finally { runtime.close(); }
+});
+
+test("personal consumer privacy mailboxes are not published on public pages", async () => {
+  assert.equal(publishablePrivacyContactEmail("kriant@hey.com"), null);
+  assert.equal(publishablePrivacyContactEmail("privacy@example.org"), "privacy@example.org");
+  const runtime = createApp({ sqlitePath: ":memory:", env: { NODE_ENV: "test", PRIVACY_CONTACT_EMAIL: "kriant@hey.com" } });
+  try {
+    for (const path of ["/en/privacy", "/en/methodology", "/he/privacy"]) {
+      const html = await (await runtime.app.request(path)).text();
+      assert.doesNotMatch(html, /kriant@hey\.com/i);
+      assert.doesNotMatch(html, /@hey\.com/i);
+      assert.match(html, /campaign privacy contact configured for this site|פרטי הקשר לפרטיות של הקמפיין/);
+    }
+  } finally { runtime.close(); }
+});
+
+test("repository sources never hardcode the owner personal mailbox", async () => {
+  const { readdirSync, readFileSync, statSync } = await import("node:fs");
+  const { join } = await import("node:path");
+  const roots = ["src", "test", "docs", "migrations", "scripts"];
+  const skip = new Set(["node_modules", "dist", "data", ".git"]);
+  const hits: string[] = [];
+  const walk = (dir: string) => {
+    for (const name of readdirSync(dir)) {
+      if (skip.has(name)) continue;
+      const path = join(dir, name);
+      const st = statSync(path);
+      if (st.isDirectory()) walk(path);
+      else if (/\.(ts|tsx|js|json|md|sql|example|yml|yaml|html|txt)$/i.test(name)) {
+        const text = readFileSync(path, "utf8");
+        if (/kriant@hey\.com/i.test(text)) hits.push(path);
+      }
+    }
+  };
+  for (const root of roots) walk(root);
+  // Allow this test file to mention the address only as a forbidden example.
+  const unexpected = hits.filter((path) => !path.endsWith("perimeter-attachment.test.ts"));
+  assert.deepEqual(unexpected, []);
 });
 
 test("response attachment requires admin authorization and is forced to inert download headers", async () => {

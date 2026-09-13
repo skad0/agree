@@ -118,3 +118,41 @@ function flag(value: string | undefined, fallback: boolean): boolean {
 
 function isEmail(value: string) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value); }
 function trim(value: string | undefined) { const next = value?.trim(); return next || undefined; }
+
+/** Consumer/personal mailbox hosts that must never be published on public pages. */
+const PERSONAL_MAILBOX_HOSTS = new Set([
+  "hey.com",
+  "gmail.com",
+  "googlemail.com",
+  "yahoo.com",
+  "yahoo.co.il",
+  "outlook.com",
+  "hotmail.com",
+  "live.com",
+  "icloud.com",
+  "me.com",
+  "mac.com",
+  "proton.me",
+  "protonmail.com",
+  "mail.ru",
+  "yandex.ru",
+  "yandex.com"
+]);
+
+/**
+ * Address safe to show on public privacy/methodology pages.
+ * Keeps `PRIVACY_CONTACT_EMAIL` for server config / erasure flows, but never
+ * publishes a personal consumer mailbox (the product does not store an "owner email").
+ */
+export function publishablePrivacyContactEmail(email: string): string | null {
+  const normalized = email.trim().toLowerCase();
+  if (!isEmail(normalized)) return null;
+  if (normalized.includes("campaign operator contact") || normalized.includes("to be added")) return null;
+  const host = normalized.split("@")[1] ?? "";
+  if (PERSONAL_MAILBOX_HOSTS.has(host)) return null;
+  return email.trim();
+}
+
+export function publicPrivacyContactDisplay(email: string, fallback: string): string {
+  return publishablePrivacyContactEmail(email) ?? fallback;
+}
