@@ -26,8 +26,6 @@ services:
         value: cloudflare
       - key: TRUSTED_PROXY_SECRET
         generateValue: true
-      - key: PRIVACY_CONTACT_EMAIL
-        sync: false
       - key: ELECTION_ETL_ENABLED
         value: "false"
       - key: ELECTION_ETL_ELECTION_NUMBER

@@ -28,7 +28,6 @@ Production must have all of these values before the process will listen:
 - `APP_BASE_URL`: explicitly set to the public `https://` URL, with no credentials, query, or fragment.
 - `TRUSTED_PROXY=cloudflare`.
 - `TRUSTED_PROXY_SECRET`: a separate generated secret of at least 32 characters.
-- `PRIVACY_CONTACT_EMAIL`: the operational privacy/corrections address. Required in production; reserved example/test domains are rejected. Leave blank locally to omit contact instructions rather than display a placeholder. Configuration validates the address format/domain, not mailbox ownership or delivery.
 
 The application never uses `X-Forwarded-For`. It honors `CF-Connecting-IP` only when the request also contains an exact, constant-time-checked `X-Edge-Proxy-Proof` value equal to `TRUSTED_PROXY_SECRET`; otherwise all requests share the in-process fallback identity.
 

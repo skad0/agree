@@ -8,8 +8,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env) {
   const port = integer(env.PORT, 3000);
   const nodeEnv = env.NODE_ENV ?? "development";
   if (nodeEnv === "production" && !env.SESSION_SECRET) throw new Error("SESSION_SECRET is required in production");
-  const configuredContact = env.PRIVACY_CONTACT_EMAIL?.trim() ?? "";
-  const privacyContactEmail = isPublicContactEmail(configuredContact) ? configuredContact : "";
   const trustedProxy = env.TRUSTED_PROXY?.trim().toLowerCase();
   const trustedProxySecret = env.TRUSTED_PROXY_SECRET?.trim();
   if (trustedProxy && trustedProxy !== "cloudflare") throw new Error("TRUSTED_PROXY must be cloudflare or blank");
@@ -22,7 +20,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env) {
     try { url = new URL(appBaseUrl); } catch { throw new Error("APP_BASE_URL must be a valid HTTPS URL in production"); }
     if (url.protocol !== "https:" || !url.hostname || url.username || url.password || url.search || url.hash) throw new Error("APP_BASE_URL must be a valid HTTPS URL in production");
   }
-  if (nodeEnv === "production" && !privacyContactEmail) throw new Error("PRIVACY_CONTACT_EMAIL must be a non-placeholder email address in production");
   const erasureLedger = parseErasureLedger(env);
   const electionEtlEnabled = flag(env.ELECTION_ETL_ENABLED, false);
   const electionEtlScheduleEnabled = flag(env.ELECTION_ETL_SCHEDULE_ENABLED, false);
@@ -34,7 +31,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env) {
   return {
     port,
     nodeEnv,
-    privacyContactEmail,
     appBaseUrl,
     sqlitePath: env.SQLITE_PATH ?? "data/app.db",
     sessionSecret: env.SESSION_SECRET ?? ephemeralSecret,
@@ -114,10 +110,4 @@ function flag(value: string | undefined, fallback: boolean): boolean {
   throw new Error("boolean environment values must be true or false");
 }
 
-function isEmail(value: string) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value); }
-function isPublicContactEmail(value: string) {
-  if (!isEmail(value)) return false;
-  const domain = value.split("@")[1]!.toLowerCase();
-  return !/(^|\.)(example\.(com|org|net)|example|test|invalid|localhost)$/.test(domain);
-}
 function trim(value: string | undefined) { const next = value?.trim(); return next || undefined; }

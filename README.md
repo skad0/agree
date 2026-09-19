@@ -79,7 +79,7 @@ The product contract and route inventory are in [docs/SPEC.md](docs/SPEC.md). Cr
 `render.yaml` creates one paid Starter web instance with a 5 GB disk mounted at `/data`; SQLite is `/data/app.db`. Keep `numInstances: 1`: a Render persistent disk cannot be shared horizontally, and this MVP intentionally uses one SQLite writer.
 
 1. Create a Render Blueprint from this repository and verify `APP_BASE_URL` matches the assigned domain.
-2. Add production perimeter inputs from `docs/SECRETS.md` (`SESSION_SECRET`, `TRUSTED_PROXY*`, `PRIVACY_CONTACT_EMAIL`). No object-store credentials are required.
+2. Add production perimeter inputs from `docs/SECRETS.md` (`SESSION_SECRET`, `TRUSTED_PROXY*`). No object-store credentials are required.
 3. Proxy the production domain through Cloudflare. Cache only public `GET` pages/assets for a short TTL. Bypass cache for every `POST`, `/admin/*`, `/verify-email`, support/request/response/delete forms, and any response carrying `Set-Cookie`.
 4. Protect `/admin*` with a Cloudflare Access application whose audience equals `CF_ACCESS_AUD`; require SSO and 2FA in its policy.
 5. Set the production perimeter contract described in [docs/SECRETS.md](docs/SECRETS.md): `SESSION_SECRET`, `TRUSTED_PROXY=cloudflare`, a generated `TRUSTED_PROXY_SECRET`, and an HTTPS `APP_BASE_URL`. The server refuses to boot when any required value is absent or malformed.
