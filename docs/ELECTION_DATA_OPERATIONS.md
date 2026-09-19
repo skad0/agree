@@ -26,12 +26,47 @@ Boot fails closed if ETL is enabled without election number or manifest path. Se
 npm run build
 node dist/scripts/elections.js source-check [manifest]
 node dist/scripts/elections.js dry-run [manifest] [fixture]
+node dist/scripts/elections.js import <transcript.json>
+node dist/scripts/elections.js activate <publicationId>
 node dist/scripts/elections.js report
 ```
 
 - `source-check` loads the manifest; live probe only when `ELECTION_ETL_ENABLED=true`.
 - `dry-run` refuses blocked/unverified resources and **never** activates a directory publication.
+- `import` loads a manual official transcript and writes a **draft** publication. It needs no
+  network and ignores `ELECTION_ETL_ENABLED`; the public directory is unchanged until activation.
+  Re-importing identical content is refused by content hash, so the command is safe to repeat.
+- `activate` projects one draft into the selectable directory. Previously imported recipients are
+  set `is_active = 0`, never deleted: `generated_requests` and `submitted_responses` reference
+  `recipients(id)` with no `ON DELETE`. The previous publication becomes `rolled_back`.
 - `report` prints local coverage counts from SQLite.
+
+## Candidate transcripts
+
+`data/elections/knesset-26-lists.json` is a transcript of the official CEC pages, taken with a
+browser because the host returns HTTP 403 to non-browser clients. Shape and rules:
+
+- `source.approvalState` is `submitted_not_approved` or `approved`. Submitted lists are what the
+  parties filed; the CEC approves them later. The directory banner is driven by this field, so
+  never label a submitted transcript as approved to make the notice go away.
+- `fullNameHe` is authoritative. The CEC publishes one concatenated string, family name first, and
+  the family/given split is not mechanically derivable (`השכל שרן מרים` is Haskel / Sharan Miriam,
+  not `השכל שרן` / `מרים`). `candidacy_versions.given_name_raw` and `family_name_raw` stay null
+  until a reviewed source fills them.
+- `ballotLetters` are the letters as submitted. They are neither final nor unique across lists
+  (`ב`, `כן`, `יד` and `רץ` each appear twice in the 26th-Knesset submissions). Never key on them.
+- A list that publishes no roster is recorded with `rosterPublished: false` and zero rows, and the
+  directory says how many such lists exist. Do not fill those rows from media or encyclopedias:
+  the import refuses a list that claims a roster but carries none, and vice versa.
+
+Imported candidates carry no contact channel, so they show as not contactable until a reviewed
+contact source is resolved into `contact_points` / `candidate_contact_resolutions`.
+
+Each import creates fresh `people` rows rather than matching names across snapshots, because a
+name and a rank do not identify a person. Activating a re-import therefore retires the previous
+recipient set and creates a new one (~1,258 rows per import of the 26th-Knesset transcript), and
+`activate` reports both counts. Cross-snapshot identity belongs in the reviewed `identity_matches`
+flow; until that lands, keep re-imports deliberate rather than scheduled.
 
 ## Deploy checklist (election stack)
 

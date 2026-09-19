@@ -2,10 +2,13 @@ import { readFileSync } from "node:fs";
 import { loadConfig } from "../src/config.js";
 import { openDatabase } from "../src/db.js";
 import {
+  activatePublication,
   electionCoverage,
   fetchBounded,
   gateSourceResource,
+  importCandidateSource,
   loadSourceManifest,
+  parseCandidateSource,
   runEnrichmentPipeline
 } from "../src/integrations/elections/index.js";
 
@@ -25,16 +28,60 @@ switch (command) {
     finally { db.close(); }
     break;
   }
+  case "import":
+    runImport(process.argv[3]);
+    break;
+  case "activate":
+    runActivate(process.argv[3]);
+    break;
   default: {
     const _exhaustive: never = command;
     throw new Error(_exhaustive);
   }
 }
 
-function parseCommand(value: string | undefined): "source-check" | "dry-run" | "report" {
-  if (value === "source-check" || value === "dry-run" || value === "report") return value;
-  console.error("usage: elections source-check|dry-run|report");
+type Command = "source-check" | "dry-run" | "report" | "import" | "activate";
+
+function parseCommand(value: string | undefined): Command {
+  const commands: Command[] = ["source-check", "dry-run", "report", "import", "activate"];
+  if (commands.includes(value as Command)) return value as Command;
+  console.error(`usage: elections ${commands.join("|")}`);
   process.exit(1);
+}
+
+/** Imports a manual official transcript as a draft. Activation stays a separate, deliberate step. */
+function runImport(path: string | undefined) {
+  if (!path) {
+    console.error("usage: elections import <transcript.json>");
+    process.exit(1);
+  }
+  const raw = readFileSync(path, "utf8");
+  const source = parseCandidateSource(JSON.parse(raw));
+  const db = openDatabase(config.sqlitePath);
+  try {
+    const result = importCandidateSource(db, source, raw);
+    console.log(JSON.stringify(result));
+    if (!result.ok) process.exitCode = 1;
+    else console.error(`draft publication ${result.publicationId} written; run: elections activate ${result.publicationId}`);
+  } finally {
+    db.close();
+  }
+}
+
+function runActivate(value: string | undefined) {
+  const publicationId = Number(value);
+  if (!Number.isInteger(publicationId) || publicationId <= 0) {
+    console.error("usage: elections activate <publicationId>");
+    process.exit(1);
+  }
+  const db = openDatabase(config.sqlitePath);
+  try {
+    const result = activatePublication(db, publicationId);
+    console.log(JSON.stringify(result));
+    if (!result.ok) process.exitCode = 1;
+  } finally {
+    db.close();
+  }
 }
 
 function dryRun(manifestPath: string | undefined, fixturePath: string | undefined) {

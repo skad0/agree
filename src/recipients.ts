@@ -8,6 +8,8 @@ export type Recipient = {
   id: number;
   type: RecipientType;
   name: string;
+  /** The name is the Hebrew original because this locale has no translation of it. */
+  nameIsHebrewFallback: boolean;
   email: string | null;
   whatsapp: string | null;
   socialHandle: string | null;
@@ -29,9 +31,12 @@ export type DirectoryPartyOption = {
 export type DirectoryBrowseItem = {
   id: number;
   name: string;
+  nameIsHebrewFallback: boolean;
   type: RecipientType;
   contactable: boolean;
   list: DirectoryListOption | null;
+  /** Position on the electoral list as published, or null for a recipient outside one. */
+  listRank: number | null;
   party: DirectoryPartyOption | null;
 };
 
@@ -61,21 +66,35 @@ export const DIRECTORY_PAGE_SIZE = 20;
 export const DIRECTORY_MAX_QUERY = 100;
 export const DIRECTORY_MAX_SUGGESTIONS = 8;
 
-const namedRecipientSql = `SELECT r.id, r.type, rt.name, r.email, r.whatsapp, r.social_handle AS socialHandle FROM recipients r
-    JOIN recipient_translations rt ON rt.recipient_id = r.id AND rt.locale = ?
-    WHERE r.is_active = 1`;
+// Falls back to the Hebrew name when a locale has no translation. An inner join here
+// hid every Hebrew-only recipient from the six non-Hebrew locales; imported candidate
+// names are published in Hebrew only, so the fallback is the normal case, not an edge.
+const namedRecipientSql = `SELECT r.id, r.type, COALESCE(rt.name, fb.name) AS name,
+    CASE WHEN rt.name IS NULL THEN 1 ELSE 0 END AS nameIsHebrewFallback,
+    r.email, r.whatsapp, r.social_handle AS socialHandle
+    FROM recipients r
+    LEFT JOIN recipient_translations rt ON rt.recipient_id = r.id AND rt.locale = ?
+    LEFT JOIN recipient_translations fb ON fb.recipient_id = r.id AND fb.locale = 'he'
+    WHERE r.is_active = 1 AND COALESCE(rt.name, fb.name) IS NOT NULL`;
 const sendableChannelSql = `(NULLIF(TRIM(r.email), '') IS NOT NULL OR NULLIF(TRIM(r.whatsapp), '') IS NOT NULL)`;
 
+/** SQLite yields 0/1 for the CASE, so the flag is coerced once here rather than at each caller. */
+function toRecipient(row: unknown): Recipient {
+  const record = row as Recipient & { nameIsHebrewFallback: number | boolean };
+  return { ...record, nameIsHebrewFallback: Boolean(record.nameIsHebrewFallback) };
+}
+
 export function listNamedRecipients(db: Db, locale: Locale): Recipient[] {
-  return db.prepare(`${namedRecipientSql} ORDER BY rt.name`).all(locale) as Recipient[];
+  return db.prepare(`${namedRecipientSql} ORDER BY name`).all(locale).map(toRecipient);
 }
 
 export function listContactableRecipients(db: Db, locale: Locale): ContactableRecipient[] {
-  return db.prepare(`${namedRecipientSql} AND ${sendableChannelSql} ORDER BY rt.name`).all(locale) as ContactableRecipient[];
+  return db.prepare(`${namedRecipientSql} AND ${sendableChannelSql} ORDER BY name`).all(locale).map(toRecipient);
 }
 
 export function getContactableRecipient(db: Db, locale: Locale, id: number): ContactableRecipient | undefined {
-  return db.prepare(`${namedRecipientSql} AND r.id = ? AND ${sendableChannelSql}`).get(locale, id) as ContactableRecipient | undefined;
+  const row = db.prepare(`${namedRecipientSql} AND r.id = ? AND ${sendableChannelSql}`).get(locale, id);
+  return row ? toRecipient(row) : undefined;
 }
 
 export function hasSendableChannel(recipient: Pick<Recipient, "email" | "whatsapp">): boolean {
@@ -83,14 +102,38 @@ export function hasSendableChannel(recipient: Pick<Recipient, "email" | "whatsap
 }
 
 export function listDirectoryBrowse(db: Db, locale: Locale): DirectoryBrowseItem[] {
+  const lists = electoralListByRecipient(db);
   return listNamedRecipients(db, locale).map((row) => ({
     id: row.id,
     name: row.name,
+    nameIsHebrewFallback: row.nameIsHebrewFallback,
     type: row.type,
     contactable: hasSendableChannel(row),
-    list: null,
+    list: lists.get(row.id)?.list ?? null,
+    listRank: lists.get(row.id)?.rank ?? null,
     party: null
   }));
+}
+
+/**
+ * Electoral list and published rank per recipient, taken from the active publication only.
+ * Recipients from a rolled-back or draft publication resolve to null, so the filters and
+ * the ranks on screen always describe the publication being served.
+ */
+function electoralListByRecipient(db: Db): Map<number, { list: DirectoryListOption; rank: number }> {
+  const rows = db.prepare(`SELECT l.recipient_id AS recipientId, e.id AS listId, e.title_he AS label,
+      e.ballot_letters AS ballotLetters, v.rank AS rank
+    FROM recipient_entity_links l
+    JOIN candidacies c ON c.person_id = l.person_id
+    JOIN electoral_lists e ON e.id = c.list_id
+    JOIN directory_publications p ON p.election_id = c.election_id AND p.status = 'active'
+    JOIN candidacy_versions v ON v.candidacy_id = c.id AND v.snapshot_id = p.snapshot_id
+    WHERE l.review_state = 'accepted' AND l.person_id IS NOT NULL`)
+    .all() as { recipientId: number; listId: number; label: string; ballotLetters: string | null; rank: number }[];
+  return new Map(rows.map((row) => [
+    row.recipientId,
+    { list: { id: row.listId, label: row.label, ballotLetters: row.ballotLetters }, rank: Number(row.rank) }
+  ]));
 }
 
 export function parseDirectoryQuery(fields: {
@@ -143,6 +186,9 @@ function matchingDirectoryItems(items: DirectoryBrowseItem[], query: DirectoryQu
     if (query.partyId && item.party?.id !== query.partyId) return false;
     return rankItem(item, terms) !== null;
   }).sort((a, b) => {
+    // Inside one electoral list the neutral order is the official one the list was filed in,
+    // so browsing a list shows ballot order rather than an alphabetical reshuffle of it.
+    if (query.listId && !query.q) return (a.listRank ?? Infinity) - (b.listRank ?? Infinity) || a.id - b.id;
     const rank = (rankItem(a, terms) ?? 9) - (rankItem(b, terms) ?? 9);
     return rank || compareText(a.name, b.name) || a.id - b.id;
   });
@@ -167,6 +213,29 @@ export function directoryPublicationRef(db: Db): { electionId: number; publicati
   const row = db.prepare(`SELECT id AS publicationId, election_id AS electionId FROM directory_publications WHERE status = 'active' ORDER BY id DESC LIMIT 1`)
     .get() as { publicationId: number; electionId: number } | undefined;
   return row ?? null;
+}
+
+export type DirectoryElectionState =
+  | { kind: "none" }
+  | { kind: "submitted"; electionNumber: number; listsWithoutRoster: number }
+  | { kind: "approved"; electionNumber: number };
+
+/**
+ * What the directory is currently showing. "submitted" means the CEC has published the
+ * lists as filed but has not approved them, which the page must say out loud rather than
+ * presenting a provisional roster as the final ballot.
+ */
+export function directoryElectionState(db: Db): DirectoryElectionState {
+  const row = db.prepare(`SELECT e.number AS number, e.approval_state AS approvalState
+    FROM directory_publications p JOIN elections e ON e.id = p.election_id
+    WHERE p.status = 'active' ORDER BY p.id DESC LIMIT 1`)
+    .get() as { number: number; approvalState: string } | undefined;
+  if (!row) return { kind: "none" };
+  if (row.approvalState !== "submitted_not_approved") return { kind: "approved", electionNumber: Number(row.number) };
+  const missing = db.prepare(`SELECT count(*) AS n FROM electoral_lists l
+    JOIN directory_publications p ON p.election_id = l.election_id AND p.status = 'active'
+    WHERE l.roster_published = 0`).get() as { n: number };
+  return { kind: "submitted", electionNumber: Number(row.number), listsWithoutRoster: Number(missing.n) };
 }
 
 export function recipientsByIds(db: Db, locale: Locale, ids: number[]): Recipient[] {

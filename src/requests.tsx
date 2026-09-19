@@ -6,6 +6,7 @@ import { isLocale, localeNames, locales, t, type Locale } from "./i18n.js";
 import { Layout } from "./layout.js";
 import { Callout, JourneyIntro, PrimaryAction, Surface } from "./components/public-ui.js";
 import {
+  directoryElectionState,
   directoryPublicationRef,
   getContactableRecipient,
   listContactableRecipients,
@@ -17,6 +18,7 @@ import {
   selectedHiddenByFilter,
   suggestDirectory,
   type DirectoryBrowseItem,
+  type DirectoryElectionState,
   type DirectoryPage,
   type DirectoryQuery,
   type DirectorySuggestion,
@@ -362,7 +364,7 @@ export function registerRequestRoutes(app: Hono, db: Db, config: Config) {
     const placeholders = demandIds.map(() => "?").join(",");
     const demands = placeholders ? db.prepare(`SELECT dt.title FROM demand_translations dt WHERE dt.locale = ? AND dt.demand_id IN (${placeholders}) ORDER BY dt.demand_id`).all(request.locale, ...demandIds) as { title: string }[] : [];
     const social = db.prepare("SELECT body FROM message_templates WHERE locale = ? AND channel = 'social'").get(request.locale) as { body: string } | undefined;
-    const recipient = { id: 0, type: request.type, name: request.recipient, email: null, whatsapp: null, socialHandle: request.socialHandle } satisfies Recipient;
+    const recipient = { id: 0, type: request.type, name: request.recipient, nameIsHebrewFallback: false, email: null, whatsapp: null, socialHandle: request.socialHandle } satisfies Recipient;
     const resultUrl = `${config.appBaseUrl}/${request.locale}/request/result?request=${request.publicId}`;
     const message = social ? fill(social.body, { recipient: request.recipient, demands: demands.map((demand) => `• ${demand.title}`).join("\n"), handle: mention(recipient), link: resultUrl, name: "", city: "", context: "" }) : `${mention(recipient)}\n\n${demands.map((demand) => `• ${demand.title}`).join("\n")}`;
     const share = encodeURIComponent(message);
@@ -388,15 +390,40 @@ export function registerRequestRoutes(app: Hono, db: Db, config: Config) {
   });
 }
 
+/**
+ * Candidate names are published in Hebrew only. Inside an LTR locale they need an explicit
+ * lang/dir so bidi ordering and screen-reader pronunciation follow the name, not the page.
+ */
+function RecipientName({ item }: { item: Pick<DirectoryBrowseItem, "name" | "nameIsHebrewFallback"> }) {
+  if (!item.nameIsHebrewFallback) return <>{item.name}</>;
+  return <bdi lang="he" dir="rtl">{item.name}</bdi>;
+}
+
+/**
+ * States what the directory is showing. A submitted-but-unapproved candidate list is not
+ * the ballot: say so, and say how many submitted lists published no roster at all, so an
+ * absent list reads as unpublished rather than as not running.
+ */
+function DirectoryStateNotice({ locale, state }: { locale: Locale; state: DirectoryElectionState }) {
+  if (state.kind === "none") return <Callout tone="muted"><p>{t(locale, "directoryNoElection")}</p></Callout>;
+  if (state.kind === "approved") {
+    return <Callout tone="muted"><p>{t(locale, "directoryListsApproved").replace("{n}", String(state.electionNumber))}</p></Callout>;
+  }
+  return <Callout tone="caution">
+    <p>{t(locale, "directoryListsSubmitted").replace("{n}", String(state.electionNumber))}</p>
+    {state.listsWithoutRoster ? <p>{t(locale, "directoryListsWithoutRoster").replace("{n}", String(state.listsWithoutRoster))}</p> : null}
+  </Callout>;
+}
+
 function directoryPage(locale: Locale, path: string, csrf: string, db: Db, query: DirectoryQuery, basket: SelectionBasket, token: string, notice?: string) {
   const items = listDirectoryBrowse(db, locale);
   const page = searchDirectory(items, query);
   const questions = listSelectableQuestions(db, locale);
   const stances = displayStancesForRecipients(db, page.rows.map((row) => row.id), query.questionVersionId, locale);
-  return directoryDocument(locale, path, csrf, query, page, items, basket, token, questions, stances, notice);
+  return directoryDocument(locale, path, csrf, query, page, items, basket, token, questions, stances, directoryElectionState(db), notice);
 }
 
-function directoryDocument(locale: Locale, path: string, csrf: string, query: DirectoryQuery, page: DirectoryPage, items: DirectoryBrowseItem[], basket: SelectionBasket, token: string, questions: QuestionChoice[], stances: Map<number, StanceDisplay>, notice?: string) {
+function directoryDocument(locale: Locale, path: string, csrf: string, query: DirectoryQuery, page: DirectoryPage, items: DirectoryBrowseItem[], basket: SelectionBasket, token: string, questions: QuestionChoice[], stances: Map<number, StanceDisplay>, electionState: DirectoryElectionState, notice?: string) {
   const selected = query.personId ? items.find((item) => item.id === query.personId) : undefined;
   const selectedIds = new Set(basket.ids);
   const selectedPeople = basket.ids.map((id) => items.find((item) => item.id === id));
@@ -405,7 +432,7 @@ function directoryDocument(locale: Locale, path: string, csrf: string, query: Di
   return <Layout locale={locale} title={t(locale, "requestTitle")} path={path}>
     <div class="request-page request-recipient-page">
       <JourneyIntro eyebrow={<>{t(locale, "stepChoose")} · <bdi>1/3</bdi></>} title={t(locale, "directoryTitle")} />
-      <Callout tone="muted"><p>{t(locale, "directoryNoElection")}</p></Callout>
+      <DirectoryStateNotice locale={locale} state={electionState} />
       {notice ? <Callout tone="caution"><p role="status">{notice}</p></Callout> : null}
       <Surface class="recipient-panel">
         <form class="directory-search" method="post" action={`/${locale}/request`} data-directory-search data-suggest={`/${locale}/request/suggest`} data-suggest-unavailable={t(locale, "directorySuggestUnavailable")}>
@@ -449,9 +476,10 @@ function directoryDocument(locale: Locale, path: string, csrf: string, query: Di
           <p class="directory-status" role="status">{page.total} {t(locale, "directoryMatches")}{page.pageCount > 1 ? ` · ${t(locale, "directoryPage")} ${page.page}` : ""}{basket.ids.length ? ` · ${t(locale, "directoryPeopleSelected").replace("{n}", String(basket.ids.length))}` : ""}{hidden ? ` · ${t(locale, "directoryHiddenSelected").replace("{n}", String(hidden))}` : ""}</p>
           {page.rows.length ? <ul class="recipient-list">{page.rows.map((item) => <li class={selectedIds.has(item.id) ? "recipient-row recipient-row-selected" : "recipient-row"}>
             <div class="recipient-copy">
-              <strong class="recipient-name">{item.name}</strong>
+              <strong class="recipient-name"><RecipientName item={item} /></strong>
               <p class="recipient-meta">{item.type === "party" ? t(locale, "directoryRoleParty") : t(locale, "directoryRolePerson")}
                 {item.list ? ` · ${item.list.label}${item.list.ballotLetters ? ` (${item.list.ballotLetters})` : ""}` : ""}
+                {item.listRank ? ` · ${t(locale, "directoryListRank").replace("{n}", String(item.listRank))}` : ""}
                 {item.party ? ` · ${item.party.label}` : ""}
                 {" · "}{item.contactable ? t(locale, "directoryContactable") : t(locale, "directoryNotContactable")}
               </p>

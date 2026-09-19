@@ -121,7 +121,9 @@ test("directory selection survives filters, rejects a sixth add, and review name
       token = field(html, "selection") ?? token;
     }
     assert.match(html, /5 people selected/);
-    const sixth = await postForm(app.app, "/en/request/selection", { csrf: field(html, "csrf") ?? firstCsrf, selection: token, add: "9006" }, cookie);
+    // Search for the sixth person so the rejected add is on the rendered page: the directory
+    // now lists every active recipient, so an unfiltered page 1 need not contain 9006.
+    const sixth = await postForm(app.app, "/en/request/selection", { csrf: field(html, "csrf") ?? firstCsrf, selection: token, add: "9006", q: "Sixth Person" }, cookie);
     const sixthHtml = await sixth.text();
     assert.match(sixthHtml, /You can select up to 5 people/);
     assert.match(sixthHtml, /5 people selected/);

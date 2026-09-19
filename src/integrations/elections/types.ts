@@ -151,3 +151,56 @@ export type PipelineStage = "acquire" | "stage" | "validate" | "enrich";
 export type PipelineResult =
   | { ok: true; stage: PipelineStage; publicationActivated: false }
   | { ok: false; stage: PipelineStage; code: string; publicationActivated: false };
+
+export type CandidateApprovalState = "submitted_not_approved" | "approved";
+
+export type CandidateSourceMeta = {
+  publisher: string;
+  title: string;
+  retrievedAt: string;
+  publishedAt: string | null;
+  sourceUrl: string;
+  artifactKind: string;
+  approvalState: CandidateApprovalState;
+  notes: string | null;
+};
+
+export type CandidateSourceList = {
+  officialListKey: string | null;
+  listTitleHe: string;
+  ballotLetters: string | null;
+  submittedByHe: string | null;
+  rosterPublished: boolean;
+};
+
+export type CandidateSourceRow = {
+  officialListKey: string;
+  rank: number;
+  fullNameHe: string;
+  viaPartyHe: string | null;
+  cityPublished: string | null;
+  status: "listed" | "withdrawn" | "replaced";
+};
+
+export type CandidateSource = {
+  schemaVersion: number;
+  electionNumber: number;
+  source: CandidateSourceMeta;
+  lists: CandidateSourceList[];
+  rows: CandidateSourceRow[];
+};
+
+export type ImportResult =
+  | {
+    ok: true;
+    snapshotId?: number;
+    electionId: number;
+    publicationId: number;
+    version?: number;
+    lists?: number;
+    candidacies?: number;
+    listsWithoutRoster?: number;
+    recipientsCreated?: number;
+    recipientsReactivated?: number;
+  }
+  | { ok: false; code: string; snapshotId?: number };

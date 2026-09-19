@@ -1158,12 +1158,15 @@ test("contactless recipients stay visible without send links and unavailable dir
     runtime.db.prepare("INSERT INTO recipient_translations (recipient_id, locale, name) VALUES (7, 'en', 'No Contact Recipient'), (8, 'en', 'Email Recipient')").run();
     runtime.db.prepare("UPDATE recipients SET email = 'email@example.org' WHERE id = 8").run();
 
-    const list = await runtime.app.request("/en/request");
+    // Search rather than reading page 1: the directory lists every active recipient, so the
+    // seeded roster would otherwise push these two fixtures off the first page.
+    const listForm = await getForm(runtime.app, "/en/request");
+    const list = await postForm(runtime.app, "/en/request", { csrf: listForm.csrf, q: "Recipient" }, listForm.cookie);
     const listHtml = await list.text();
     assert.match(listHtml, /No Contact Recipient/);
     assert.match(listHtml, /Email Recipient/);
-    assert.doesNotMatch(listHtml, /\/en\/request\/build\?recipient=7/);
-    assert.match(listHtml, /\/en\/request\/build\?recipient=8/);
+    assert.doesNotMatch(listHtml, /\/en\/request\/build\?recipient=7"/);
+    assert.match(listHtml, /\/en\/request\/build\?recipient=8"/);
     assert.equal((await runtime.app.request("/en/request/build?recipient=7")).headers.get("location"), "/en/request");
 
     const emailForm = await getForm(runtime.app, "/en/request/build?recipient=8");

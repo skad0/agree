@@ -29,7 +29,10 @@ test("listContactableRecipients matches previous request eligibility on seed dat
     const db = openDatabase(join(dir, "app.db"));
     const expected = db.prepare(previousRequestSql).all("he");
     const actual = listContactableRecipients(db, "he");
-    assert.deepEqual(actual, expected);
+    // Eligibility must be unchanged; only the row shape grew a fallback-name flag.
+    // Both sides are spread because node:sqlite yields null-prototype rows.
+    assert.deepEqual(actual.map(({ nameIsHebrewFallback, ...row }) => row), expected.map((row) => ({ ...row })));
+    assert.ok(actual.every((row) => row.nameIsHebrewFallback === false), "seed names exist in Hebrew");
     assert.ok(actual.length > 1);
     assert.equal(getContactableRecipient(db, "he", actual[0]!.id)?.id, actual[0]!.id);
 
@@ -65,10 +68,10 @@ test("listContactableRecipients matches previous request eligibility on seed dat
 });
 
 const fixtureItems: DirectoryBrowseItem[] = [
-  { id: 1, name: "Ada Example", type: "politician", contactable: true, list: { id: 10, label: "Blue List", ballotLetters: "ב" }, party: { id: 20, label: "Blue Party" } },
-  { id: 2, name: "Bo Other", type: "politician", contactable: false, list: { id: 10, label: "Blue List", ballotLetters: "ב" }, party: null },
-  { id: 3, name: "Cal Office", type: "party", contactable: true, list: { id: 11, label: "Other List", ballotLetters: "א" }, party: { id: 21, label: "Other Party" } },
-  { id: 4, name: "Ada Twin", type: "politician", contactable: true, list: { id: 11, label: "Other List", ballotLetters: "א" }, party: { id: 20, label: "Blue Party" } }
+  { id: 1, name: "Ada Example", nameIsHebrewFallback: false, type: "politician", contactable: true, listRank: 1, list: { id: 10, label: "Blue List", ballotLetters: "ב" }, party: { id: 20, label: "Blue Party" } },
+  { id: 2, name: "Bo Other", nameIsHebrewFallback: false, type: "politician", contactable: false, listRank: 1, list: { id: 10, label: "Blue List", ballotLetters: "ב" }, party: null },
+  { id: 3, name: "Cal Office", nameIsHebrewFallback: false, type: "party", contactable: true, listRank: 1, list: { id: 11, label: "Other List", ballotLetters: "א" }, party: { id: 21, label: "Other Party" } },
+  { id: 4, name: "Ada Twin", nameIsHebrewFallback: false, type: "politician", contactable: true, listRank: 1, list: { id: 11, label: "Other List", ballotLetters: "א" }, party: { id: 20, label: "Blue Party" } }
 ];
 
 test("parseDirectoryQuery bounds query text and treats clear as empty", () => {
@@ -106,9 +109,11 @@ test("searchDirectory paginates at 20 and keeps uncontactable rows discoverable"
   const items = Array.from({ length: 21 }, (_, index) => ({
     id: index + 1,
     name: `Person ${String(index + 1).padStart(2, "0")}`,
+    nameIsHebrewFallback: false,
     type: "politician" as const,
     contactable: index !== 0,
     list: null,
+    listRank: null,
     party: null
   }));
   const first = searchDirectory(items, parseDirectoryQuery({}));
@@ -140,9 +145,11 @@ test("suggestDirectory bounds typed options and never infers missing lists from 
   const many = Array.from({ length: 12 }, (_, index) => ({
     id: index + 1,
     name: `Ada ${index}`,
+    nameIsHebrewFallback: false,
     type: "politician" as const,
     contactable: true,
     list: null,
+    listRank: null,
     party: null
   }));
   assert.equal(suggestDirectory(many, { q: "Ada", listId: null, partyId: null }).length, DIRECTORY_MAX_SUGGESTIONS);

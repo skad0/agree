@@ -38,3 +38,19 @@ Statements of existing Israeli law need the closest reading: the 80-member thres
 ## After review
 
 Correct the text in place, then note here who reviewed which locale and when. Until every row above says reviewed, `STATUS.md` keeps translation review listed as an open launch gate.
+
+## Added with the 26th-Knesset candidate import (unreviewed)
+
+Four directory strings were added in every locale, Russian included, and none has been reviewed.
+They are unusually sensitive because they state the legal status of a candidate list:
+
+| Key | What it asserts |
+|---|---|
+| `directoryListsSubmitted` | The lists are as **submitted** and the CEC has **not approved** them |
+| `directoryListsApproved` | The lists **are** the approved ones |
+| `directoryListsWithoutRoster` | How many submitted lists published no candidate roster |
+| `directoryListRank` | A candidate's published place on their list |
+
+A translation that blurs submitted into approved misstates an official act during an election
+period. Review these against the Hebrew source wording on the CEC page —
+`רשימות אלה אינן סופיות וועדת הבחירות המרכזית טרם אישרה אותן` — before public launch.

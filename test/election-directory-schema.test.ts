@@ -12,8 +12,9 @@ const fixture = join(process.cwd(), "test/fixtures/elections/source-manifest.v1.
 
 test("openDatabase applies election directory schema with clean foreign keys", () => {
   const dir = mkdtempSync(join(tmpdir(), "agree-election-schema-"));
+  let handle: ReturnType<typeof openDatabase> | undefined;
   try {
-    const db = openDatabase(join(dir, "app.db"));
+    const db = handle = openDatabase(join(dir, "app.db"));
     const applied = db.prepare("SELECT 1 FROM schema_migrations WHERE name = '016_election_directory.sql'").get();
     assert.ok(applied);
     assert.ok(db.prepare("SELECT 1 FROM schema_migrations WHERE name = '017_election_finance.sql'").get());
@@ -42,11 +43,18 @@ test("openDatabase applies election directory schema with clean foreign keys", (
     db.prepare("INSERT INTO people (knesset_person_id, given_name, family_name, created_at) VALUES ('p1', 'שם', 'משפחה', '2026-09-07T00:00:00.000Z')").run();
     db.prepare("INSERT INTO candidacies (election_id, list_id, person_id, status) VALUES (?, 1, 1, 'active')").run(electionId);
     db.prepare("INSERT INTO source_records (snapshot_id, record_key, payload_json) VALUES (?, '1', '{}')").run(snapshotId);
-    db.prepare("INSERT INTO candidacy_versions (candidacy_id, snapshot_id, list_id, source_record_id, rank, given_name_raw, family_name_raw, status) VALUES (1, ?, 1, 1, 1, 'שם', 'משפחה', 'listed')").run(snapshotId);
-    assert.throws(() => db.prepare("INSERT INTO candidacy_versions (candidacy_id, snapshot_id, list_id, rank, given_name_raw, family_name_raw, status) VALUES (1, ?, 1, 0, 'שם', 'משפחה', 'listed')").run(snapshotId));
-    assert.equal(db.prepare("SELECT count(*) n FROM candidacies").get()?.n, 1);
-    db.close();
+    db.prepare("INSERT INTO candidacy_versions (candidacy_id, snapshot_id, list_id, source_record_id, rank, full_name_raw, given_name_raw, family_name_raw, status) VALUES (1, ?, 1, 1, 1, 'משפחה שם', 'שם', 'משפחה', 'listed')").run(snapshotId);
+    assert.throws(() => db.prepare("INSERT INTO candidacy_versions (candidacy_id, snapshot_id, list_id, rank, full_name_raw, status) VALUES (1, ?, 1, 0, 'משפחה שם', 'listed')").run(snapshotId));
+    // The published name is one string; the family/given split is optional and reviewed.
+    db.prepare("INSERT INTO people (knesset_person_id, created_at) VALUES ('p2', '2026-09-07T00:00:00.000Z')").run();
+    db.prepare("INSERT INTO candidacies (election_id, list_id, person_id, status) VALUES (?, 1, 3, 'active')").run(electionId);
+    db.prepare("INSERT INTO candidacy_versions (candidacy_id, snapshot_id, list_id, rank, full_name_raw, status) VALUES (2, ?, 1, 2, 'השכל שרן מרים', 'listed')").run(snapshotId);
+    assert.throws(() => db.prepare("INSERT INTO candidacy_versions (candidacy_id, snapshot_id, list_id, rank, status) VALUES (2, ?, 1, 3, 'listed')").run(snapshotId));
+    assert.equal(db.prepare("SELECT count(*) n FROM candidacies").get()?.n, 2);
   } finally {
+    // Close before removing: an open handle turns any assertion failure into an
+    // unrelated EPERM from rmSync, hiding the error that actually matters.
+    handle?.close();
     rmSync(dir, { recursive: true, force: true });
   }
 });
