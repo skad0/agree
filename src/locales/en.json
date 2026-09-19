@@ -83,9 +83,9 @@
   "navAbout": "Who we are",
   "navMethodology": "Methodology",
   "standardTitle": "A transparency standard for every party",
-  "standardLede": "Ten identical requirements put to every registered list.",
+  "standardLede": "Ten proposed commitments for every party.",
   "coalitionTitle": "Coalition readiness agreement",
-  "coalitionLede": "An additional document addressed only to parties that state they intend to form the next government together.",
+  "coalitionLede": "Proposed commitments for parties planning to form a government together.",
   "planTitle": "The first 100 days",
   "planLede": "What should be settled and by when, counted in days from the formation of the government.",
   "modelTitle": "A smaller government",
@@ -118,8 +118,8 @@
   "journeySupport": "Confirm your email. Support is counted once.",
   "journeyRequest": "Find people, choose questions, prepare the text, and open your own channel to send it.",
   "journeyResponse": "Got a reply? You may pass it on for verification.",
-  "aboutBody": "Contract in Advance is an independent civic platform concerned with the transparency of party commitments before an election.\n\nThe project is not a political party, does not field candidates, and does not recommend voting for or against any list. Read a problem, examine the proposed commitment, and share its public link. Candidates are optional context; no account or email address is needed. The site does not send appeals or record share actions.\n\n### Funding\n\nAs at the date of publication the project is funded by: [personal funds / funds of a registered organisation / other]. The funding source, project costs, services provided free of charge and potential conflicts of interest are published. Until separate legal and accounting arrangements are in place, the project does not accept donations for electoral activity.\n\n### Connections\n\nDirectors and editors disclose paid work for parties, official party positions, significant services to candidates, and participation in campaign headquarters.",
-  "methodologyBody": "The ten issues link to the existing standard and its proposed commitments. These are proposals from this project, not promises made by a candidate.\n\nThe candidate directory reproduces the official Hebrew names, lists and ranks from a dated Central Elections Committee snapshot. Submitted lists are not described as approved. Missing or unverified information is labeled; list order is not a recommendation.\n\nSharing opens the platform you choose. Copying a link or opening an app does not prove publication or delivery. We do not record these actions or publish popularity counters.\n\nNew appeals, support signups and reply submissions are paused. Historical request links show only retained recipient and issue selections. Contact {{PRIVACY_CONTACT_EMAIL}} to report a source error.",
+  "aboutBody": "Contract in Advance is an independent civic platform concerned with the transparency of party commitments before an election.\n\nThe project is not a political party, does not field candidates, and does not recommend voting for or against any list. Read a problem, examine the proposed commitment, and share its public link. Candidates are optional context; no account or email address is needed. The site does not send appeals or record share actions.",
+  "methodologyBody": "The ten issues link to the existing standard and its proposed commitments. These are proposals from this project, not promises made by a candidate.\n\nThe candidate directory reproduces the official Hebrew names, lists and ranks from a dated Central Elections Committee snapshot. Submitted lists are not described as approved. Missing or unverified information is labeled; list order is not a recommendation.\n\nSharing opens the platform you choose. Copying a link or opening an app does not prove publication or delivery. We do not record these actions or publish popularity counters.",
   "appearance": "Appearance",
   "appearanceLight": "Light",
   "appearanceDark": "Dark",
@@ -182,5 +182,6 @@
   "stanceStatementAvailable": "Statement available",
   "stanceSource": "Source",
   "stanceMethodology": "These labels are reviewed public statements about a named question. Missing evidence is not opposition. A party statement is not a personal statement.",
-  "methodologyStance": "### Reviewed public positions\n\nA public position appears only after an administrator reviews a source, matches it to a versioned standard question, and publishes it. A moderator marking a private reply as confirmed does not publish anything. Unknown means no verified record is available here; it does not mean the person opposes the question, refused to answer, or was never asked. A party or list statement is shown as an organisational position and is never treated as an individual's answer. An older question version is labelled as historical context, not a current answer. There is no score, ranking, endorsement or colour scale. To correct a record, write to {{PRIVACY_CONTACT_EMAIL}}."
+  "methodologyStance": "### Reviewed public positions\n\nA public position appears only after an administrator reviews a source, matches it to a versioned standard question, and publishes it. A moderator marking a private reply as confirmed does not publish anything. Unknown means no verified record is available here; it does not mean the person opposes the question, refused to answer, or was never asked. A party or list statement is shown as an organisational position and is never treated as an individual's answer. An older question version is labelled as historical context, not a current answer. There is no score, ranking, endorsement or colour scale. To correct a record, write to {{PRIVACY_CONTACT_EMAIL}}.",
+  "sourceCorrectionContact": "To report a source error, contact {{PRIVACY_CONTACT_EMAIL}}."
 }

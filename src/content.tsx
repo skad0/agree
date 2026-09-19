@@ -36,7 +36,10 @@ export function registerContentRoutes(app: Hono, db: Db, config: Config) {
   page("first-100-days", "planTitle", "planLede", (locale) => timeline(locale, planItems(db, locale)));
   page("government-model", "modelTitle", "modelLede", (locale) => portfolioGrid(locale, portfolios(db, locale)));
   page("about", "aboutTitle", "slogan", (locale) => prose(t(locale, "aboutBody")));
-  page("methodology", "methodologyTitle", "slogan", (locale) => prose(t(locale, "methodologyBody").replaceAll("{{PRIVACY_CONTACT_EMAIL}}", config.privacyContactEmail)));
+  page("methodology", "methodologyTitle", "slogan", (locale) => <>
+    {prose(t(locale, "methodologyBody"))}
+    {config.privacyContactEmail ? prose(t(locale, "sourceCorrectionContact").replaceAll("{{PRIVACY_CONTACT_EMAIL}}", config.privacyContactEmail)) : null}
+  </>);
 
   // The old placeholder route keeps working so existing links do not break.
   app.get("/:locale/demands", (context) => {
@@ -135,27 +138,8 @@ function portfolioGrid(locale: Locale, names: (string | null)[]) {
 }
 
 function prose(value: string) {
-  const paragraphs = value.split("\n\n");
-  const filtered: string[] = [];
-  for (let index = 0; index < paragraphs.length; index += 1) {
-    if (isUnresolvedFundingParagraph(paragraphs[index + 1] ?? "")) { index += 1; continue; }
-    if (!isUnresolvedFundingParagraph(paragraphs[index]!)) filtered.push(paragraphs[index]!);
-  }
-  const html = markdown(filtered.join("\n\n")).replaceAll("<h3>", "<h2>").replaceAll("</h3>", "</h2>");
+  const html = markdown(value).replaceAll("<h3>", "<h2>").replaceAll("</h3>", "</h2>");
   return <DocumentSurface><div class="document-prose" dangerouslySetInnerHTML={{ __html: html }} /></DocumentSurface>;
-}
-
-const unresolvedFundingPlaceholders = new Set([
-  "[personal funds / funds of a registered organisation / other]",
-  "[מקורות עצמיים / אמצעי ארגון רשום / אחר]",
-  "[موارد شخصية / موارد منظمة مسجلة / غير ذلك]",
-  "[אייגענע מיטלען / מיטלען פֿון אַ רעגיסטרירטער אָרגאַניזאַציע / אַנדערש]",
-  "[личными средствами / средствами зарегистрированной организации / иное]",
-  "[особистими коштами / коштами зареєстрованої організації / інше]",
-  "[የግል ገንዘብ / የተመዘገበ ድርጅት ገንዘብ / ሌላ]"
-]);
-function isUnresolvedFundingParagraph(value: string) {
-  return [...unresolvedFundingPlaceholders].some((placeholder) => value.includes(placeholder));
 }
 
 function clauses(db: Db, locale: Locale, document: string) {

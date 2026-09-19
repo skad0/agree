@@ -457,7 +457,7 @@ test("public campaign gates and localized error pages do not leak campaign or un
     const about = await runtime.app.request("/en/about");
     const aboutHtml = await about.text();
     assert.doesNotMatch(aboutHtml, /\[personal funds \/ funds of a registered organisation \/ other\]/);
-    assert.match(aboutHtml, /Connections/);
+    assert.doesNotMatch(aboutHtml, /Connections|Directors and editors disclose/);
 
     runtime.db.prepare("UPDATE campaigns SET status = 'draft' WHERE id = 1").run();
     const inactiveHome = await runtime.app.request("/he");

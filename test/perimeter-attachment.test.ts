@@ -5,7 +5,7 @@ import { createApp } from "../src/app.js";
 import { loadConfig } from "../src/config.js";
 import { createRateLimiter } from "../src/security.js";
 import { locales, t } from "../src/i18n.js";
-const productionBase = { NODE_ENV: "production", SESSION_SECRET: "secret", TRUSTED_PROXY: "cloudflare", TRUSTED_PROXY_SECRET: "edge-secret-012345678901234567890123", APP_BASE_URL: "https://example.org", PRIVACY_CONTACT_EMAIL: "privacy@example.org" };
+const productionBase = { NODE_ENV: "production", SESSION_SECRET: "secret", TRUSTED_PROXY: "cloudflare", TRUSTED_PROXY_SECRET: "edge-secret-012345678901234567890123", APP_BASE_URL: "https://example.org", PRIVACY_CONTACT_EMAIL: "privacy@campaign.org" };
 
 test("client identity ignores spoofed forwarding headers unless Cloudflare is explicitly trusted", async () => {
   const make = (trusted: string | undefined) => {
@@ -30,9 +30,13 @@ test("production requires an operational privacy contact and policy renders it",
   const base = { NODE_ENV: "production", SESSION_SECRET: "session-secret", TRUSTED_PROXY: "cloudflare", TRUSTED_PROXY_SECRET: "edge-secret-012345678901234567890123", APP_BASE_URL: "https://example.org" } as const;
   assert.throws(() => loadConfig(base), /PRIVACY_CONTACT_EMAIL/);
   assert.throws(() => loadConfig({ ...base, PRIVACY_CONTACT_EMAIL: "[CAMPAIGN OPERATOR CONTACT TO BE ADDED BEFORE PRODUCTION]" }), /PRIVACY_CONTACT_EMAIL/);
-  const config = loadConfig({ ...base, PRIVACY_CONTACT_EMAIL: "privacy@example.org" });
-  assert.equal(config.privacyContactEmail, "privacy@example.org");
-  const runtime = createApp({ sqlitePath: ":memory:", env: { NODE_ENV: "test", PRIVACY_CONTACT_EMAIL: "privacy@example.org" } });
+  for (const address of ["privacy@example.org", "privacy@EXAMPLE.COM", "privacy@sub.example.net", "privacy@local.test", "privacy@site.invalid"]) {
+    assert.throws(() => loadConfig({...base,PRIVACY_CONTACT_EMAIL:address}), /PRIVACY_CONTACT_EMAIL/);
+    assert.equal(loadConfig({NODE_ENV:"test",PRIVACY_CONTACT_EMAIL:address}).privacyContactEmail, "");
+  }
+  const config = loadConfig({ ...base, PRIVACY_CONTACT_EMAIL: "privacy@campaign.org" });
+  assert.equal(config.privacyContactEmail, "privacy@campaign.org");
+  const runtime = createApp({ sqlitePath: ":memory:", env: { NODE_ENV: "test", PRIVACY_CONTACT_EMAIL: "privacy@campaign.org" } });
   try {
     const requiredTerms: Record<string, string[]> = {
       en: ["email", "recipient", "Historical appeal", "Cloudflare", "Turnstile", "cookies"],
@@ -47,7 +51,8 @@ test("production requires an operational privacy contact and policy renders it",
       const response = await runtime.app.request(`/${locale}/privacy`);
       const html = await response.text();
       assert.equal(response.status, 200);
-      assert.match(html, /privacy@example\.org/);
+      assert.match(html, /privacy@campaign\.org/);
+      assert.match(await (await runtime.app.request(`/${locale}/methodology`)).text(), /privacy@campaign\.org/);
       assert.equal(t(locale, "privacyBody").split("\n\n").length, 7);
       assert.match(t(locale, "privacyBody"), /\{\{PRIVACY_CONTACT_EMAIL\}\}/);
       for (const term of requiredTerms[locale]!) assert.match(t(locale, "privacyBody"), new RegExp(term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), `${locale} missing ${term}`);

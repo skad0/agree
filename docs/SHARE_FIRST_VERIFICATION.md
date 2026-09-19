@@ -13,7 +13,7 @@ Implemented: ten problem cards and issue pages; social/copy/native controls; thr
 | Check | Result |
 | --- | --- |
 | `npm run typecheck` | Pass |
-| `npm test` | **115 passed, 0 failed** |
+| `npm test` | **116 passed, 0 failed** after public-copy cleanup |
 | `npm run smoke:pages` | Pass, including new pages, locales, documents, redirects, paused intake, privacy and Access denial |
 | `npm run smoke` | Pass on an isolated compiled server; fetch follows legacy redirects |
 | `git diff --check` | Pass; line-ending normalization notices only |
@@ -36,6 +36,8 @@ Codex in-app Chromium, isolated local server, in-memory database with refreshed 
 - No console warnings/errors during the checked enhanced flow. Hebrew/Amharic PNGs visually inspected; all seven served and dimension-checked in tests.
 
 No social post, email or third-party submission was sent during verification.
+
+Follow-up public-copy review: removed unfinished funding text and unsupported disclosure claims from About in all locales, moved retired-workflow context out of Methodology, and clarified document introductions as proposals. Missing/example contacts no longer render; production rejects reserved example/test addresses. A regression scan covers 20 public routes in every locale with missing, example and marker contacts. Historical privacy/retention/deletion information remains. English/Hebrew About, Methodology and Privacy were checked again in the refreshed browser preview.
 
 ## Remaining release checks
 
