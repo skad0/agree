@@ -35,13 +35,13 @@ test("production requires an operational privacy contact and policy renders it",
   const runtime = createApp({ sqlitePath: ":memory:", env: { NODE_ENV: "test", PRIVACY_CONTACT_EMAIL: "privacy@example.org" } });
   try {
     const requiredTerms: Record<string, string[]> = {
-      en: ["email", "recipient", "event-level", "Cloudflare", "Turnstile", "cookies"],
-      he: ["דוא", "הנמען", "אירועים", "Cloudflare", "Turnstile", "עוגיות"],
-      ar: ["البريد", "المستلم", "أحداث", "Cloudflare", "Turnstile", "ملفات تعريف"],
-      ru: ["email", "адресат", "событийные", "Cloudflare", "Turnstile", "cookie"],
-      uk: ["електронна пошта", "адресата", "подієві", "Cloudflare", "Turnstile", "cookie"],
-      am: ["ኢሜይል", "ተቀባዩ", "ክስተት", "Cloudflare", "Turnstile", "ኩኪ"],
-      yi: ["בליצפּאָסט", "אַדרעסאַט", "געשעעניש", "Cloudflare", "Turnstile", "קיכלעך"]
+      en: ["email", "recipient", "Historical appeal", "Cloudflare", "Turnstile", "cookies"],
+      he: ["דוא", "נמען", "היסטוריות", "Cloudflare", "Turnstile", "עוגיות"],
+      ar: ["البريد", "المستلم", "السابقة", "Cloudflare", "Turnstile", "ملفات تعريف"],
+      ru: ["email", "адресат", "Исторические", "Cloudflare", "Turnstile", "cookie"],
+      uk: ["пошти", "адресата", "Історичні", "Cloudflare", "Turnstile", "cookie"],
+      am: ["ኢሜይል", "ተቀባይ", "ታሪካዊ", "Cloudflare", "Turnstile", "ኩኪ"],
+      yi: ["בליצפּאָסט", "אָפּנעמער", "היסטאָרישע", "Cloudflare", "Turnstile", "קיכלעך"]
     };
     for (const locale of locales) {
       const response = await runtime.app.request(`/${locale}/privacy`);

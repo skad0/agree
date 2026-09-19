@@ -162,10 +162,13 @@ export type CandidateSourceMeta = {
   sourceUrl: string;
   artifactKind: string;
   approvalState: CandidateApprovalState;
+  approvalEvidenceUrl?: string | null;
   notes: string | null;
 };
 
 export type CandidateSourceList = {
+  sourceUrl?: string | null;
+  candidateCount?: number | null;
   officialListKey: string | null;
   listTitleHe: string;
   ballotLetters: string | null;

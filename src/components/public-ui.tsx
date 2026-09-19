@@ -1,3 +1,5 @@
+import { s } from "../share-copy.js";
+import { issueSlug } from "../issues.js";
 import type { Child } from "hono/jsx";
 import { t, type Locale } from "../i18n.js";
 
@@ -14,11 +16,8 @@ export function DocumentSurface({ children }: { children: Child }) {
 }
 
 export function AskPanel({ locale, demandId }: { locale: Locale; demandId?: number }) {
-  const href = demandId ? `/${locale}/request?demand=${demandId}` : `/${locale}/request`;
-  return <div class="document-ask">
-    <div><h2>{t(locale, "navRequest")}</h2><p>{t(locale, "subtitle")}</p></div>
-    <PrimaryAction href={href}>{t(locale, "navRequest")}</PrimaryAction>
-  </div>;
+  const slug = demandId ? issueSlug(demandId) : undefined;
+  return <p class="document-ask"><a href={slug ? `/${locale}/issues/${slug}` : `/${locale}`}>{s(locale,"all")}</a></p>;
 }
 
 export function Surface({ children, class: className = "", emphasis = false }: { children: Child; class?: string; emphasis?: boolean }) {

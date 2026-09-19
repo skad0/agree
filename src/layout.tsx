@@ -1,3 +1,4 @@
+import { s } from "./share-copy.js";
 import type { Child } from "hono/jsx";
 import { cssPath, jsPath, themePath } from "./assets.js";
 import { dirOf, localeNames, locales, t, type Locale } from "./i18n.js";
@@ -7,7 +8,7 @@ import { dirOf, localeNames, locales, t, type Locale } from "./i18n.js";
  * body. The public site and the admin console share the stylesheet and the theme script but not
  * the chrome: a supporter's wayfinding is the wrong furniture for someone editing the campaign.
  */
-export type ShareMeta = { url: string; description: string };
+export type ShareMeta = { url: string; description: string; image?: string; imageAlt?: string };
 
 export function Shell({ locale, title, bodyClass, shareMeta, children }: { locale: Locale; title: string; bodyClass?: string; shareMeta?: ShareMeta; children: Child }) {
   const fullTitle = `${title} · ${t(locale, "siteName")}`;
@@ -24,10 +25,15 @@ export function Shell({ locale, title, bodyClass, shareMeta, children }: { local
         <meta property="og:title" content={fullTitle} />
         <meta property="og:description" content={shareMeta.description} />
         <meta property="og:url" content={shareMeta.url} />
-        <meta name="twitter:card" content="summary" />
+        <meta name="twitter:card" content={shareMeta.image ? "summary_large_image" : "summary"} />
+        {shareMeta.image ? <>
+          <meta property="og:image" content={shareMeta.image} /><meta property="og:image:width" content="1200" /><meta property="og:image:height" content="630" /><meta property="og:image:type" content="image/png" /><meta property="og:image:alt" content={shareMeta.imageAlt ?? title} />
+          <meta name="twitter:image" content={shareMeta.image} /><meta name="twitter:image:alt" content={shareMeta.imageAlt ?? title} />
+        </> : null}
         <meta name="twitter:title" content={fullTitle} />
         <meta name="twitter:description" content={shareMeta.description} />
         <link rel="canonical" href={shareMeta.url} />
+        {locales.map(option => <link rel="alternate" hrefLang={option} href={shareMeta.url.replace(new RegExp(`/${locale}(?=/|$)`),`/${option}`)} />)}
       </> : null}
       {/* Not deferred and not inlined: it must run before first paint to avoid a flash of the
           wrong theme, and script-src has no 'unsafe-inline'. */}
@@ -51,13 +57,11 @@ export function Layout({ locale, title, path, languageQuery = "", languageHref, 
       <div class="public-rule" aria-hidden="true"><span></span><span></span></div>
       <header class="wrap site-header">
         <a class="wordmark" href={`/${locale}`}>{t(locale, "siteName")}</a>
-        {/* Two tiers on purpose: what you can read, and what you can do. Action links keep the
-            same order and wording everywhere so the sequence can be memorised. */}
-        <nav class="primary" aria-label={t(locale, "documentsTitle")}>
-          <a href={`/${locale}/standard`}>{t(locale, "navStandard")}</a>
-          <a href={`/${locale}/first-100-days`}>{t(locale, "navPlan")}</a>
-          <a href={`/${locale}/government-model`}>{t(locale, "navModel")}</a>
-          <a href={`/${locale}/about`}>{t(locale, "navAbout")}</a>
+        {/* The same three destinations appear in the same order on every public page. */}
+        <nav class="primary" aria-label={s(locale,"problems")}>
+          <a href={`/${locale}`} aria-current={suffix === "" ? "page" : suffix.startsWith("/issues/") ? "location" : undefined}>{s(locale,"problems")}</a>
+          <a href={`/${locale}/candidates`} aria-current={suffix === "/candidates" ? "page" : undefined}>{s(locale,"candidates")}</a>
+          <a href={`/${locale}/about`} aria-current={suffix === "/about" ? "page" : undefined}>{s(locale,"about")}</a>
         </nav>
         <details class="languages">
           <summary><span class="label">{t(locale, "language")}</span> <span lang={locale}>{localeNames[locale]}</span></summary>
@@ -67,12 +71,11 @@ export function Layout({ locale, title, path, languageQuery = "", languageHref, 
           </li>)}</ul>
         </details>
       </header>
-      <nav class="actions-bar wrap" aria-label={t(locale, "howItWorks")}>
-        <a href={`/${locale}/request`}><b>1</b>{t(locale, "navRequest")}</a>
-        <a href={`/${locale}/responses/new`}><b>2</b>{t(locale, "navResponse")}</a>
-      </nav>
-      <main id="content" class="wrap">{children}</main>
+      <main id="content" tabIndex={-1} class="wrap">{children}</main>
       <footer class="wrap">
+        <a href={`/${locale}/standard`}>{t(locale,"navStandard")}</a>
+        <a href={`/${locale}/first-100-days`}>{t(locale,"navPlan")}</a>
+        <a href={`/${locale}/government-model`}>{t(locale,"navModel")}</a>
         <a href={`/${locale}/coalition-agreement`}>{t(locale, "navCoalition")}</a>
         <a href={`/${locale}/methodology`}>{t(locale, "navMethodology")}</a>
         <a href={`/${locale}/privacy`}>{t(locale, "navPrivacy")}</a>

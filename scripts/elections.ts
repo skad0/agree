@@ -61,8 +61,8 @@ function runImport(path: string | undefined) {
   try {
     const result = importCandidateSource(db, source, raw);
     console.log(JSON.stringify(result));
-    if (!result.ok) process.exitCode = 1;
-    else console.error(`draft publication ${result.publicationId} written; run: elections activate ${result.publicationId}`);
+    if (!result.ok && result.code !== "already_imported") process.exitCode = 1;
+    else if (result.ok) console.error(`draft publication ${result.publicationId} written; run: elections activate ${result.publicationId}`);
   } finally {
     db.close();
   }

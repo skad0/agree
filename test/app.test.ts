@@ -1,3 +1,4 @@
+import { createLegacyApp } from "./legacy-runtime.js";
 import assert from "node:assert/strict";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -40,26 +41,6 @@ test("all public locales render with the correct text direction", async () => {
       const html = await response.text();
       assert.match(html, new RegExp(`<html lang="${locale}" dir="${["he", "ar", "yi"].includes(locale) ? "rtl" : "ltr"}"`));
       assert.match(html, /href="\/uk(?:\?[^\"]*)?"[^>]*>Українська</, `Ukrainian selector missing from /${locale}`);
-    }
-    close();
-  } finally {
-    rmSync(dir, { recursive: true, force: true });
-  }
-});
-
-test("redesigned home leads to the locale request journey without a draft surface", async () => {
-  const dir = mkdtempSync(join(tmpdir(), "agree-public-home-"));
-  try {
-    const { app, close } = createApp({ sqlitePath: join(dir, "app.db") });
-    for (const [locale, direction] of [["en", "ltr"], ["he", "rtl"]] as const) {
-      const response = await app.request(`/${locale}`);
-      assert.equal(response.status, 200, locale);
-      const html = await response.text();
-      assert.match(html, new RegExp(`<html lang="${locale}" dir="${direction}"`));
-      assert.match(html, new RegExp(`class="primary-action" href="/${locale}/request"`));
-      assert.match(html, new RegExp(`href="/${locale}/request"`));
-      assert.doesNotMatch(html, /<form\b|<textarea\b|name="(?:context|message|subject|whatsappMessage|socialMessage)"/);
-      assert.doesNotMatch(html, /Your letter is ready|Your content is prepared below/);
     }
     close();
   } finally {
@@ -127,13 +108,13 @@ test("unrelated home query input has no rendered, cookie, or database effect", a
 
 test("campaign documents render from SQLite in every locale", async () => {
   const dir = mkdtempSync(join(tmpdir(), "agree-content-"));
+  const { app, db, close } = createApp({ sqlitePath: join(dir, "app.db") });
   try {
-    const { app, db, close } = createApp({ sqlitePath: join(dir, "app.db") });
     assert.equal(db.prepare("SELECT count(*) c FROM demands WHERE document = 'standard'").get()?.c, 10);
     assert.equal(db.prepare("SELECT count(*) c FROM demands WHERE document = 'coalition'").get()?.c, 5);
 
     const home = await app.request("/en");
-    assert.match(await home.text(), /Elections held on schedule/);
+    assert.match(await home.text(), /Will elections happen on time\?/);
 
     // The standard renders the obligation plus all three fixed callouts.
     const standard = await app.request("/en/standard");
@@ -161,8 +142,8 @@ test("campaign documents render from SQLite in every locale", async () => {
     assert.doesNotMatch(await (await app.request("/uk/government-model")).text(), /translation unavailable/);
 
     assert.equal((await app.request("/en/demands")).status, 301);
-    close();
   } finally {
+    close();
     rmSync(dir, { recursive: true, force: true });
   }
 });
@@ -207,8 +188,8 @@ test("document surfaces preserve canonical routes and server-render all content 
     const about = await (await app.request("/en/about")).text();
     const methodology = await (await app.request("/en/methodology")).text();
     assert.match(about, /independent civic platform/);
-    assert.match(methodology, /Public pages do not show campaign progress counters/);
-    assert.match(methodology, /This does not mean it was sent/);
+    assert.match(methodology, /do not record these actions or publish popularity counters/);
+    assert.match(methodology, /does not prove publication or delivery/);
 
     for (const locale of ["en", "he"] as const) {
       const compatibility = await app.request(`/${locale}/demands`);
@@ -218,32 +199,6 @@ test("document surfaces preserve canonical routes and server-render all content 
     close();
   } finally {
     try { rmSync(dir, { recursive: true, force: true }); } catch { /* Windows may briefly lock SQLite sidecars */ }
-  }
-});
-
-test("document request affordance and cache state follow campaign controls", async () => {
-  const dir = mkdtempSync(join(tmpdir(), "agree-document-state-"));
-  try {
-    const { app, db, close } = createApp({ sqlitePath: join(dir, "app.db") });
-    const enabled = await app.request("/en/standard");
-    assert.equal(enabled.status, 200);
-    assert.match(await enabled.text(), /class="document-ask"/);
-    assert.equal(enabled.headers.get("cache-control"), "public, max-age=0, s-maxage=60");
-
-    db.prepare("UPDATE campaigns SET requests_enabled = 0 WHERE id = 1").run();
-    const disabled = await app.request("/he/standard");
-    assert.equal(disabled.status, 200);
-    const disabledHtml = await disabled.text();
-    assert.doesNotMatch(disabledHtml, /class="document-ask"/);
-    assert.doesNotMatch(disabledHtml, /class="primary-action" href="\/he\/request"/);
-
-    const selected = await app.request("/he/standard?lang=1");
-    assert.equal(selected.status, 200);
-    assert.equal(selected.headers.get("cache-control"), "private, no-store");
-    assert.match(selected.headers.get("set-cookie") ?? "", /(?:^|;\s*)locale=he(?:;|$)/);
-    close();
-  } finally {
-    rmSync(dir, { recursive: true, force: true });
   }
 });
 
@@ -331,7 +286,7 @@ test("every locale has every key used by the templates", async () => {
   try {
     const { app, db, close } = createApp({ sqlitePath: join(dir, "app.db") });
     db.prepare("UPDATE campaigns SET support_enabled = 1 WHERE id = 1").run();
-    const paths = ["", "/standard", "/coalition-agreement", "/first-100-days", "/government-model", "/about", "/methodology", "/support", "/request", "/responses/new", "/privacy"];
+    const paths = ["", "/standard", "/coalition-agreement", "/first-100-days", "/government-model", "/about", "/methodology", "/candidates", "/issues/elections-on-time", "/privacy"];
     for (const locale of ["he", "ar", "yi", "ru", "uk", "en", "am"]) {
       for (const path of paths) {
         const response = await app.request(`/${locale}${path}`);
@@ -346,31 +301,10 @@ test("every locale has every key used by the templates", async () => {
   }
 });
 
-test("home and nav are action-only without support or public counters", async () => {
-  const dir = mkdtempSync(join(tmpdir(), "agree-action-only-home-"));
-  try {
-    const runtime = createApp({ sqlitePath: join(dir, "app.db"), env: { NODE_ENV: "test", SESSION_SECRET: "test-secret" } });
-    assert.equal(runtime.db.prepare("SELECT support_enabled FROM campaigns WHERE id = 1").get()?.support_enabled, 0);
-    const page = await runtime.app.request("/en");
-    assert.equal(page.status, 200);
-    const html = await page.text();
-    assert.doesNotMatch(html, /href="\/en\/support"/);
-    assert.doesNotMatch(html, /class="metrics"/);
-    assert.doesNotMatch(html, /proof-count/);
-    assert.match(html, /href="\/en\/request"/);
-    assert.match(html, /href="\/en\/responses\/new"/);
-    const disabled = await runtime.app.request("/en/support");
-    assert.equal(disabled.status, 503);
-    runtime.close();
-  } finally {
-    rmSync(dir, { recursive: true, force: true });
-  }
-});
-
 test("support verification invalidates pending tokens and counts once for a normalized email", async () => {
   const dir = mkdtempSync(join(tmpdir(), "agree-support-"));
   try {
-    const runtime = createApp({ sqlitePath: join(dir, "app.db"), env: { NODE_ENV: "test", SESSION_SECRET: "test-secret" } });
+    const runtime = createLegacyApp({ sqlitePath: join(dir, "app.db"), env: { NODE_ENV: "test", SESSION_SECRET: "test-secret" } });
     enableSupport(runtime.db);
     const first = await submitSupport(runtime.app, " Citizen@Example.org ");
     const second = await submitSupport(runtime.app, "citizen@example.org");
@@ -385,26 +319,10 @@ test("support verification invalidates pending tokens and counts once for a norm
   }
 });
 
-test("locale negotiation and Ukrainian selectors resolve correctly", async () => {
-  const dir = mkdtempSync(join(tmpdir(), "agree-uk-locale-"));
-  try {
-    const { app, close } = createApp({ sqlitePath: join(dir, "app.db") });
-    const root = await app.request("/", { headers: { "Accept-Language": "uk-UA,uk;q=0.9,en;q=0.8" } });
-    assert.equal(root.status, 302);
-    assert.equal(root.headers.get("location"), "/uk");
-    const form = await getForm(app, "/uk/request/build?recipient=1");
-    assert.match(form.html, /<option value="uk"[^>]*selected[^>]*>Українська<\/option>/);
-    assert.match(form.html, /<html lang="uk" dir="ltr"/);
-    close();
-  } finally {
-    rmSync(dir, { recursive: true, force: true });
-  }
-});
-
 test("appeals render in seven locales, count every action, and do not store personal text", async () => {
   const dir = mkdtempSync(join(tmpdir(), "agree-request-"));
   try {
-    const runtime = createApp({ sqlitePath: join(dir, "app.db"), env: { NODE_ENV: "test", SESSION_SECRET: "test-secret" } });
+    const runtime = createLegacyApp({ sqlitePath: join(dir, "app.db"), env: { NODE_ENV: "test", SESSION_SECRET: "test-secret" } });
     for (const locale of ["he", "ar", "yi", "ru", "uk", "en", "am"]) {
       const form = await getForm(runtime.app, `/${locale}/request/build?recipient=1`);
       const response = await postForm(runtime.app, `/${locale}/request/preview`, {
@@ -447,7 +365,7 @@ test("appeals render in seven locales, count every action, and do not store pers
 test("single-recipient request flow keeps RTL form, action, and result contracts", async () => {
   const dir = mkdtempSync(join(tmpdir(), "agree-request-redesign-"));
   try {
-    const runtime = createApp({ sqlitePath: join(dir, "app.db"), env: { NODE_ENV: "test", SESSION_SECRET: "test-secret" } });
+    const runtime = createLegacyApp({ sqlitePath: join(dir, "app.db"), env: { NODE_ENV: "test", SESSION_SECRET: "test-secret" } });
     const chooser = await runtime.app.request("/he/request");
     assert.equal(chooser.status, 200);
     assert.equal(chooser.headers.get("cache-control"), "private, no-store");
@@ -530,85 +448,6 @@ test("single-recipient request flow keeps RTL form, action, and result contracts
   }
 });
 
-test("secondary public pages preserve localized forms, private states, and error semantics", async () => {
-  const dir = mkdtempSync(join(tmpdir(), "agree-secondary-pages-"));
-  try {
-    const runtime = createApp({ sqlitePath: join(dir, "app.db"), env: { NODE_ENV: "test", SESSION_SECRET: "test-secret" } });
-
-    enableSupport(runtime.db);
-    const support = await getForm(runtime.app, "/he/support?lang=1");
-    assert.match(support.html, /<html lang="he" dir="rtl"/);
-    assert.match(support.cookie, /^locale=he$/);
-    assert.match(support.html, /name="email"/);
-    assert.match(support.html, /name="consent"/);
-    const badSupport = await postForm(runtime.app, "/he/support", { csrf: "wrong", email: "person@example.org", consent: "yes" }, support.cookie);
-    assert.equal(badSupport.status, 403);
-    assert.equal(badSupport.headers.get("cache-control"), "private, no-store");
-    runtime.db.prepare("UPDATE campaigns SET support_enabled = 0 WHERE id = 1").run();
-    const disabledSupport = await runtime.app.request("/he/support");
-    assert.equal(disabledSupport.status, 503);
-    assert.equal(disabledSupport.headers.get("cache-control"), "private, no-store");
-    assert.match(await disabledSupport.text(), /<h1>[^<]+<\/h1>/);
-    runtime.db.prepare("UPDATE campaigns SET support_enabled = 1 WHERE id = 1").run();
-
-    const selectedVerification = await runtime.app.request("/verify-email?locale=he&token=expired-token&lang=1");
-    assert.equal(selectedVerification.headers.get("cache-control"), "private, no-store");
-    assert.match(selectedVerification.headers.get("set-cookie") ?? "", /(?:^|;\s*)locale=he(?:;|$)/);
-    const verification = await getForm(runtime.app, "/verify-email?locale=he&token=expired-token");
-    assert.match(verification.html, /<html lang="he" dir="rtl"/);
-    assert.match(verification.html, /name="token" value="expired-token"/);
-    assert.match(verification.html, /action="\/verify-email"/);
-    assert.match(verification.html, /\/verify-email\?token=expired-token&amp;locale=en&amp;lang=1/);
-    assert.equal((await postForm(runtime.app, "/verify-email", { csrf: verification.csrf, token: "expired-token", locale: "he" }, verification.cookie)).status, 400);
-
-    const responseNew = await getForm(runtime.app, "/ar/responses/new?lang=1");
-    assert.match(responseNew.html, /<html lang="ar" dir="rtl"/);
-    assert.match(responseNew.cookie, /^locale=ar$/);
-    assert.match(responseNew.html, /encType="multipart\/form-data"/);
-    assert.match(responseNew.html, /name="submissionToken"/);
-    for (const field of ["recipientId", "receivedAt", "channel", "responseText", "email", "consent"]) assert.match(responseNew.html, new RegExp(`name="${field}"`), field);
-    const thanks = await runtime.app.request("/he/responses/thanks");
-    assert.equal(thanks.status, 200);
-    assert.equal(thanks.headers.get("cache-control"), "private, no-store");
-    assert.match(await thanks.text(), /<html lang="he" dir="rtl"/);
-    assert.match(await (await runtime.app.request("/he/responses/thanks")).text(), /role="status"/);
-
-    for (const locale of ["en", "he"] as const) {
-      const privacy = await runtime.app.request(`/${locale}/privacy`);
-      assert.equal(privacy.status, 200);
-      const privacyHtml = await privacy.text();
-      assert.match(privacyHtml, new RegExp(`<html lang="${locale}" dir="${locale === "he" ? "rtl" : "ltr"}`));
-      assert.match(privacyHtml, new RegExp(`href="/${locale}/delete-data"`));
-      assert.match(privacyHtml, /<h1>[^<]+<\/h1>/);
-    }
-    const selectedPrivacy = await runtime.app.request("/he/privacy?lang=1");
-    assert.equal(selectedPrivacy.headers.get("cache-control"), "private, no-store");
-    assert.match(selectedPrivacy.headers.get("set-cookie") ?? "", /(?:^|;\s*)locale=he(?:;|$)/);
-
-    const deletion = await getForm(runtime.app, "/he/delete-data?lang=1");
-    assert.match(deletion.cookie, /^locale=he$/);
-    assert.equal(deletion.html.match(/<html lang="he" dir="rtl"/)?.[0], '<html lang="he" dir="rtl"');
-    assert.equal((await runtime.app.request("/he/delete-data")).headers.get("cache-control"), "private, no-store");
-    assert.match(deletion.html, /name="email"/);
-    assert.match(deletion.html, /name="csrf"/);
-    const tokenDeletion = await runtime.app.request("/he/delete-data?token=delete-token");
-    assert.equal(tokenDeletion.headers.get("cache-control"), "private, no-store");
-    assert.match(await tokenDeletion.text(), /\/en\/delete-data\?lang=1&amp;token=delete-token/);
-
-    for (const locale of ["en", "he"] as const) {
-      const missing = await runtime.app.request(`/${locale}/definitely-missing`);
-      assert.equal(missing.status, 404, locale);
-      const missingHtml = await missing.text();
-      assert.match(missingHtml, new RegExp(`<html lang="${locale}" dir="${locale === "he" ? "rtl" : "ltr"}`));
-      assert.match(missingHtml, /role="status"/);
-    }
-    assert.equal((await runtime.app.request("/admin")).status, 403);
-    runtime.close();
-  } finally {
-    rmSync(dir, { recursive: true, force: true });
-  }
-});
-
 test("public campaign gates and localized error pages do not leak campaign or unknown paths", async () => {
   const dir = mkdtempSync(join(tmpdir(), "agree-public-gates-"));
   try {
@@ -649,7 +488,7 @@ test("public campaign gates and localized error pages do not leak campaign or un
 test("public post text mentions the handle, falls back to the name, and builds share links", async () => {
   const dir = mkdtempSync(join(tmpdir(), "agree-social-"));
   try {
-    const runtime = createApp({ sqlitePath: join(dir, "app.db"), env: { NODE_ENV: "test", SESSION_SECRET: "test-secret", APP_BASE_URL: "https://campaign.test" } });
+    const runtime = createLegacyApp({ sqlitePath: join(dir, "app.db"), env: { NODE_ENV: "test", SESSION_SECRET: "test-secret", APP_BASE_URL: "https://campaign.test" } });
     const add = (id: number, handle: string | null) => {
       runtime.db.prepare("INSERT INTO recipients (id, type, email, social_handle) VALUES (?, 'politician', 'mk@example.org', ?)").run(id, handle);
       runtime.db.prepare("INSERT INTO recipient_translations (recipient_id, locale, name) VALUES (?, 'en', ?)").run(id, `MK Number ${id}`);
@@ -712,7 +551,7 @@ test("response files stream to S3-compatible storage and enter moderation as new
   let uploaded = 0; let responseCountAtPut = -1; let pendingWorkAtPut = -1; let runtime: ReturnType<typeof createApp> | undefined; const originalFetch = globalThis.fetch;
   globalThis.fetch = async (input, init) => { if (String(input).startsWith("http://storage.test")) { uploaded = (init?.body as Uint8Array).byteLength; responseCountAtPut = Number(runtime?.db.prepare("SELECT count(*) count FROM submitted_responses").get()?.count ?? -1); pendingWorkAtPut = Number(runtime?.db.prepare("SELECT count(*) count FROM response_object_work WHERE state = 'upload_pending'").get()?.count ?? -1); return new Response(null, { status: 200 }); } return originalFetch(input, init); };
   try {
-    runtime = createApp({ sqlitePath: join(dir, "app.db"), env: {
+    runtime = createLegacyApp({ sqlitePath: join(dir, "app.db"), env: {
       NODE_ENV: "test", SESSION_SECRET: "test-secret", R2_ACCOUNT_ID: "test", R2_ACCESS_KEY_ID: "key",
       R2_SECRET_ACCESS_KEY: "secret", R2_BUCKET: "bucket", R2_ENDPOINT: "http://storage.test"
     } });
@@ -760,7 +599,7 @@ test("concurrent same-token file submissions use distinct intents and keep only 
     return originalFetch(input, init);
   };
   try {
-    const runtime = createApp({ sqlitePath: join(dir, "app.db"), env: { NODE_ENV: "test", SESSION_SECRET: "test-secret", TURNSTILE_SITE_KEY: "site", TURNSTILE_SECRET_KEY: "secret", R2_ACCOUNT_ID: "test", R2_ACCESS_KEY_ID: "key", R2_SECRET_ACCESS_KEY: "secret", R2_BUCKET: "bucket", R2_ENDPOINT: "http://storage.test" } });
+    const runtime = createLegacyApp({ sqlitePath: join(dir, "app.db"), env: { NODE_ENV: "test", SESSION_SECRET: "test-secret", TURNSTILE_SITE_KEY: "site", TURNSTILE_SECRET_KEY: "secret", R2_ACCOUNT_ID: "test", R2_ACCESS_KEY_ID: "key", R2_SECRET_ACCESS_KEY: "secret", R2_BUCKET: "bucket", R2_ENDPOINT: "http://storage.test" } });
     const form = await getForm(runtime.app, "/en/responses/new");
     const token = form.html.match(/name="submissionToken" value="([^"]+)"/)?.[1] ?? "";
     const makeBody = (letter: string, turnstile: string) => {
@@ -819,7 +658,7 @@ test("ambiguous aborted PUT retains delayed cleanup until a late remote commit i
     return originalFetch(input, init);
   };
   try {
-    const runtime = createApp({ sqlitePath: join(dir, "agree.db"), env: { NODE_ENV: "test", SESSION_SECRET: "test-secret", RESPONSE_PUT_TIMEOUT_MS: "50", TURNSTILE_SITE_KEY: "site", TURNSTILE_SECRET_KEY: "secret", R2_ACCOUNT_ID: "test", R2_ACCESS_KEY_ID: "key", R2_SECRET_ACCESS_KEY: "secret", R2_BUCKET: "bucket", R2_ENDPOINT: "http://storage.test" } });
+    const runtime = createLegacyApp({ sqlitePath: join(dir, "agree.db"), env: { NODE_ENV: "test", SESSION_SECRET: "test-secret", RESPONSE_PUT_TIMEOUT_MS: "50", TURNSTILE_SITE_KEY: "site", TURNSTILE_SECRET_KEY: "secret", R2_ACCOUNT_ID: "test", R2_ACCESS_KEY_ID: "key", R2_SECRET_ACCESS_KEY: "secret", R2_BUCKET: "bucket", R2_ENDPOINT: "http://storage.test" } });
     const form = await getForm(runtime.app, "/en/responses/new");
     const body = new FormData();
     Object.entries({ csrf: form.csrf, submissionToken: form.html.match(/name="submissionToken" value="([^"]+)"/)?.[1] ?? "", recipientId: "1", receivedAt: "2026-01-01", channel: "email", responseText: "Ambiguous", email: "ambiguous@example.org", consent: "yes", "cf-turnstile-response": "valid" }).forEach(([key, value]) => body.set(key, value));
@@ -849,7 +688,7 @@ test("TypeError PUT failures are also retained as delayed ambiguous cleanup", as
     return originalFetch(input, init);
   };
   try {
-    const runtime = createApp({ sqlitePath: join(dir, "agree.db"), env: { NODE_ENV: "test", SESSION_SECRET: "test-secret", RESPONSE_PUT_TIMEOUT_MS: "50", TURNSTILE_SITE_KEY: "site", TURNSTILE_SECRET_KEY: "secret", R2_ACCOUNT_ID: "test", R2_ACCESS_KEY_ID: "key", R2_SECRET_ACCESS_KEY: "secret", R2_BUCKET: "bucket", R2_ENDPOINT: "http://storage.test" } });
+    const runtime = createLegacyApp({ sqlitePath: join(dir, "agree.db"), env: { NODE_ENV: "test", SESSION_SECRET: "test-secret", RESPONSE_PUT_TIMEOUT_MS: "50", TURNSTILE_SITE_KEY: "site", TURNSTILE_SECRET_KEY: "secret", R2_ACCOUNT_ID: "test", R2_ACCESS_KEY_ID: "key", R2_SECRET_ACCESS_KEY: "secret", R2_BUCKET: "bucket", R2_ENDPOINT: "http://storage.test" } });
     const form = await getForm(runtime.app, "/en/responses/new"); const body = new FormData();
     Object.entries({ csrf: form.csrf, submissionToken: form.html.match(/name="submissionToken" value="([^"]+)"/)?.[1] ?? "", recipientId: "1", receivedAt: "2026-01-01", channel: "email", responseText: "Transport failure", email: "transport@example.org", consent: "yes", "cf-turnstile-response": "valid" }).forEach(([key, value]) => body.set(key, value));
     body.set("file", new File([Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 3])], "transport.png", { type: "image/png" }));
@@ -868,7 +707,7 @@ test("TypeError PUT failures are also retained as delayed ambiguous cleanup", as
 test("response submission tokens are opaque, replay-safe, and tombstone known expired tokens", async () => {
   const dir = mkdtempSync(join(tmpdir(), "agree-response-token-"));
   try {
-    const runtime = createApp({ sqlitePath: join(dir, "app.db"), env: { NODE_ENV: "test", SESSION_SECRET: "test-secret" } });
+    const runtime = createLegacyApp({ sqlitePath: join(dir, "app.db"), env: { NODE_ENV: "test", SESSION_SECRET: "test-secret" } });
     const form = await getForm(runtime.app, "/en/responses/new");
     const token = form.html.match(/name="submissionToken" value="([^"]+)"/)?.[1] ?? "";
     const values = { csrf: form.csrf, submissionToken: token, recipientId: "1", receivedAt: "2026-01-01", channel: "email", responseText: "One response", email: "sender@example.org", consent: "yes" };
@@ -896,7 +735,7 @@ test("failed response upload is compensated through durable delete work", async 
   const originalFetch = globalThis.fetch; const methods: string[] = [];
   globalThis.fetch = async (input, init) => { if (String(input).startsWith("http://storage.test")) { methods.push(init?.method ?? "GET"); return new Response(null, { status: init?.method === "DELETE" ? 204 : 500 }); } return originalFetch(input, init); };
   try {
-    const runtime = createApp({ sqlitePath: join(dir, "app.db"), env: { NODE_ENV: "test", SESSION_SECRET: "test-secret", R2_ACCOUNT_ID: "test", R2_ACCESS_KEY_ID: "key", R2_SECRET_ACCESS_KEY: "secret", R2_BUCKET: "bucket", R2_ENDPOINT: "http://storage.test" } });
+    const runtime = createLegacyApp({ sqlitePath: join(dir, "app.db"), env: { NODE_ENV: "test", SESSION_SECRET: "test-secret", R2_ACCOUNT_ID: "test", R2_ACCESS_KEY_ID: "key", R2_SECRET_ACCESS_KEY: "secret", R2_BUCKET: "bucket", R2_ENDPOINT: "http://storage.test" } });
     const form = await getForm(runtime.app, "/en/responses/new");
     const body = new FormData();
     Object.entries({ csrf: form.csrf, submissionToken: form.html.match(/name="submissionToken" value="([^"]+)"/)?.[1] ?? "", recipientId: "1", receivedAt: "2026-01-01", channel: "email", responseText: "Upload failure", email: "failure@example.org", consent: "yes" }).forEach(([key, value]) => body.set(key, value));
@@ -919,7 +758,7 @@ test("privacy deletion queues response objects, erases nonce links, and preserve
   let runtime: ReturnType<typeof createApp> | undefined;
   globalThis.fetch = async (input, init) => { if (String(input).startsWith("http://ledger.test")) return new Response(null, { status: 200 }); if (String(input).startsWith("http://storage.test") && init?.method === "DELETE") { deleted.push(new URL(String(input)).pathname); responseCountAtDelete = Number(runtime?.db.prepare("SELECT count(*) count FROM submitted_responses").get()?.count ?? -1); return new Response(null, { status: 204 }); } return originalFetch(input, init); };
   try {
-    runtime = createApp({ sqlitePath: join(dir, "app.db"), env: { NODE_ENV: "test", SESSION_SECRET: "test-secret", R2_ACCOUNT_ID: "test", R2_ACCESS_KEY_ID: "key", R2_SECRET_ACCESS_KEY: "secret", R2_BUCKET: "bucket", R2_ENDPOINT: "http://storage.test", ERASURE_LEDGER_S3_ENDPOINT: "http://ledger.test", ERASURE_LEDGER_S3_ACCESS_KEY: "ledger-key", ERASURE_LEDGER_S3_SECRET_KEY: "ledger-secret", ERASURE_LEDGER_S3_BUCKET: "ledger", ERASURE_LEDGER_HMAC_KEYS: `v1:${Buffer.alloc(32, 7).toString("base64url")}`, ERASURE_LEDGER_ACTIVE_KEY_VERSION: "v1" } });
+    runtime = createLegacyApp({ sqlitePath: join(dir, "app.db"), env: { NODE_ENV: "test", SESSION_SECRET: "test-secret", R2_ACCOUNT_ID: "test", R2_ACCESS_KEY_ID: "key", R2_SECRET_ACCESS_KEY: "secret", R2_BUCKET: "bucket", R2_ENDPOINT: "http://storage.test", ERASURE_LEDGER_S3_ENDPOINT: "http://ledger.test", ERASURE_LEDGER_S3_ACCESS_KEY: "ledger-key", ERASURE_LEDGER_S3_SECRET_KEY: "ledger-secret", ERASURE_LEDGER_S3_BUCKET: "ledger", ERASURE_LEDGER_HMAC_KEYS: `v1:${Buffer.alloc(32, 7).toString("base64url")}`, ERASURE_LEDGER_ACTIVE_KEY_VERSION: "v1" } });
     enableSupport(runtime.db);
     const support = await submitSupport(runtime.app, "delete-response@example.org");
     await verifySupport(runtime.app, support.token);
@@ -1042,7 +881,7 @@ test("moderators are confined to response moderation and receive a restricted na
 test("request A capability is rejected at every request B action endpoint", async () => {
   const dir = mkdtempSync(join(tmpdir(), "agree-capability-routes-"));
   try {
-    const runtime = createApp({ sqlitePath: join(dir, "app.db"), env: { NODE_ENV: "test", SESSION_SECRET: "test-secret" } });
+    const runtime = createLegacyApp({ sqlitePath: join(dir, "app.db"), env: { NODE_ENV: "test", SESSION_SECRET: "test-secret" } });
     const a = await generatedRequest(runtime.app, 1);
     const b = await generatedRequest(runtime.app, 1);
     const wrong = { csrf: b.csrf, requestId: b.requestId, capability: a.capability };
@@ -1062,7 +901,7 @@ test("request A capability is rejected at every request B action endpoint", asyn
 test("disabled requests reject action, copy, and report without recording actions", async () => {
   const dir = mkdtempSync(join(tmpdir(), "agree-disabled-request-actions-"));
   try {
-    const runtime = createApp({ sqlitePath: join(dir, "app.db"), env: { NODE_ENV: "test", SESSION_SECRET: "test-secret" } });
+    const runtime = createLegacyApp({ sqlitePath: join(dir, "app.db"), env: { NODE_ENV: "test", SESSION_SECRET: "test-secret" } });
     const request = await generatedRequest(runtime.app, 1);
     runtime.db.prepare("UPDATE campaigns SET requests_enabled = 0 WHERE id = 1").run();
     const values = { csrf: request.csrf, requestId: request.requestId, capability: request.capability };
@@ -1092,7 +931,7 @@ test("copy bypasses Turnstile while a one-use token protects the substantive act
     return originalFetch(input, init);
   };
   try {
-    const runtime = createApp({ sqlitePath: join(dir, "app.db"), env: {
+    const runtime = createLegacyApp({ sqlitePath: join(dir, "app.db"), env: {
       NODE_ENV: "test", SESSION_SECRET: "test-secret", TURNSTILE_SITE_KEY: "site", TURNSTILE_SECRET_KEY: "secret"
     } });
     const request = await generatedRequest(runtime.app, 1, "preview-token");
@@ -1115,7 +954,7 @@ test("copy bypasses Turnstile while a one-use token protects the substantive act
 test("request preview, action, and result are private; result shares the handle and preserves language request", async () => {
   const dir = mkdtempSync(join(tmpdir(), "agree-request-route-headers-"));
   try {
-    const runtime = createApp({ sqlitePath: join(dir, "app.db"), env: { NODE_ENV: "test", SESSION_SECRET: "test-secret", APP_BASE_URL: "https://campaign.test" } });
+    const runtime = createLegacyApp({ sqlitePath: join(dir, "app.db"), env: { NODE_ENV: "test", SESSION_SECRET: "test-secret", APP_BASE_URL: "https://campaign.test" } });
     runtime.db.prepare("INSERT INTO recipients (id, type, email, social_handle, is_active) VALUES (7, 'politician', 'oracle@example.org', '@oracle_handle', 1)").run();
     runtime.db.prepare("INSERT INTO recipient_translations (recipient_id, locale, name) VALUES (7, 'en', 'Oracle Recipient')").run();
     const form = await getForm(runtime.app, "/en/request/build?recipient=7");
@@ -1153,7 +992,7 @@ test("request preview, action, and result are private; result shares the handle 
 test("contactless recipients stay visible without send links and unavailable direct actions are not persisted", async () => {
   const dir = mkdtempSync(join(tmpdir(), "agree-contactless-recipient-"));
   try {
-    const runtime = createApp({ sqlitePath: join(dir, "app.db"), env: { NODE_ENV: "test", SESSION_SECRET: "test-secret" } });
+    const runtime = createLegacyApp({ sqlitePath: join(dir, "app.db"), env: { NODE_ENV: "test", SESSION_SECRET: "test-secret" } });
     runtime.db.prepare("INSERT INTO recipients (id, type, is_active) VALUES (7, 'politician', 1), (8, 'politician', 1)").run();
     runtime.db.prepare("INSERT INTO recipient_translations (recipient_id, locale, name) VALUES (7, 'en', 'No Contact Recipient'), (8, 'en', 'Email Recipient')").run();
     runtime.db.prepare("UPDATE recipients SET email = 'email@example.org' WHERE id = 8").run();
@@ -1193,7 +1032,7 @@ test("contactless recipients stay visible without send links and unavailable dir
 
 test("directory search, suggest bounds, question help, and legacy build links", async () => {
   const dir = mkdtempSync(join(tmpdir(), "agree-directory-ui-"));
-  const runtime = createApp({ sqlitePath: join(dir, "app.db"), env: { NODE_ENV: "test", SESSION_SECRET: "test-secret" } });
+  const runtime = createLegacyApp({ sqlitePath: join(dir, "app.db"), env: { NODE_ENV: "test", SESSION_SECRET: "test-secret" } });
   try {
     const page = await getForm(runtime.app, "/en/request");
     assert.match(page.html, /Name, party, list or ballot letters/);
@@ -1420,7 +1259,7 @@ test("invalid admin recipient input returns an HTML 422 page", async () => {
 test("request result rejects missing IDs and builds a request-specific recipient share", async () => {
   const dir = mkdtempSync(join(tmpdir(), "agree-request-result-"));
   try {
-    const runtime = createApp({ sqlitePath: join(dir, "app.db"), env: { NODE_ENV: "test", SESSION_SECRET: "test-secret", APP_BASE_URL: "https://campaign.test" } });
+    const runtime = createLegacyApp({ sqlitePath: join(dir, "app.db"), env: { NODE_ENV: "test", SESSION_SECRET: "test-secret", APP_BASE_URL: "https://campaign.test" } });
     for (const path of ["/en/request/result", "/en/request/result?request=999999", "/en/request/result?request=not-an-id"]) {
       const response = await runtime.app.request(path);
       assert.equal(response.status, 422, path);
@@ -1479,7 +1318,7 @@ test("data deletion requires email-link confirmation and anonymizes matching rec
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async (input, init) => String(input).startsWith("http://ledger.test") ? new Response(null, { status: 200 }) : originalFetch(input, init);
   try {
-    const runtime = createApp({ sqlitePath: join(dir, "app.db"), env: { NODE_ENV: "test", SESSION_SECRET: "test-secret", ERASURE_LEDGER_S3_ENDPOINT: "http://ledger.test", ERASURE_LEDGER_S3_ACCESS_KEY: "ledger-key", ERASURE_LEDGER_S3_SECRET_KEY: "ledger-secret", ERASURE_LEDGER_S3_BUCKET: "ledger", ERASURE_LEDGER_HMAC_KEYS: `v1:${Buffer.alloc(32, 7).toString("base64url")}`, ERASURE_LEDGER_ACTIVE_KEY_VERSION: "v1" } });
+    const runtime = createLegacyApp({ sqlitePath: join(dir, "app.db"), env: { NODE_ENV: "test", SESSION_SECRET: "test-secret", ERASURE_LEDGER_S3_ENDPOINT: "http://ledger.test", ERASURE_LEDGER_S3_ACCESS_KEY: "ledger-key", ERASURE_LEDGER_S3_SECRET_KEY: "ledger-secret", ERASURE_LEDGER_S3_BUCKET: "ledger", ERASURE_LEDGER_HMAC_KEYS: `v1:${Buffer.alloc(32, 7).toString("base64url")}`, ERASURE_LEDGER_ACTIVE_KEY_VERSION: "v1" } });
     enableSupport(runtime.db);
     const support = await submitSupport(runtime.app, "delete@example.org"); await verifySupport(runtime.app, support.token);
     const request = await getForm(runtime.app, "/en/delete-data");

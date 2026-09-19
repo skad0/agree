@@ -4,7 +4,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { createApp } from "../src/app.js";
+import { createLegacyApp as createApp } from "./legacy-runtime.js";
 import { openDatabase } from "../src/db.js";
 import {
   currentQuestionVersionForDemand,

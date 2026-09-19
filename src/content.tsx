@@ -1,3 +1,5 @@
+import { issueSlug } from "./issues.js";
+import { s } from "./share-copy.js";
 import type { Hono } from "hono";
 import type { Db } from "./db.js";
 import { dirOf, isLocale, t, type Locale } from "./i18n.js";
@@ -5,7 +7,7 @@ import { Layout } from "./layout.js";
 import { markdown } from "./markdown.js";
 import { AskPanel, DocumentIntro, DocumentSurface } from "./components/public-ui.js";
 import type { Config } from "./config.js";
-import { privateNoStore, publicCache, publicCampaignActive, publicRequestsEnabled, rememberLocale } from "./public-state.js";
+import { privateNoStore, publicCache, publicCampaignActive, rememberLocale } from "./public-state.js";
 
 type Clause = { id: number; sortOrder: number; title: string | null; body: string | null; rationale: string | null; verification: string | null; exceptions: string | null };
 type PlanItem = { id: number; dayFrom: number; dayTo: number; title: string | null; decision: string | null; instrument: string | null; owners: string | null; criterion: string | null };
@@ -20,11 +22,11 @@ export function registerContentRoutes(app: Hono, db: Db, config: Config) {
       rememberLocale(context, locale, config);
       if (!publicCampaignActive(db)) return statusPage(context, locale, t(locale, "formDisabled"), 503);
       publicCache(context);
-      const askEnabled = publicRequestsEnabled(db);
+      const askEnabled = true;
       return context.html(<Layout locale={locale} title={t(locale, titleKey)} path={context.req.path}>
         <DocumentIntro title={t(locale, titleKey)} lede={t(locale, ledeKey)} />
         {render(locale, askEnabled)}
-        <p class="neutrality" role="note">{t(locale, "neutrality")}</p>
+        <p class="neutrality" role="note">{s(locale, "neutrality")}</p>
         {askEnabled ? <AskPanel locale={locale} /> : null}
       </Layout>);
     });
@@ -34,10 +36,7 @@ export function registerContentRoutes(app: Hono, db: Db, config: Config) {
   page("first-100-days", "planTitle", "planLede", (locale) => timeline(locale, planItems(db, locale)));
   page("government-model", "modelTitle", "modelLede", (locale) => portfolioGrid(locale, portfolios(db, locale)));
   page("about", "aboutTitle", "slogan", (locale) => prose(t(locale, "aboutBody")));
-  page("methodology", "methodologyTitle", "slogan", (locale) => <>
-    {prose(t(locale, "methodologyBody"))}
-    {prose(t(locale, "methodologyStance").replaceAll("{{PRIVACY_CONTACT_EMAIL}}", config.privacyContactEmail))}
-  </>);
+  page("methodology", "methodologyTitle", "slogan", (locale) => prose(t(locale, "methodologyBody").replaceAll("{{PRIVACY_CONTACT_EMAIL}}", config.privacyContactEmail)));
 
   // The old placeholder route keeps working so existing links do not break.
   app.get("/:locale/demands", (context) => {
@@ -73,7 +72,7 @@ function clauseList(locale: Locale, rows: Clause[], askEnabled = false) {
         {row.verification ? <div class="callout how"><p class="clause-label">{t(locale, "verification")}</p>{splitList(row.verification)}</div> : null}
         {row.exceptions ? <div class="callout except"><p class="clause-label">{t(locale, "exceptions")}</p><p>{row.exceptions}</p></div> : null}
       </details> : null}
-      {askEnabled ? <p class="clause-ask"><a href={`/${locale}/request?demand=${row.id}`}>{t(locale, "navRequest")}</a></p> : null}
+      {askEnabled && issueSlug(row.id) ? <p class="clause-ask"><a href={`/${locale}/issues/${issueSlug(row.id)}`}>{s(locale,"share")}: {row.title}</a></p> : null}
     </> : <p role="status">{t(locale, "unavailable")}</p>}
   </li>)}</ol>;
 }

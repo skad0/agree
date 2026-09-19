@@ -217,6 +217,7 @@ export function directoryPublicationRef(db: Db): { electionId: number; publicati
 
 export type DirectoryElectionState =
   | { kind: "none" }
+  | { kind: "unknown"; electionNumber: number }
   | { kind: "submitted"; electionNumber: number; listsWithoutRoster: number }
   | { kind: "approved"; electionNumber: number };
 
@@ -226,15 +227,15 @@ export type DirectoryElectionState =
  * presenting a provisional roster as the final ballot.
  */
 export function directoryElectionState(db: Db): DirectoryElectionState {
-  const row = db.prepare(`SELECT e.number AS number, e.approval_state AS approvalState
+  const row = db.prepare(`SELECT e.number AS number, m.approval_state AS approvalState, p.snapshot_id AS snapshotId
     FROM directory_publications p JOIN elections e ON e.id = p.election_id
+    LEFT JOIN election_snapshot_metadata m ON m.snapshot_id=p.snapshot_id
     WHERE p.status = 'active' ORDER BY p.id DESC LIMIT 1`)
-    .get() as { number: number; approvalState: string } | undefined;
+    .get() as { number: number; approvalState: string; snapshotId: number } | undefined;
   if (!row) return { kind: "none" };
-  if (row.approvalState !== "submitted_not_approved") return { kind: "approved", electionNumber: Number(row.number) };
-  const missing = db.prepare(`SELECT count(*) AS n FROM electoral_lists l
-    JOIN directory_publications p ON p.election_id = l.election_id AND p.status = 'active'
-    WHERE l.roster_published = 0`).get() as { n: number };
+  if (row.approvalState === "approved") return { kind: "approved", electionNumber: Number(row.number) };
+  if (row.approvalState !== "submitted_not_approved") return { kind: "unknown", electionNumber: Number(row.number) };
+  const missing = db.prepare(`SELECT count(*) AS n FROM electoral_list_versions l WHERE l.snapshot_id=? AND l.roster_published = 0`).get(row.snapshotId) as { n: number };
   return { kind: "submitted", electionNumber: Number(row.number), listsWithoutRoster: Number(missing.n) };
 }
 

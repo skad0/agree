@@ -406,6 +406,7 @@ function RecipientName({ item }: { item: Pick<DirectoryBrowseItem, "name" | "nam
  */
 function DirectoryStateNotice({ locale, state }: { locale: Locale; state: DirectoryElectionState }) {
   if (state.kind === "none") return <Callout tone="muted"><p>{t(locale, "directoryNoElection")}</p></Callout>;
+  if (state.kind === "unknown") return <Callout tone="muted"><p>{t(locale,"directoryNoElection")}</p></Callout>;
   if (state.kind === "approved") {
     return <Callout tone="muted"><p>{t(locale, "directoryListsApproved").replace("{n}", String(state.electionNumber))}</p></Callout>;
   }

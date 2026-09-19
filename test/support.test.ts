@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { createApp } from "../src/app.js";
+import { createLegacyApp as createApp } from "./legacy-runtime.js";
 
 test("support submission does not overwrite a verified supporter", async () => {
   const dir = mkdtempSync(join(tmpdir(), "agree-support-integrity-"));

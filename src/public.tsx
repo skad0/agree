@@ -1,20 +1,15 @@
 import type { Hono } from "hono";
 import { AMHARIC_BOLD, AMHARIC_REGULAR, CSS, JS, THEME_JS, amharicBoldPath, amharicRegularPath, cssPath, jsPath, themePath } from "./assets.js";
 import { registerContentRoutes } from "./content.js";
-import { markdown } from "./markdown.js";
 import { getCookie } from "hono/cookie";
 import type { Config } from "./config.js";
 import type { Db } from "./db.js";
-import { isLocale, localeFromRequest, t, type Locale } from "./i18n.js";
-import { Layout } from "./layout.js";
-import { registerRequestRoutes } from "./requests.js";
-import { registerResponseRoutes } from "./responses.js";
+import { localeFromRequest } from "./i18n.js";
+import { registerShareRoutes } from "./share-pages.js";
+import { registerCandidateRoutes } from "./candidates.js";
+import { shareImages } from "./share-images.js";
 import { registerPrivacyRoutes } from "./privacy.js";
 import { registerSupportRoutes } from "./support.js";
-import { Callout, PrimaryAction, Surface } from "./components/public-ui.js";
-import { privateNoStore, publicCache, publicCampaignActive, publicRequestsEnabled, rememberLocale } from "./public-state.js";
-
-type Demand = { id: number; title: string | null; body: string | null };
 
 export function registerPublicRoutes(app: Hono, db: Db, config: Config) {
   // The URL carries the content hash, so these may be cached forever without stranding a deploy.
@@ -34,81 +29,17 @@ export function registerPublicRoutes(app: Hono, db: Db, config: Config) {
   font(amharicRegularPath, AMHARIC_REGULAR);
   font(amharicBoldPath, AMHARIC_BOLD);
 
+  registerShareRoutes(app, db, config);
+  registerCandidateRoutes(app, db, config);
   registerSupportRoutes(app, db, config);
-  registerRequestRoutes(app, db, config);
-  registerResponseRoutes(app, db, config);
+  for (const asset of shareImages) app.get(asset.path, context => {
+    context.header("Content-Type", "image/png");
+    context.header("Cache-Control", "public, max-age=31536000, immutable");
+    return context.body(asset.body as any);
+  });
   registerPrivacyRoutes(app, db, config);
   registerContentRoutes(app, db, config);
 
   app.get("/", (context) => context.redirect(`/${localeFromRequest(getCookie(context, "locale"), context.req.header("Accept-Language"))}`));
 
-  app.get("/:locale", (context) => {
-    const locale = publicLocale(context.req.param("locale"));
-    if (!locale) return context.notFound();
-    rememberLocale(context, locale, config);
-    if (!publicCampaignActive(db)) return statusPage(context, locale, t(locale, "formDisabled"), 503);
-    const demands = demandRows(db, locale);
-    const requestsEnabled = publicRequestsEnabled(db);
-    publicCache(context);
-    return context.html(<Layout locale={locale} title={t(locale, "homeTitle")} path={context.req.path}>
-      <section class="home-hero" aria-labelledby="home-heading">
-        <p class="eyebrow">{t(locale, "slogan")}</p>
-        <h1 id="home-heading">{t(locale, "homeTitle")}</h1>
-        {requestsEnabled ? <div class="ask-action-row"><PrimaryAction href={`/${locale}/request`}>{t(locale, "navRequest")}</PrimaryAction></div> : null}
-        <nav class="suggestions" aria-label={t(locale, "documentsTitle")}>
-          <span>{t(locale, "documentsTitle")}</span>
-          <a href={`/${locale}/standard`}>{t(locale, "navStandard")}</a>
-          <a href={`/${locale}/coalition-agreement`}>{t(locale, "navCoalition")}</a>
-          <a href={`/${locale}/first-100-days`}>{t(locale, "navPlan")}</a>
-        </nav>
-      </section>
-
-      <Surface class="home-information">
-        <p>{t(locale, "problem")}</p>
-        <p>{t(locale, "solution")}</p>
-        <Callout tone="caution"><p role="note">{t(locale, "neutrality")}</p></Callout>
-      </Surface>
-
-      <h2 class="section-label">{t(locale, "howItWorks")}</h2>
-      <ol class="journey">
-        <li><a href={`/${locale}/request`}><strong>{t(locale, "navRequest")}</strong><span>{t(locale, "journeyRequest")}</span></a></li>
-        <li><a href={`/${locale}/responses/new`}><strong>{t(locale, "navResponse")}</strong><span>{t(locale, "journeyResponse")}</span></a></li>
-      </ol>
-
-      <h2 class="section-label">{t(locale, "documentsTitle")}</h2>
-      <ul class="documents">
-        <li><a href={`/${locale}/standard`}><strong>{t(locale, "standardTitle")}</strong><span>{t(locale, "standardLede")}</span></a></li>
-        <li><a href={`/${locale}/coalition-agreement`}><strong>{t(locale, "coalitionTitle")}</strong><span>{t(locale, "coalitionLede")}</span></a></li>
-        <li><a href={`/${locale}/first-100-days`}><strong>{t(locale, "planTitle")}</strong><span>{t(locale, "planLede")}</span></a></li>
-        <li><a href={`/${locale}/government-model`}><strong>{t(locale, "modelTitle")}</strong><span>{t(locale, "modelLede")}</span></a></li>
-      </ul>
-
-      <h2 class="section-label">{t(locale, "standardTitle")}</h2>
-      {demandList(locale, demands)}
-      <p><a href={`/${locale}/standard`}>{t(locale, "readFull")}</a></p>
-    </Layout>);
-  });
-}
-
-function demandRows(db: Db, locale: Locale) {
-  return db.prepare(`SELECT d.id, dt.title, dt.body FROM demands d
-    JOIN campaigns c ON c.id = d.campaign_id
-    LEFT JOIN demand_translations dt ON dt.demand_id = d.id AND dt.locale = ?
-    WHERE c.status = 'active' AND d.is_active = 1 AND d.document = 'standard' ORDER BY d.sort_order`).all(locale) as Demand[];
-}
-
-function demandList(locale: Locale, demands: Demand[], full = false) {
-  if (!demands.length) return <p role="status">{t(locale, "unavailable")}</p>;
-  return <ol>{demands.map((demand) => <li>
-    {demand.title ? <><strong>{demand.title}</strong>{full && demand.body ? <div dangerouslySetInnerHTML={{ __html: markdown(demand.body) }} /> : null}</> : <span role="status">{t(locale, "unavailable")}</span>}
-  </li>)}</ol>;
-}
-
-function statusPage(context: any, locale: Locale, message: string, status = 200) {
-  privateNoStore(context);
-  return context.html(<Layout locale={locale} title={t(locale, "siteName")} path={`/${locale}`}><div class="status-page"><h1>{t(locale, "siteName")}</h1><p role="status">{message}</p></div></Layout>, status);
-}
-
-function publicLocale(value: string) {
-  return isLocale(value) ? value : undefined;
 }

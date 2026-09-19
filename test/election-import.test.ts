@@ -5,7 +5,9 @@ import { join } from "node:path";
 import test from "node:test";
 import { openDatabase } from "../src/db.js";
 import { activatePublication, importCandidateSource, parseCandidateSource } from "../src/integrations/elections/import.js";
-import { directoryElectionState, listDirectoryBrowse, listNamedRecipients } from "../src/recipients.js";
+import { directoryElectionState, listNamedRecipients } from "../src/recipients.js";
+
+import { candidateLists, candidateRows, candidatePublication } from "../src/candidates.js";
 
 const transcript = {
   schemaVersion: 1,
@@ -72,6 +74,20 @@ test("parseCandidateSource refuses transcripts that would import as silent half-
   const duplicate = clone(transcript);
   duplicate.rows[1]!.rank = 1;
   assert.throws(() => parseCandidateSource(duplicate), /duplicate rank/);
+
+  assert.throws(() => parseCandidateSource({...transcript,electionNumber:25}), /electionNumber/);
+  assert.throws(() => parseCandidateSource({...transcript,schemaVersion:2}), /schemaVersion/);
+  assert.throws(() => parseCandidateSource({...transcript,lists:[...transcript.lists,transcript.lists[0]]}), /duplicate officialListKey/);
+  const invalidBoolean=clone(transcript) as any;invalidBoolean.lists[0].rosterPublished="false";
+  assert.throws(() => parseCandidateSource(invalidBoolean), /must be boolean/);
+  const invalidCount=clone(transcript) as any;invalidCount.lists[0].candidateCount=3;
+  assert.throws(() => parseCandidateSource(invalidCount), /candidateCount mismatch/);
+  const approved=clone(transcript) as any;approved.source.approvalState="approved";
+  assert.throws(() => parseCandidateSource(approved), /official source URL/);
+  approved.source.approvalEvidenceUrl="https://example.org/claims-approval";
+  assert.throws(() => parseCandidateSource(approved), /official HTTPS/);
+  approved.source.approvalEvidenceUrl="https://www.gov.il/he/pages/candidates-lists-26";
+  assert.equal(parseCandidateSource(approved).source.approvalState,"approved");
 });
 
 test("import writes a draft that changes nothing on the public directory until it is activated", () => {
@@ -106,50 +122,35 @@ test("import writes a draft that changes nothing on the public directory until i
   });
 });
 
-test("activation publishes candidates, labels them unapproved, and keeps Hebrew names readable in other locales", () => {
-  withDb((db) => {
-    const raw = JSON.stringify(transcript);
-    const imported = importCandidateSource(db, parseCandidateSource(JSON.parse(raw)), raw);
-    assert.equal(imported.ok, true);
-    if (!imported.ok) return;
-
-    const activated = activatePublication(db, imported.publicationId);
-    assert.equal(activated.ok, true);
-    if (!activated.ok) return;
-    assert.equal(activated.recipientsCreated, 2);
-
-    const state = directoryElectionState(db);
-    assert.equal(state.kind, "submitted");
-    if (state.kind !== "submitted") return;
-    assert.equal(state.electionNumber, 26);
-    assert.equal(state.listsWithoutRoster, 1, "a submitted list with no roster is reported, not hidden");
-
-    const hebrew = listDirectoryBrowse(db, "he").find((row) => row.name === "כהן ישראל");
-    assert.ok(hebrew, "imported candidate is listed in Hebrew");
-    assert.equal(hebrew?.list?.label, "רשימה א");
-    assert.equal(hebrew?.list?.ballotLetters, "אמת");
-    assert.equal(hebrew?.contactable, false, "no channel was imported, so nothing claims to be contactable");
-
-    const english = listDirectoryBrowse(db, "en").find((row) => row.id === hebrew?.id);
-    assert.ok(english, "a Hebrew-only name still appears in an English locale");
-    assert.equal(english?.nameIsHebrewFallback, true);
-    assert.equal(english?.name, "כהן ישראל");
-
-    // Re-activating a second import retires the first set instead of deleting rows that
-    // generated_requests and submitted_responses still reference.
-    const second = { ...clone(transcript), source: { ...clone(transcript.source), retrievedAt: "2026-09-14T00:00:00.000Z" } };
-    const secondRaw = JSON.stringify(second);
-    const reimported = importCandidateSource(db, parseCandidateSource(JSON.parse(secondRaw)), secondRaw);
-    assert.equal(reimported.ok, true);
-    if (!reimported.ok) return;
-    const reactivated = activatePublication(db, reimported.publicationId);
-    assert.equal(reactivated.ok, true);
-    assert.equal(db.prepare("SELECT status FROM directory_publications WHERE id = ?").get(imported.publicationId)?.status, "rolled_back");
-    assert.equal(db.prepare("SELECT count(*) n FROM directory_publications WHERE status = 'active'").get()?.n, 1);
-    const retired = db.prepare(`SELECT count(*) n FROM recipients r
-      JOIN recipient_entity_links l ON l.recipient_id = r.id WHERE r.is_active = 0`).get()?.n;
-    assert.equal(retired, 2, "superseded recipients are retired, not deleted");
-    assert.equal(db.prepare("SELECT count(*) n FROM recipient_entity_links").get()?.n, 4);
+test("activation and rollback select immutable snapshots without changing contacts", () => {
+  withDb(db => {
+    const contacts=JSON.stringify(db.prepare("SELECT * FROM recipients").all());
+    const first=importCandidateSource(db,parseCandidateSource(transcript),JSON.stringify(transcript));
+    assert.ok(first.ok); if(!first.ok) return;
+    assert.equal(activatePublication(db,first.publicationId).ok,true);
+    assert.equal(directoryElectionState(db).kind,"submitted");
+    const current=candidatePublication(db)!;
+    assert.equal(candidateRows(db,current.snapshotId)[0]?.name,"כהן ישראל");
+    const changed=clone(transcript);
+    changed.lists[0]!.listTitleHe="שם חדש";
+    changed.source.title="Changed source title";
+    const second=importCandidateSource(db,parseCandidateSource(changed),JSON.stringify(changed));
+    assert.ok(second.ok); if(!second.ok) return;
+    assert.equal(candidatePublication(db)?.id,first.publicationId,"draft cannot alter published pointer");
+    assert.equal(candidateLists(db,current.snapshotId).find(l=>l.roster)?.title,"רשימה א");
+    assert.equal(activatePublication(db,second.publicationId).ok,true);
+    assert.equal(candidateLists(db,candidatePublication(db)!.snapshotId).find(l=>l.roster)?.title,"שם חדש");
+    assert.equal(activatePublication(db,first.publicationId).ok,true);
+    assert.equal(candidatePublication(db)?.id,first.publicationId);
+    assert.equal(db.prepare("SELECT count(*) n FROM directory_publications WHERE status='active'").get()?.n,1);
+    assert.equal(JSON.stringify(db.prepare("SELECT * FROM recipients").all()),contacts);
+    assert.equal(db.prepare("SELECT count(*) n FROM recipient_entity_links").get()?.n,0);
+    const fetchedAgain=clone(transcript);fetchedAgain.source.retrievedAt="2026-09-19T00:00:00Z";
+    fetchedAgain.lists.reverse();fetchedAgain.rows.reverse();
+    const duplicate=importCandidateSource(db,parseCandidateSource(fetchedAgain),JSON.stringify(fetchedAgain));
+    assert.equal(duplicate.ok,false); if(!duplicate.ok) assert.equal(duplicate.code,"already_imported");
+    db.prepare("UPDATE election_snapshot_metadata SET approval_state='unknown' WHERE snapshot_id=?").run(first.snapshotId!);
+    assert.equal(directoryElectionState(db).kind,"unknown");
   });
 });
 
@@ -159,7 +160,7 @@ test("the shipped 26th Knesset transcript parses and matches its own published c
   assert.equal(source.electionNumber, 26);
   assert.equal(source.source.approvalState, "submitted_not_approved");
   assert.equal(source.lists.length, 38);
-  assert.equal(source.lists.filter((list) => list.rosterPublished).length, 35);
-  assert.equal(source.rows.length, 1258);
+  assert.equal(source.lists.filter((list) => list.rosterPublished).length, 38);
+  assert.equal(source.rows.length, 1379);
   assert.ok(source.rows.every((row) => row.fullNameHe.trim().length > 1));
 });

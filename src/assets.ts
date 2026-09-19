@@ -1,3 +1,4 @@
+import { SHARE_JS } from "./share-client.js";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 
@@ -132,7 +133,7 @@ nav.primary a { text-decoration: none; color: var(--mute); font-size: .95rem; pa
 nav.primary a:hover { color: var(--seal); }
 .languages { margin: 0; }
 /* Language controls stay at a comfortable 44px touch target, including long translated labels. */
-.languages summary {
+.languages summary { column-gap: .35rem;
   display: inline-flex; align-items: center; min-block-size: 44px;
   font-size: .9rem; color: var(--mute); cursor: pointer; padding-block: .45rem;
 }
@@ -643,6 +644,50 @@ button.danger:hover { background: var(--caution); color: var(--paper); border-co
   .admin-fields dd { margin-block-end: .6rem; }
 }
 
+.sr-only { position: absolute; inline-size: 1px; block-size: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+[hidden] { display: none !important; }
+.public-site nav.primary { flex-wrap: wrap; overflow: visible; gap: .25rem 1rem; }
+.public-site nav.primary a { white-space: normal; }
+.public-site nav.primary [aria-current] { color: var(--seal); text-decoration: underline; text-underline-offset: .3em; font-weight: 700; }
+.public-site .site-header { margin-block-end: 1.5rem; }
+.issue-intro { max-inline-size: 48rem; margin-block-end: 2rem; }
+.issue-intro h1 { font-size: clamp(2rem, 5vw, 3.4rem); line-height: 1.12; }
+.issue-intro .neutrality { font-size: .9rem; }
+.issue-grid { list-style: none; padding: 0; display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 1rem; align-items: start; }
+.issue-grid > li { list-style: none; margin: 0; padding: 1.35rem; border: 1px solid var(--rule); border-radius: .5rem; background: var(--card); min-inline-size: 0; }
+.issue-number { color: var(--seal); font-size: .9rem; font-weight: 700; }
+.issue-card h2 { font-size: 1.35rem; line-height: 1.35; margin-block: .6rem; }
+.issue-card h2 a { text-decoration: none; }
+.issue-card h2 a:hover { text-decoration: underline; }
+.issue-card > p { font-size: .95rem; }
+.share-options { margin-block: 1rem 0; }
+.public-site .share-options > summary { display: block; padding: .7rem 1rem; min-block-size: 48px; background: var(--seal); color: var(--paper); border-radius: .25rem; font-weight: 650; cursor: pointer; }
+.share-options > summary::after { filter: brightness(0) invert(1); }
+.share-content { padding-block: 1rem; }
+.share-content input { font-size: .85rem; }
+.share-controls { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
+.share-controls a, .share-controls button { display: inline-flex; align-items: center; justify-content: center; min-block-size: 44px; min-inline-size: 44px; padding: .5rem .75rem; border: 1px solid var(--seal); border-radius: .25rem; font-size: .9rem; margin: 0; inline-size: auto; background: transparent; color: var(--seal); }
+.share-note, .share-status { font-size: .85rem; margin-block: .75rem 0; }
+.share-status:empty { margin: 0; }
+.issue-detail { max-inline-size: 48rem; margin-inline: auto; }
+.issue-detail > h1 { margin-block-start: 1.5rem; }
+.commitment { padding: 1.25rem; background: var(--card); border-inline-start: 4px solid var(--seal); }
+.commitment h2 { font-size: 1.2rem; }
+.issue-explanation { padding-block: 1rem; border-block-end: 1px solid var(--rule); }
+.issue-explanation summary { min-block-size: 44px; display: flex; align-items: center; }
+.candidate-provenance { border-inline-start: 4px solid var(--seal); padding-inline-start: 1rem; margin-block-end: 2rem; }
+.candidate-filters { display: flex; flex-wrap: wrap; gap: 1rem; align-items: end; }
+.candidate-filters label { flex: 1 1 16rem; min-inline-size: 0; }
+.candidate-filters button, .candidate-filters a { inline-size: auto; min-block-size: 44px; margin-block-end: 1rem; }
+.candidate-list { padding: 0; list-style: none; }
+.candidate-list li { list-style: none; border-block-end: 1px solid var(--rule); padding-block: 1rem; }
+.candidate-list h2 { font-size: 1.15rem; margin-block-end: .4rem; }
+.candidate-pages { display: flex; gap: 1rem; justify-content: start; }
+.candidate-pages a { min-block-size: 44px; padding: .6rem; }
+.public-site footer.wrap { display: flex; flex-wrap: wrap; gap: .5rem 1rem; }
+.public-site main { overflow-wrap: anywhere; }
+@media (max-width: 47.99rem) { .issue-grid { grid-template-columns: minmax(0,1fr); } .issue-grid > li { padding: 1rem; } }
+@media (forced-colors: active) { .share-options > summary { border: 2px solid ButtonText; } :focus-visible { outline-color: Highlight; } }
 bdi, [dir=ltr] { unicode-bidi: isolate; }
 
 @media (prefers-reduced-motion: reduce) {
@@ -660,6 +705,7 @@ export const THEME_JS =
   "try{var t=localStorage.getItem('theme');if(t==='dark'||t==='light')document.documentElement.dataset.theme=t}catch(e){}";
 
 export const JS = `
+${SHARE_JS}
 document.addEventListener('click', async (e) => {
   const button = e.target?.closest?.('[data-copy]');
   const copy = button?.dataset?.copy;

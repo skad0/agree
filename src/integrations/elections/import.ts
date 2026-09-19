@@ -3,16 +3,22 @@ import type { Db } from "../../db.js";
 import { insertDirectoryPublication, insertElection, insertSourceSnapshot } from "./repository.js";
 import type { CandidateSource, CandidateSourceList, CandidateSourceRow, ImportResult } from "./types.js";
 
-export const TRANSCRIPT_PARSER_VERSION = "transcript-1";
+export const TRANSCRIPT_PARSER_VERSION = "transcript-2";
 
 /** Validates a manual official transcript. Rejects rather than repairing: a bad transcript must not become data. */
 export function parseCandidateSource(raw: unknown): CandidateSource {
   const doc = expectObject(raw, "root");
+  if (doc.schemaVersion !== 1) throw new Error("schemaVersion must be 1");
+  if (doc.electionNumber !== 26) throw new Error("Expected electionNumber 26");
   const source = expectObject(doc.source, "source");
+  for (const field of ["retrievedAt", "publishedAt"]) if (source[field] != null && !Number.isFinite(Date.parse(String(source[field])))) throw new Error(`Invalid source.${field}`);
+  officialUrl(source.sourceUrl);
   const approvalState = expectEnum(source.approvalState, ["submitted_not_approved", "approved"], "source.approvalState");
   const lists = expectArray(doc.lists, "lists").map((entry, index) => parseList(entry, index));
   const rows = expectArray(doc.rows, "rows").map((entry, index) => parseRow(entry, index));
 
+  if (!lists.length) throw new Error("lists must not be empty");
+  if (new Set(lists.map(listKey)).size !== lists.length) throw new Error("duplicate officialListKey");
   const byKey = new Map(lists.filter((list) => list.officialListKey).map((list) => [list.officialListKey!, list]));
   const seen = new Set<string>();
   for (const row of rows) {
@@ -23,6 +29,7 @@ export function parseCandidateSource(raw: unknown): CandidateSource {
   }
   for (const list of lists) {
     const ranks = rows.filter((row) => row.officialListKey === list.officialListKey).map((row) => row.rank).sort((a, b) => a - b);
+    if (list.candidateCount != null && list.candidateCount !== ranks.length) throw new Error(`candidateCount mismatch for ${listKey(list)}`);
     if (!list.rosterPublished) {
       if (ranks.length) throw new Error(`list ${list.listTitleHe} has rosterPublished=false but carries rows`);
       continue;
@@ -42,6 +49,7 @@ export function parseCandidateSource(raw: unknown): CandidateSource {
       sourceUrl: expectString(source.sourceUrl, "source.sourceUrl"),
       artifactKind: expectString(source.artifactKind, "source.artifactKind"),
       approvalState,
+      approvalEvidenceUrl: approvalState === "approved" ? officialUrl(source.approvalEvidenceUrl) : null,
       notes: optionalString(source.notes)
     },
     lists,
@@ -57,7 +65,15 @@ export type ImportOptions = { now?: string; artifactRef?: string | null };
  */
 export function importCandidateSource(db: Db, source: CandidateSource, raw: string, options: ImportOptions = {}): ImportResult {
   const now = options.now ?? new Date().toISOString();
-  const contentHash = createHash("sha256").update(raw).digest("hex");
+  source = parseCandidateSource(source);
+  const compareKeys = (left: string, right: string) => left < right ? -1 : left > right ? 1 : 0;
+  const normalized = {
+    ...source,
+    source: {...source.source, retrievedAt: undefined},
+    lists: [...source.lists].sort((left,right) => compareKeys(listKey(left),listKey(right))),
+    rows: [...source.rows].sort((left,right) => compareKeys(left.officialListKey,right.officialListKey) || left.rank-right.rank)
+  };
+  const contentHash = createHash("sha256").update(JSON.stringify(normalized)).digest("hex");
 
   const existing = db.prepare(`SELECT id FROM source_snapshots WHERE content_hash = ? AND parser_version = ?`)
     .get(contentHash, TRANSCRIPT_PARSER_VERSION) as { id: number } | undefined;
@@ -79,9 +95,12 @@ export function importCandidateSource(db: Db, source: CandidateSource, raw: stri
     });
 
     const electionId = upsertElection(db, source, snapshotId);
+    db.prepare(`INSERT INTO election_snapshot_metadata (snapshot_id,election_id,approval_state,approval_evidence_url,parser_version) VALUES (?,?,?,?,?)`).run(snapshotId,electionId,source.source.approvalState,source.source.approvalEvidenceUrl ?? null,TRANSCRIPT_PARSER_VERSION);
     const listIds = new Map<string, number>();
     for (const list of source.lists) {
-      listIds.set(listKey(list), upsertList(db, electionId, list, snapshotId));
+      const listId = upsertList(db, electionId, list, snapshotId);
+      listIds.set(listKey(list), listId);
+      db.prepare(`INSERT INTO electoral_list_versions (snapshot_id,list_id,official_list_key,title_he,ballot_letters,roster_published,submitted_by_raw,source_url,candidate_count) VALUES (?,?,?,?,?,?,?,?,?)`).run(snapshotId,listId,listKey(list),list.listTitleHe,list.ballotLetters,list.rosterPublished ? 1 : 0,list.submittedByHe,list.sourceUrl ?? null,source.rows.filter(row=>row.officialListKey===listKey(list)).length);
     }
 
     const insertRecord = db.prepare(`INSERT INTO source_records (snapshot_id, record_key, payload_json) VALUES (?, ?, ?) RETURNING id`);
@@ -125,73 +144,32 @@ export function importCandidateSource(db: Db, source: CandidateSource, raw: stri
   }
 }
 
-/**
- * Projects a draft publication into the selectable directory and activates it.
- * Retires previously imported recipients instead of deleting them: generated_requests
- * and submitted_responses reference recipients(id) with no ON DELETE.
- */
+/** Atomically selects a validated snapshot. No contact recipients are created or retired. */
 export function activatePublication(db: Db, publicationId: number, options: { now?: string } = {}): ImportResult {
   const now = options.now ?? new Date().toISOString();
-  const publication = db.prepare(`SELECT id, election_id, status, snapshot_id FROM directory_publications WHERE id = ?`)
-    .get(publicationId) as { id: number; election_id: number; status: string; snapshot_id: number | null } | undefined;
-  if (!publication) return { ok: false, code: "unknown_publication" };
-  if (publication.status === "active") return { ok: false, code: "already_active" };
-  if (publication.snapshot_id == null) return { ok: false, code: "publication_without_snapshot" };
-
   db.exec("BEGIN IMMEDIATE");
   try {
-    db.prepare(`UPDATE recipients SET is_active = 0 WHERE id IN (
-      SELECT recipient_id FROM recipient_entity_links WHERE review_state = 'accepted')`).run();
-    db.prepare(`UPDATE directory_publications SET status = 'rolled_back' WHERE election_id = ? AND status = 'active'`)
-      .run(publication.election_id);
-
-    const rows = db.prepare(`SELECT c.id AS candidacyId, c.person_id AS personId, v.full_name_raw AS name
-      FROM candidacy_versions v
-      JOIN candidacies c ON c.id = v.candidacy_id
-      WHERE v.snapshot_id = ? AND v.status = 'listed'
-      ORDER BY v.list_id, v.rank`).all(publication.snapshot_id) as { candidacyId: number; personId: number | null; name: string }[];
-
-    let created = 0;
-    let reactivated = 0;
-    for (const row of rows) {
-      if (row.personId == null) continue;
-      const linked = db.prepare(`SELECT recipient_id AS id FROM recipient_entity_links WHERE person_id = ? AND review_state = 'accepted'`)
-        .get(row.personId) as { id: number } | undefined;
-      if (linked) {
-        db.prepare(`UPDATE recipients SET is_active = 1 WHERE id = ?`).run(linked.id);
-        db.prepare(`INSERT INTO recipient_translations (recipient_id, locale, name) VALUES (?, 'he', ?)
-          ON CONFLICT(recipient_id, locale) DO UPDATE SET name = excluded.name`).run(linked.id, row.name);
-        reactivated += 1;
-        continue;
-      }
-      const recipientId = Number((db.prepare(`INSERT INTO recipients (type, email, whatsapp, website, social_handle, is_active)
-        VALUES ('politician', NULL, NULL, NULL, NULL, 1) RETURNING id`).get() as { id: number }).id);
-      db.prepare(`INSERT INTO recipient_translations (recipient_id, locale, name) VALUES (?, 'he', ?)`).run(recipientId, row.name);
-      db.prepare(`INSERT INTO recipient_entity_links (recipient_id, person_id, review_state, created_at) VALUES (?, ?, 'accepted', ?)`)
-        .run(recipientId, row.personId, now);
-      created += 1;
-    }
-
-    db.prepare(`UPDATE directory_publications SET status = 'active', activated_at = ? WHERE id = ?`).run(now, publicationId);
+    const row = db.prepare(`SELECT p.id,p.election_id,p.snapshot_id,p.status FROM directory_publications p
+      JOIN elections e ON e.id=p.election_id JOIN election_snapshot_metadata m ON m.snapshot_id=p.snapshot_id AND m.election_id=e.id
+      WHERE p.id=? AND e.number=26 AND EXISTS (SELECT 1 FROM electoral_list_versions l WHERE l.snapshot_id=p.snapshot_id)`).get(publicationId) as {id:number;election_id:number;snapshot_id:number;status:string}|undefined;
+    if (!row) { db.exec("ROLLBACK"); return {ok:false,code:"publication_without_snapshot"}; }
+    const invalid = db.prepare(`SELECT count(*) AS n FROM electoral_list_versions l WHERE l.snapshot_id=? AND
+      l.candidate_count != (SELECT count(*) FROM candidacy_versions v WHERE v.snapshot_id=l.snapshot_id AND v.list_id=l.list_id)`).get(row.snapshot_id) as {n:number};
+    if (invalid.n) throw new Error("Snapshot candidate counts do not match");
+    db.prepare("UPDATE directory_publications SET status='rolled_back' WHERE election_id=? AND status='active' AND id<>?").run(row.election_id,row.id);
+    db.prepare("UPDATE directory_publications SET status='active',activated_at=? WHERE id=?").run(now,row.id);
     db.exec("COMMIT");
-    return { ok: true, publicationId, electionId: publication.election_id, recipientsCreated: created, recipientsReactivated: reactivated };
-  } catch (error) {
-    db.exec("ROLLBACK");
-    throw error;
-  }
+    return {ok:true,publicationId:row.id,electionId:row.election_id,recipientsCreated:0,recipientsReactivated:0};
+  } catch (error) { db.exec("ROLLBACK"); throw error; }
 }
 
 function listKey(list: CandidateSourceList): string {
-  return list.officialListKey ?? `no-roster:${list.ballotLetters ?? list.listTitleHe}`;
+  return list.officialListKey ?? `source:${list.sourceUrl ?? list.listTitleHe}`;
 }
 
 function upsertElection(db: Db, source: CandidateSource, snapshotId: number): number {
   const existing = db.prepare(`SELECT id FROM elections WHERE number = ?`).get(source.electionNumber) as { id: number } | undefined;
-  if (existing) {
-    db.prepare(`UPDATE elections SET publication_status = 'announced', approval_state = ?, published_at = ?, snapshot_id = ? WHERE id = ?`)
-      .run(source.source.approvalState, source.source.publishedAt ?? null, snapshotId, existing.id);
-    return existing.id;
-  }
+  if (existing) return existing.id;
   const id = insertElection(db, {
     number: source.electionNumber,
     publicationStatus: "announced",
@@ -206,11 +184,7 @@ function upsertList(db: Db, electionId: number, list: CandidateSourceList, snaps
   const key = listKey(list);
   const existing = db.prepare(`SELECT id FROM electoral_lists WHERE election_id = ? AND official_list_key = ?`)
     .get(electionId, key) as { id: number } | undefined;
-  if (existing) {
-    db.prepare(`UPDATE electoral_lists SET ballot_letters = ?, title_he = ?, snapshot_id = ?, roster_published = ?, submitted_by_raw = ? WHERE id = ?`)
-      .run(list.ballotLetters, list.listTitleHe, snapshotId, list.rosterPublished ? 1 : 0, list.submittedByHe ?? null, existing.id);
-    return existing.id;
-  }
+  if (existing) return existing.id;
   return Number((db.prepare(`INSERT INTO electoral_lists
     (election_id, official_list_key, ballot_letters, title_he, snapshot_id, roster_published, submitted_by_raw)
     VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id`)
@@ -246,7 +220,9 @@ function parseList(raw: unknown, index: number): CandidateSourceList {
     listTitleHe: expectString(list.listTitleHe, `lists[${index}].listTitleHe`),
     ballotLetters: optionalString(list.ballotLetters),
     submittedByHe: optionalString(list.submittedByHe),
-    rosterPublished: list.rosterPublished === true
+    sourceUrl: list.sourceUrl == null ? null : officialUrl(list.sourceUrl),
+    candidateCount: list.candidateCount == null ? null : expectNumber(list.candidateCount,"candidateCount"),
+    rosterPublished: expectBoolean(list.rosterPublished,"rosterPublished")
   };
 }
 
@@ -294,3 +270,6 @@ function expectEnum<T extends string>(value: unknown, allowed: readonly T[], lab
   if (typeof value !== "string" || !allowed.includes(value as T)) throw new Error(`${label} must be one of ${allowed.join(", ")}`);
   return value as T;
 }
+
+function expectBoolean(value: unknown,label:string):boolean { if (typeof value!=="boolean") throw new Error(`${label} must be boolean`); return value; }
+function officialUrl(value:unknown):string { const url=new URL(expectString(value,"official source URL")); if(url.protocol!=="https:" || !(url.hostname==="www.gov.il" || url.hostname==="gov.il" || url.hostname==="bechirot.gov.il" || url.hostname.endsWith(".bechirot.gov.il")) || url.username || url.password) throw new Error("Expected official HTTPS source URL"); return url.href; }

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createApp } from "../src/app.js";
+import { createLegacyApp as createApp } from "./legacy-runtime.js";
 import { enforceRetention } from "../src/response-storage.js";
 
 const env = { NODE_ENV: "test" };
