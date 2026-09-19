@@ -1,6 +1,6 @@
 # Problem-first sharing: consolidated plan
 
-Date: 2026-09-19. Status: implementation-ready planning contract, including resolved UI/UX decisions, route behavior, content catalog, and data-publication design. Application changes have not started; accessibility and usability of the proposed implementation remain to be verified.
+Date: 2026-09-19. Status: implemented locally on `codex/share-first`; not deployed. Current behavior and verification evidence are in [SPEC.md](SPEC.md) and [SHARE_FIRST_VERIFICATION.md](SHARE_FIRST_VERIFICATION.md). The audit below records the pre-implementation baseline; candidate data was subsequently refreshed as documented in [the source diff](CANDIDATE_REFRESH_2026-09-19.md). Human translation, assistive-technology, real-device and deployed-preview checks remain open.
 
 ## Implementation brief
 

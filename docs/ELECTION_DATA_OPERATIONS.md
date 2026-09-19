@@ -1,6 +1,6 @@
 # Election directory operations (deployment)
 
-Status: schema, directory journey, stances, and fail-closed enrichment scaffolding are in the application tree. Production import and schedule remain **off** until the target election and source contracts are confirmed.
+Status: the public directory is read-only and snapshot-based. The September 19 transcript has 38 lists and 1,379 candidates, explicitly submitted, not approved. No production activation was performed during implementation. Automatic import and scheduling remain **off**.
 
 ## Runtime shape
 
@@ -35,10 +35,8 @@ node dist/scripts/elections.js report
 - `dry-run` refuses blocked/unverified resources and **never** activates a directory publication.
 - `import` loads a manual official transcript and writes a **draft** publication. It needs no
   network and ignores `ELECTION_ETL_ENABLED`; the public directory is unchanged until activation.
-  Re-importing identical content is refused by content hash, so the command is safe to repeat.
-- `activate` projects one draft into the selectable directory. Previously imported recipients are
-  set `is_active = 0`, never deleted: `generated_requests` and `submitted_responses` reference
-  `recipients(id)` with no `ON DELETE`. The previous publication becomes `rolled_back`.
+  Re-importing normalized identical content returns `already_imported` with CLI exit code 0. Retrieval timestamp alone does not create a new snapshot.
+- `activate` atomically selects a validated snapshot for the read-only directory. It changes no contact recipients. The previous publication becomes `rolled_back`. Run `activate <previousPublicationId>` to roll back data.
 - `report` prints local coverage counts from SQLite.
 
 ## Candidate transcripts
@@ -59,26 +57,25 @@ browser because the host returns HTTP 403 to non-browser clients. Shape and rule
   directory says how many such lists exist. Do not fill those rows from media or encyclopedias:
   the import refuses a list that claims a roster but carries none, and vice versa.
 
-Imported candidates carry no contact channel, so they show as not contactable until a reviewed
-contact source is resolved into `contact_points` / `candidate_contact_resolutions`.
+Migration `021` stores approval metadata and list labels in snapshot-owned tables. Public reads never combine an active roster with mutable identity-table labels. A pre-021 active publication is not displayed until its source is reviewed and re-imported with `transcript-2`; do not fabricate missing historical metadata. The unique active-publication index fails migration if an existing database has multiple active publications for an election; inspect and resolve those records deliberately before retrying.
 
-Each import creates fresh `people` rows rather than matching names across snapshots, because a
-name and a rank do not identify a person. Activating a re-import therefore retires the previous
-recipient set and creates a new one (~1,258 rows per import of the 26th-Knesset transcript), and
-`activate` reports both counts. Cross-snapshot identity belongs in the reviewed `identity_matches`
-flow; until that lands, keep re-imports deliberate rather than scheduled.
+Imported candidates need no contact channel and produce no recipient records. Each snapshot creates fresh person/candidacy rows rather than guessing identity across snapshots. Reviewed identity matching remains separate and no automatic schedule is enabled.
+
+`source.approvalState=approved` requires an official HTTPS `approvalEvidenceUrl`; review the actual source before import. Schema/election mismatches, non-boolean roster flags, duplicate list keys/ranks, rank gaps, unknown row references and count mismatches fail validation. Missing-roster lists remain explicit.
+
+Review [the September 19 source diff](CANDIDATE_REFRESH_2026-09-19.md) before importing. Use a staging/local database first. No page request fetches official sources.
 
 ## Deploy checklist (election stack)
 
-1. Deploy with ETL flags **false** (Blueprint defaults). Migrations `016`/`017` apply at boot; imported recipients stay unpublished until an accepted publication is activated deliberately.
-2. Confirm `/health`, seven locale homes, `/en/request` (and one RTL locale), `/admin` via Access.
+1. Deploy with ETL flags **false** (Blueprint defaults). Migrations through `021` apply at boot. Take a recoverable SQLite backup first. Imported drafts stay unpublished until explicitly activated.
+2. Confirm `/health`, seven locale homes, `/en/issues/elections-on-time`, `/en/candidates` (and one RTL locale), `/admin` via Access.
 3. Do **not** set `ELECTION_ETL_ENABLED=true` until: election number confirmed; CEC/newer and finance contracts closed in the manifest; a complete dry-run against fixtures passes; the SQLite disk still has headroom with the new tables.
 4. Artifact directory under `/data` only. Keep within the disk budget alongside `app.db`.
-5. After any future publication activation, verify rollback to the previous publication version and that old single-recipient links still resolve.
+5. After any future publication activation, verify rollback to the previous publication version and that historical result links and legacy request redirects still resolve.
 
 ## What this deploy does **not** do
 
 - No automatic import of CEC or finance data.
-- No activation of imported candidates into the selectable directory.
-- No guarantee that list/party filters are populated until enrichment + publication land.
-- Human translation review and participant UX testing remain launch gates, not deploy gates.
+- No automatic activation of imported candidate snapshots.
+- The directory remains empty until a compatible snapshot is activated.
+- Human translation review and remaining browser/device/assistive-technology checks remain release gates; see SHARE_FIRST_VERIFICATION.md.

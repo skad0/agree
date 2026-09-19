@@ -4,6 +4,10 @@
 
 The canonical source is `docs/Каноническийпакеттекстовиправилпроекта.docx`, written in Russian. Russian is authoritative; where a translation and the Russian disagree, the Russian wins.
 
+## Share-first additions — 2026-09-19
+
+New plain-language questions (`src/issue-headings.ts`), sharing/directory UI (`src/share-copy.ts`), and updated about/methodology/privacy paragraphs (`src/locales/*.json`) need named human review in **all seven locales, including Russian**. The Russian additions are new drafts, not verbatim canonical text. Existing canonical clause bodies and their obligations were reused unchanged. No new translation has been marked approved.
+
 ## Why this matters more than usual here
 
 The content is not marketing copy. It is a set of political commitments put to registered parties during an Israeli election period, plus privacy and terms text. Section 0 of the canonical package is explicit that whether the project counts as regulated electoral activity depends on what it actually says and does, not only on intent. A mistranslation in Hebrew or Arabic is not a typo — it can change what a party is being asked to commit to, or how the platform's neutrality reads to a regulator.

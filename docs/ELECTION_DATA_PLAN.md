@@ -1,3 +1,5 @@
+> Historical plan. The current product and route contract is `docs/SHARE_FIRST_PLAN.md` and `docs/SPEC.md`.
+
 # Israeli election enrichment: verified architecture and implementation plan
 
 Status: slice 5 lands finance schema (reports/entries/summaries), enrichment modules (matching/contacts/finance/jobs/pipeline), CLI `dry-run`, journey demand pre-check deep links, and election-scoped party membership for stance display. Finance and newer CEC sources remain blocked in the manifest. Election number still unconfirmed. No production import, no imported recipients activated, and no production stance seeds. Remaining gates: confirm the target election; close newer CEC and finance source contracts; import one complete CEC snapshot; parliamentary/contact enrichment; reviewed directory publication; participant UX and translation review.

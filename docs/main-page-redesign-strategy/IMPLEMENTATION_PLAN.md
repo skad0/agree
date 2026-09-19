@@ -1,3 +1,5 @@
+> Historical plan. The current product and route contract is `docs/SHARE_FIRST_PLAN.md` and `docs/SPEC.md`.
+
 # Main-page redesign implementation plan
 
 ## Scope and non-negotiables

@@ -1,3 +1,5 @@
+> Historical plan. The current product and route contract is `docs/SHARE_FIRST_PLAN.md` and `docs/SPEC.md`.
+
 # Action-only public flow (no registration / no counters)
 
 Date: 2026-09-09. Status: **implemented (slice 1–2 + backup cut)**. Election stack is on `main`. Later slices (supporter table drop; optional responses retirement) remain deferred.

@@ -1,10 +1,10 @@
 # Contract in Advance · Договор заранее
 
-A multilingual civic transparency platform. It puts the same set of questions to every registered party before an election — which coalitions they would join, how large a government they would form, whether they will comply with final court rulings, the inquiry into 7 October, and their first 100 days — and lets a visitor find people, prepare a specific question, and open their own channel to send it.
+A multilingual civic transparency platform. It puts the same set of questions to every registered party before an election — which coalitions they would join, how large a government they would form, whether they will comply with final court rulings, the inquiry into 7 October, and their first 100 days — and lets visitors understand a problem and share a short explanation and public link.
 
 The platform does not recommend how to vote, does not rank parties, and never stores personalized appeal text.
 
-Visitors do not create an account. They prepare a personal appeal to a recipient, send it privately or post it publicly through their own channel, and may optionally submit any reply for moderation. Public pages do not show campaign progress counters.
+Visitors choose a problem and share its link through WhatsApp, Facebook, Telegram, X, the device share menu, or copy. Candidates are optional context. No account, recipient selection, email address, or message submission is needed. Sharing creates no action records or counters. New appeal, support, and reply submissions are paused; historical privacy deletion remains available.
 
 The authoritative source for all site text is `docs/Каноническийпакеттекстовиправилпроекта.docx` (Russian). **Translations into Hebrew, Arabic, Yiddish, English, Amharic and Ukrainian are machine-generated and unreviewed — see [docs/TRANSLATION-REVIEW.md](docs/TRANSLATION-REVIEW.md) before launch.** It is server-rendered with Hono JSX and native HTML forms, with progressive enhancement from the same-origin client asset, uses Pico CSS, and stores state in SQLite WAL mode.
 
@@ -22,7 +22,7 @@ No third-party keys are needed to boot. With no keys:
 
 - Turnstile checks are disabled.
 - production email-dependent actions remain unverified and return an unavailable message; development/test responses expose a local confirmation link.
-- text-only response submissions work; file submissions return 503 (object storage is not part of the deploy).
+- new response and support submissions return 503; retired appeal writes return 410.
 - `/admin/*` fails closed with 403 until Cloudflare Access is configured.
 
 ## Commands
@@ -43,14 +43,14 @@ No third-party keys are needed to boot. With no keys:
 - `migrations/` contains the schema, localized seed content, and additive upgrades applied on boot. `004` carries the canonical campaign: 10 standard clauses, 5 coalition clauses, 11 first-100-days items and 18 portfolios.
 - `src/content.tsx` renders the political documents. A clause is a commitment plus three fixed callouts — why it matters, how it is checked, permitted exceptions — always in that order, so the page can be skimmed by position rather than read end to end.
 - **Inline `style` attributes do not work here.** The CSP sets `style-src 'self' https://cdn.jsdelivr.net` with no `'unsafe-inline'`, so browsers discard style attributes silently. Data-driven geometry, such as the first-100-days bars, uses SVG presentation attributes instead; SVG does not mirror on its own, so RTL offsets are computed server-side from the locale.
-- The appeal preview generates email, WhatsApp and public-post text from localized templates; every field is editable before the supporter acts on it.
-- Public posting targets X, Facebook, WhatsApp and Telegram. The post mentions the recipient's `social_handle`, or falls back to `Knesset member <name>` for politicians. Facebook's sharer accepts a URL only, so that path also shows the text for manual copy.
+- `src/share-pages.tsx`, `src/issues.ts`, and `src/components/share-options.tsx` render ten stable issue routes and one consistent sharing control. `src/issue-headings.ts` supplies plain-language questions; the existing localized standard supplies commitments and explanations.
+- Platform links are ordinary links; sharing never auto-posts. `src/share-client.ts` adds clipboard and native sharing with visible failure feedback. Locale-specific raster preview assets are content-hashed and served anonymously.
 - `src/locales/` contains all seven short-string dictionaries: Hebrew, Arabic, Yiddish, Russian, English, Amharic, and Ukrainian. Hebrew, Arabic, and Yiddish render RTL. Languages are always offered by endonym, never by ISO code.
 - `src/assets.ts` holds the stylesheet and the clipboard helper, and derives a content hash for each. The served URL contains that hash, so assets are cached `immutable` and a deploy still reaches browsers immediately.
 - Public POST routes use signed CSRF cookies, optional Turnstile, body limits, validation, and per-IP limits.
 - Cloudflare Access JWTs are verified at origin through the team JWKS. There is no application password system.
-- Appeal personalization stays in the response HTML and form payload; only recipient, locale, selected demand IDs, and aggregate actions are stored. This holds for public-post text too — the text a supporter posts is never written to the database.
-- Response submissions use signed opaque tokens so replay creates at most one response. Files are held in memory only long enough to validate and upload after a durable intent is committed; only metadata and retryable upload/delete work enter SQLite, and object cleanup is retried outside transactions.
+- Historical request/result and deletion records remain intact. Production does not register the old request or response submission modules; isolated legacy test fixtures retain their storage/privacy regression coverage.
+- `src/candidates.tsx` reads only one explicitly activated snapshot. Importing a draft cannot change visible names, list labels, ranks, or approval status. Activation and rollback never mutate contact recipients. See [candidate operations](docs/ELECTION_DATA_OPERATIONS.md).
 
 ## Visual design
 
@@ -64,13 +64,13 @@ Measured contrast: light theme 17.4:1 body text, 9.3:1 links and button labels, 
 
 Readers can override the system setting from the appearance switcher in the footer — light, dark, or follow the system. The choice lives in `localStorage` and is applied by a small render-blocking script served from `/assets/theme-{hash}.js`. It has to be a separate same-origin file rather than the usual inline snippet, because `script-src` carries no `'unsafe-inline'`, and the main bundle is deferred, which would paint the wrong theme first. With scripting off the control is hidden and the system preference applies, so nothing is left broken.
 
-There are deliberately **no webfonts**. Covering Hebrew, Arabic, Ge'ez, Cyrillic and Latin in a display face would cost this audience hundreds of kilobytes on the low-end phones many of them use, and every operating system already ships these scripts. Personality comes from the type scale and a small monospace utility register instead.
+System fonts cover most scripts; Amharic uses the existing bundled same-origin WOFF2 fonts. No new font service is introduced.
 
-The home page opens on the campaign name set simultaneously in all seven scripts, each one a link into that language. It is both the identity of the page and the language switcher.
+The home page opens on ten problem cards. The header consistently offers Problems, Candidates, About, and one language selector. Navigation wraps on narrow screens. The language selector preserves the current issue or candidate filters.
 
 Two Pico behaviours are worth knowing before editing `src/assets.ts`: Pico declares its tokens at `:root:not([data-theme=dark])`, so plain `:root` overrides silently lose; and Pico scales the root font-size with the viewport, so `rem` widths hold a constant line length in characters rather than a constant pixel width.
 
-The product contract and route inventory are in [docs/SPEC.md](docs/SPEC.md). Credential setup is in [docs/SECRETS.md](docs/SECRETS.md). Public collection policy is summarized in [docs/ACTION_ONLY_PRIVACY_PLAN.md](docs/ACTION_ONLY_PRIVACY_PLAN.md). Object storage is not part of the deploy ([docs/AWS_S3_SETUP.md](docs/AWS_S3_SETUP.md)).
+The product contract and route inventory are in [docs/SPEC.md](docs/SPEC.md). Credential setup is in [docs/SECRETS.md](docs/SECRETS.md). The consolidated contract is [docs/SHARE_FIRST_PLAN.md](docs/SHARE_FIRST_PLAN.md); verification and remaining release checks are in [docs/SHARE_FIRST_VERIFICATION.md](docs/SHARE_FIRST_VERIFICATION.md). Object storage is not part of the deploy ([docs/AWS_S3_SETUP.md](docs/AWS_S3_SETUP.md)).
 
 ## Render deployment
 
