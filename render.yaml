@@ -30,6 +30,8 @@ services:
         sync: false
       - key: ELECTION_ETL_ENABLED
         value: "false"
+      - key: ELECTION_ETL_ELECTION_NUMBER
+        value: "26"
       - key: ELECTION_ETL_SCHEDULE_ENABLED
         value: "false"
       - key: ELECTION_ETL_ARTIFACT_DIR

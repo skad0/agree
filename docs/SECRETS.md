@@ -1,7 +1,7 @@
 # Secrets and external credentials
 
 Object storage (AWS S3 / Cloudflare R2 / backup buckets / erasure-ledger buckets)
-is **not** part of the default action-only deploy. Persistence is the Render
+is **not** part of the default share-first deploy. Persistence is the Render
 `/data` disk. This repository does not create or configure cloud object stores.
 
 Store production values in the Render service environment. Limit dashboard access, never paste values into issues/logs, and rotate a credential immediately if it enters Git history. Use separate staging and production credentials.
@@ -17,6 +17,8 @@ Store production values in the Render service environment. Limit dashboard acces
 | `EMAIL_FROM` | Verify a sender domain/address in Resend (DNS records are managed in Cloudflare or the authoritative DNS provider). | Configuration rather than a secret. Re-verify after domain/DNS changes; use a campaign-owned address. |
 
 `PORT`, `NODE_ENV`, `APP_BASE_URL`, `SQLITE_PATH`, and `RATE_LIMIT_*` are configuration, not credentials. Render sets `PORT`; the Blueprint sets `/data/app.db`.
+
+Local `.env` is ignored by Git and optional. `npm run dev`, `npm start`, `npm run elections`, `npm run backup`, and `npm run restore` load it using Node's native `--env-file-if-exists`; process variables take precedence. Keep `NODE_ENV=development` and `TRUSTED_PROXY` blank locally. Production uses Render's injected environment and must keep the Cloudflare contract below. No `.env` file or secret should be committed. Leave automatic election imports/scheduling off and select election `26`.
 
 ## Production perimeter contract
 

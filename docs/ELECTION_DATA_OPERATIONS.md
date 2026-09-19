@@ -13,7 +13,7 @@ Status: the public directory is read-only and snapshot-based. The September 19 t
 | Variable | Production default | Notes |
 | --- | --- | --- |
 | `ELECTION_ETL_ENABLED` | `false` | Required `true` only after election number + verified manifest resources exist. |
-| `ELECTION_ETL_ELECTION_NUMBER` | unset | Required when ETL is enabled. |
+| `ELECTION_ETL_ELECTION_NUMBER` | `26` | Selects the public directory election; does not import or activate data. |
 | `ELECTION_ETL_SCHEDULE_ENABLED` | `false` | Requires ETL enabled. Leave false until polling budgets are proven. |
 | `ELECTION_ETL_SOURCE_MANIFEST` | unset | Absolute or repo-relative path to the versioned manifest JSON. |
 | `ELECTION_ETL_ARTIFACT_DIR` | `/data/election-artifacts` in production | Must live on the persistent disk. Cap total size; do not store unnecessary raw payloads. |

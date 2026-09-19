@@ -39,6 +39,8 @@ No social post, email or third-party submission was sent during verification.
 
 Follow-up public-copy review: removed unfinished funding text and unsupported disclosure claims from About in all locales, moved retired-workflow context out of Methodology, and clarified document introductions as proposals. Missing/example contacts no longer render; production rejects reserved example/test addresses. A regression scan covers 20 public routes in every locale with missing, example and marker contacts. Historical privacy/retention/deletion information remains. English/Hebrew About, Methodology and Privacy were checked again in the refreshed browser preview.
 
+Environment preparation for main: development/start/database-operation npm commands now load optional `.env`, with injected process variables taking precedence. Verified using a temporary environment file and an isolated server running the actual start-command arguments. Local proxy trust defaults to blank; Render retains Cloudflare trust, one persistent disk, secret injection and HTTPS base URL. Both templates explicitly select election 26 with automatic ETL/scheduling disabled. The live privacy page exposes a non-placeholder contact compatible with validation; Render's dashboard required sign-in, so live secret settings were not inspected or changed. Typecheck, 116 tests and page smoke pass. The configured high/critical dependency-audit threshold passes; npm still reports two moderate vulnerable packages (`hono`, `@hono/node-server`), outside this environment-only follow-up.
+
 ## Remaining release checks
 
 These are **not completed**:

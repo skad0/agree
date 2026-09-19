@@ -18,6 +18,8 @@ cp .env.example .env
 npm run dev
 ```
 
+The development/start and database-operation npm commands load `.env` when present. Existing process variables (including Render's settings) take precedence. Tests and isolated smoke checks do not load your local `.env`.
+
 No third-party keys are needed to boot. With no keys:
 
 - Turnstile checks are disabled.
