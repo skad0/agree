@@ -24,6 +24,7 @@ Problems, Candidates, About appear in the same header order everywhere. Document
 | `GET /:locale` | Ten problem cards; share directly from each card |
 | `GET /:locale/issues/:slug` | Explanation, proposed commitment, share, optional verification/exceptions |
 | `GET /:locale/candidates` | Active snapshot only; search, list filter, 20-row pagination |
+| `GET /:locale/scorecard` | Civic accountability matrix for Shared Threshold criteria with verified Knesset/HCJ evidence, filters, pledge banner and share metadata |
 | `GET /:locale/request`, `/request/build` | 302: known demand → issue; known recipient → directory with retirement notice; otherwise home |
 | `POST /:locale/request` and `/selection`, `/review`, `/build`, `/suggest`, `/preview`, `/action`, `/copy`, `/report-sent` | 410, no writes, independent of old feature flags |
 | `GET /:locale/request/result?request=…` | Historical recipient/issues; private/no-store, noindex, no share metadata |
