@@ -168,9 +168,16 @@ function statusMark(status: ComplianceStatus): string {
 }
 
 export function PledgeBanner({ locale, shareUrl }: { locale: Locale; shareUrl: string }) {
+  const pledge = sc(locale, "pledge");
+  const email = "desk@rafmeshutaf.org.il";
+  const parts = pledge.split(email);
   return (
     <aside class="scorecard-pledge callout callout-caution" role="note">
-      <p>{sc(locale, "pledge")}</p>
+      <p>
+        {parts[0]}
+        <bdi class="scorecard-desk" dir="ltr">{email}</bdi>
+        {parts[1] ?? ""}
+      </p>
       <p class="scorecard-methodology">{sc(locale, "methodologyNote")}</p>
       <ShareOptions
         locale={locale}
@@ -213,6 +220,10 @@ export function EvidenceDrawer({
         {" · "}
         {statusLabel(locale, status)}
       </p>
+      <div class="scorecard-basis" lang="he" dir="rtl">
+        <h3>{sc(locale, "statusBasis")}</h3>
+        <p>{party.basisHe[criterion.id]}</p>
+      </div>
       {!records.length ? <p role="status">{sc(locale, "noEvidence")}</p> : null}
       <ol class="scorecard-evidence-list">
         {records.map((record) => (
@@ -220,7 +231,7 @@ export function EvidenceDrawer({
             <p class="scorecard-trust"><span class="badge on">{sc(locale, "trustBadge")}</span></p>
             <dl class="scorecard-evidence-fields">
               <dt>{sc(locale, "evidenceDate")}</dt>
-              <dd><time dateTime={record.date}><bdi>{formatHebrewDate(record.date)}</bdi></time></dd>
+              <dd><time dateTime={record.date}><bdi dir="ltr">{formatIsraeliDate(record.date)}</bdi></time></dd>
               <dt>{sc(locale, "evidenceReference")}</dt>
               <dd lang="he" dir="rtl">{record.referenceNumber}</dd>
               <dt>{sc(locale, "evidenceSummary")}</dt>
@@ -422,7 +433,14 @@ export function ScorecardIntro({ locale, children }: { locale: Locale; children?
   );
 }
 
-/** Hebrew calendar-friendly display while keeping machine-readable ISO in <time>. */
+/** Israeli numeric date (DD.MM.YYYY) inside LTR isolation to avoid bidi digit flips. */
+export function formatIsraeliDate(iso: string): string {
+  const [year, month, day] = iso.split("-");
+  if (!year || !month || !day) return iso;
+  return `${day}.${month}.${year}`;
+}
+
+/** Hebrew month name form kept for legends; numeric form is preferred in evidence. */
 export function formatHebrewDate(iso: string): string {
   const [year, month, day] = iso.split("-").map(Number);
   if (!year || !month || !day) return iso;
@@ -431,7 +449,7 @@ export function formatHebrewDate(iso: string): string {
       new Date(Date.UTC(year, month - 1, day))
     );
   } catch {
-    return iso;
+    return formatIsraeliDate(iso);
   }
 }
 

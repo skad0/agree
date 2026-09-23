@@ -73,6 +73,8 @@ export type PartyCompliance = {
   leaderHe: string;
   block: PartyBlock;
   scores: Record<CriterionId, ComplianceStatus>;
+  /** Neutral parliamentary/legal basis for each status, shown next to evidence. */
+  basisHe: Record<CriterionId, string>;
   evidenceMap: Record<CriterionId, string[]>;
   officialResponse?: OfficialResponse;
 };
@@ -147,6 +149,8 @@ export function assertScorecardDataset(dataset: ScorecardDataset): void {
     for (const criterionId of CRITERION_IDS) {
       const status = party.scores[criterionId];
       assert(isComplianceStatus(status), `bad score ${party.partyId}/${criterionId}`);
+      const basis = party.basisHe[criterionId];
+      assert(typeof basis === "string" && basis.trim().length > 0, `missing basis ${party.partyId}/${criterionId}`);
       const linked = party.evidenceMap[criterionId] ?? [];
       assert(Array.isArray(linked), `evidence map missing ${party.partyId}/${criterionId}`);
       for (const evidenceId of linked) {

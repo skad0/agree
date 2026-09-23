@@ -691,6 +691,10 @@ button.danger:hover { background: var(--caution); color: var(--paper); border-co
 .scorecard-pledge { margin-block: 1.5rem 2rem; }
 .scorecard-pledge .share-options { margin-block-start: 1rem; }
 .scorecard-methodology { font-size: .92rem; color: var(--mute); }
+.scorecard-desk { font-weight: 700; unicode-bidi: isolate; }
+.scorecard-basis { margin-block: 1rem; padding: .85rem 1rem; border-inline-start: 3px solid var(--seal); background: var(--paper); }
+.scorecard-basis h3 { margin: 0 0 .4rem; font-size: .95rem; }
+.scorecard-basis p { margin: 0; }
 .scorecard-filters { display: flex; flex-wrap: wrap; gap: 1rem; align-items: end; margin-block: 1rem 1.5rem; }
 .scorecard-filters label { flex: 1 1 12rem; min-inline-size: 0; }
 .scorecard-filters button, .scorecard-filters a { inline-size: auto; min-block-size: 44px; margin-block-end: 1rem; }
@@ -710,28 +714,16 @@ button.danger:hover { background: var(--caution); color: var(--paper); border-co
 }
 .score-badge:hover { border-color: var(--seal); }
 .score-badge-mark { font-weight: 700; line-height: 1; }
-.score-badge-label { font-size: .72rem; line-height: 1.25; font-weight: 650; }
-.score-pass { border-color: #1f6b3a; color: #14532d; }
-.score-pass .score-badge-mark { color: #1f6b3a; }
-.score-fail { border-color: #9b1c1c; color: #7f1d1d; }
-.score-fail .score-badge-mark { color: #9b1c1c; }
-.score-partial { border-color: var(--caution); color: #7a4800; }
+.score-badge-label { font-size: .78rem; line-height: 1.25; font-weight: 650; }
+/* Status colour stays inside the project palette: techelet for pass, amber for fail/partial, mute for uncommitted. */
+.score-pass { border-color: var(--seal); color: var(--seal-deep); border-inline-start-width: 4px; }
+.score-pass .score-badge-mark { color: var(--seal); }
+.score-fail { border-color: var(--caution); color: var(--caution); border-inline-start-width: 4px; }
+.score-fail .score-badge-mark { color: var(--caution); }
+.score-partial { border-color: var(--caution); color: var(--ink); border-style: dashed; border-inline-start-width: 4px; }
 .score-partial .score-badge-mark { color: var(--caution); }
-.score-uncommitted { color: var(--mute); }
-@media (prefers-color-scheme: dark) {
-  :root:root:root:not([data-theme=light]) .score-pass { color: #86efac; border-color: #4ade80; }
-  :root:root:root:not([data-theme=light]) .score-pass .score-badge-mark { color: #86efac; }
-  :root:root:root:not([data-theme=light]) .score-fail { color: #fca5a5; border-color: #f87171; }
-  :root:root:root:not([data-theme=light]) .score-fail .score-badge-mark { color: #fca5a5; }
-  :root:root:root:not([data-theme=light]) .score-partial { color: #fbbf24; border-color: var(--caution); }
-  :root:root:root:not([data-theme=light]) .score-partial .score-badge-mark { color: #fbbf24; }
-}
-:root:root:root[data-theme=dark] .score-pass { color: #86efac; border-color: #4ade80; }
-:root:root:root[data-theme=dark] .score-pass .score-badge-mark { color: #86efac; }
-:root:root:root[data-theme=dark] .score-fail { color: #fca5a5; border-color: #f87171; }
-:root:root:root[data-theme=dark] .score-fail .score-badge-mark { color: #fca5a5; }
-:root:root:root[data-theme=dark] .score-partial { color: #fbbf24; border-color: var(--caution); }
-:root:root:root[data-theme=dark] .score-partial .score-badge-mark { color: #fbbf24; }
+.score-uncommitted { border-color: var(--rule); color: var(--mute); }
+.score-uncommitted .score-badge-mark { color: var(--mute); }
 .scorecard-cards { display: none; list-style: none; padding: 0; margin: 0 0 2rem; }
 .scorecard-cards > li { list-style: none; margin: 0; border-block-end: 1px solid var(--rule); }
 .scorecard-card > summary { display: flex; flex-direction: column; gap: .2rem; min-block-size: 48px; padding-block: .85rem; cursor: pointer; }

@@ -54,8 +54,10 @@ test("scorecard route renders Hebrew matrix, evidence drawer, pledge and Open Gr
     const evidenceHtml = await evidence.text();
     assert.match(evidenceHtml, /id="evidence"/);
     assert.match(evidenceHtml, /מקור רשמי מאומת/);
+    assert.match(evidenceHtml, /בסיס עובדתי לסטטוס/);
     assert.match(evidenceHtml, /main\.knesset\.gov\.il/);
     assert.match(evidenceHtml, /6198\/23/);
+    assert.match(evidenceHtml, /10\.06\.2024/);
     assert.equal(evidence.headers.get("cache-control"), "private, no-store");
   } finally {
     close();
