@@ -68,7 +68,7 @@ Readers can override the system setting from the appearance switcher in the foot
 
 System fonts cover most scripts; Amharic uses the existing bundled same-origin WOFF2 fonts. No new font service is introduced.
 
-The home page opens on ten problem cards. The header consistently offers Problems, Candidates, About, and one language selector. Navigation wraps on narrow screens. The language selector preserves the current issue or candidate filters.
+The home page opens on ten problem cards. The header consistently offers Problems, Candidates, About, and one language selector. The civic scorecard lives in the footer with methodology and the other supporting documents. Navigation wraps on narrow screens. The language selector preserves the current issue or candidate filters.
 
 Two Pico behaviours are worth knowing before editing `src/assets.ts`: Pico declares its tokens at `:root:not([data-theme=dark])`, so plain `:root` overrides silently lose; and Pico scales the root font-size with the viewport, so `rem` widths hold a constant line length in characters rather than a constant pixel width.
 

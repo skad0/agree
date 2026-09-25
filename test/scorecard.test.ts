@@ -30,6 +30,25 @@ test("scorecard filters search and compliance levels", () => {
   assert.ok(rows.every((row) => Object.values(row.scores).includes("PASS")));
 });
 
+test("scorecard sits in footer chrome beside methodology, not in primary nav", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "agree-scorecard-nav-"));
+  const { app, close } = createApp({ sqlitePath: join(dir, "app.db") });
+  try {
+    const html = await (await app.request("/en")).text();
+    const header = html.match(/<header[\s\S]*?<\/header>/)?.[0] ?? "";
+    const footer = html.match(/<footer[\s\S]*?<\/footer>/)?.[0] ?? "";
+    assert.match(header, /href="\/en\/candidates"/);
+    assert.match(header, /href="\/en\/about"/);
+    assert.doesNotMatch(header, /href="\/en\/scorecard"/);
+    assert.match(footer, /href="\/en\/methodology"/);
+    assert.match(footer, /href="\/en\/scorecard"/);
+    assert.match(footer, /Scorecard/);
+  } finally {
+    close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("scorecard route renders Hebrew matrix, evidence drawer, pledge and Open Graph title", async () => {
   const dir = mkdtempSync(join(tmpdir(), "agree-scorecard-"));
   const { app, close } = createApp({ sqlitePath: join(dir, "app.db") });

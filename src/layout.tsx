@@ -4,10 +4,6 @@ import type { Child } from "hono/jsx";
 import { cssPath, jsPath, themePath } from "./assets.js";
 import { dirOf, localeNames, locales, t, type Locale } from "./i18n.js";
 
-function scNav(locale: Locale) {
-  return sc(locale, "nav");
-}
-
 /**
  * The document itself — head, assets, theme bootstrap — with no opinion about what goes in the
  * body. The public site and the admin console share the stylesheet and the theme script but not
@@ -67,7 +63,6 @@ export function Layout({ locale, title, path, languageQuery = "", languageHref, 
         <nav class="primary" aria-label={s(locale,"problems")}>
           <a href={`/${locale}`} aria-current={suffix === "" ? "page" : suffix.startsWith("/issues/") ? "location" : undefined}>{s(locale,"problems")}</a>
           <a href={`/${locale}/candidates`} aria-current={suffix === "/candidates" ? "page" : undefined}>{s(locale,"candidates")}</a>
-          <a href={`/${locale}/scorecard`} aria-current={suffix === "/scorecard" ? "page" : undefined}>{scNav(locale)}</a>
           <a href={`/${locale}/about`} aria-current={suffix === "/about" ? "page" : undefined}>{s(locale,"about")}</a>
         </nav>
         <details class="languages">
@@ -85,6 +80,7 @@ export function Layout({ locale, title, path, languageQuery = "", languageHref, 
         <a href={`/${locale}/government-model`}>{t(locale,"navModel")}</a>
         <a href={`/${locale}/coalition-agreement`}>{t(locale, "navCoalition")}</a>
         <a href={`/${locale}/methodology`}>{t(locale, "navMethodology")}</a>
+        <a href={`/${locale}/scorecard`}>{sc(locale, "nav")}</a>
         <a href={`/${locale}/privacy`}>{t(locale, "navPrivacy")}</a>
         <AppearanceSwitcher locale={locale} />
       </footer>

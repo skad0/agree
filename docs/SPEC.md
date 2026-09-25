@@ -8,7 +8,7 @@ Read a problem → expand Share → choose a platform or copy its stable link. O
 
 Ten fixed issue slugs map to existing standard demand IDs 1–10. Questions are in `src/issue-headings.ts`; commitments, rationale, verification and exceptions use the existing localized canonical content. Proposals must not be presented as candidate promises. Missing/disabled issues return 404; paused campaigns return 503 with a privacy recovery link.
 
-Problems, Candidates, About appear in the same header order everywhere. Documents, methodology, privacy and appearance remain in the footer. Hebrew, Arabic and Yiddish use RTL. Directory names remain in their original Hebrew, marked with language and bidirectional isolation. Language switching preserves the issue or validated directory filters.
+Problems, Candidates, About appear in the same header order everywhere. Documents, methodology, scorecard, privacy and appearance remain in the footer. The scorecard is supporting evidence of Shared Threshold compliance, not a primary share destination and not a vote recommendation. Hebrew, Arabic and Yiddish use RTL. Directory names remain in their original Hebrew, marked with language and bidirectional isolation. Language switching preserves the issue or validated directory filters.
 
 ## Sharing
 
