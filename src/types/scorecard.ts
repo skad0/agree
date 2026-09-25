@@ -32,7 +32,9 @@ export const EVIDENCE_TYPES = [
   "KNESSET_PLENUM_VOTE",
   "COALITION_AGREEMENT",
   "BAGATZ_RULING",
-  "OFFICIAL_BILL"
+  "OFFICIAL_BILL",
+  "OFFICIAL_PLATFORM",
+  "SIGNED_PLEDGE"
 ] as const;
 export type EvidenceType = (typeof EVIDENCE_TYPES)[number];
 
@@ -51,21 +53,58 @@ export type ComplianceStatus = (typeof COMPLIANCE_STATUSES)[number];
 
 export const PARTY_IDS = [
   "likud",
-  "yesh-atid",
-  "national-unity",
+  "beyachad",
+  "yashar",
+  "blue-white",
   "the-democrats",
   "yisrael-beiteinu",
   "shas",
   "utj",
   "religious-zionism",
   "otzma-yehudit",
+  "noam",
   "raam",
-  "hadash-taal"
+  "joint-list",
+  "reservists-economy",
+  "amcha-yisrael",
+  "israel-first",
+  "pirates",
+  "sharshar",
+  "partnership-for-all",
+  "together-succeed",
+  "womens-voice",
+  "gan-eden",
+  "justice-law",
+  "shema",
+  "new-order",
+  "haredi-public",
+  "ani-veata",
+  "brit-olam",
+  "electoral-reform",
+  "biblical-bloc",
+  "social-security",
+  "orot-hashachar",
+  "personal-security",
+  "black-banner",
+  "ahi",
+  "tzomet-beit-yisrael",
+  "tkuma",
+  "hakahal"
 ] as const;
 export type PartyId = (typeof PARTY_IDS)[number];
 
-export const PARTY_BLOCKS = ["coalition-37", "opposition", "arab"] as const;
+export const PARTY_BLOCKS = ["coalition-37", "opposition", "arab", "other"] as const;
 export type PartyBlock = (typeof PARTY_BLOCKS)[number];
+
+/** Incumbent: held seats in the 25th Knesset. Challenger: no 25th-Knesset voting record. */
+export const PARLIAMENTARY_STATUSES = ["INCUMBENT", "CHALLENGER"] as const;
+export type ParliamentaryStatus = (typeof PARLIAMENTARY_STATUSES)[number];
+
+export type ComplianceMetrics = {
+  totalCriteria: number;
+  passedCount: number;
+  compliancePercentage: number;
+};
 
 export type OfficialResponse = {
   text: Localized;
@@ -77,13 +116,34 @@ export type PartyCompliance = {
   /** Official Hebrew list/party name; always rendered with lang=he like the candidate directory. */
   partyNameHe: string;
   leaderHe: string;
+  /** Extra Hebrew search terms: predecessor factions, joint-list partners, ballot letters. */
+  searchAliasesHe?: string;
+  /** One Hebrew line explaining the 2026 ballot name. Rendered with lang=he. */
+  ballotNoteHe?: string;
   block: PartyBlock;
+  parliamentaryStatus: ParliamentaryStatus;
   scores: Record<CriterionId, ComplianceStatus>;
   /** Neutral parliamentary/legal basis for each status, localized. */
   basis: Record<CriterionId, Localized>;
   evidenceMap: Record<CriterionId, string[]>;
   officialResponse?: OfficialResponse;
+  /** Official CEC roster page for this submitted 2026 list, when published. */
+  rosterUrl?: string;
 };
+
+/** PASS count over the five criteria. Partial and uncommitted do not count as passed. */
+export function complianceMetrics(party: Pick<PartyCompliance, "scores">): ComplianceMetrics {
+  const totalCriteria = CRITERION_IDS.length;
+  let passedCount = 0;
+  for (const id of CRITERION_IDS) {
+    if (party.scores[id] === "PASS") passedCount += 1;
+  }
+  return {
+    totalCriteria,
+    passedCount,
+    compliancePercentage: Math.round((passedCount / totalCriteria) * 100)
+  };
+}
 
 export type ScorecardDataset = {
   electionLabel: Localized;
@@ -95,7 +155,7 @@ export type ScorecardDataset = {
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const OFFICIAL_HOST =
-  /^(https:\/\/)(main\.knesset\.gov\.il|fs\.knesset\.gov\.il|supremedecisions\.court\.gov\.il|next\.obudget\.org)(\/|$)/i;
+  /^(https:\/\/)(main\.knesset\.gov\.il|fs\.knesset\.gov\.il|supremedecisions\.court\.gov\.il|next\.obudget\.org|www\.gov\.il)(\/|$)/i;
 
 export function isCriterionId(value: string): value is CriterionId {
   return (CRITERION_IDS as readonly string[]).includes(value);
@@ -111,6 +171,10 @@ export function isPartyId(value: string): value is PartyId {
 
 export function isPartyBlock(value: string): value is PartyBlock {
   return (PARTY_BLOCKS as readonly string[]).includes(value);
+}
+
+export function isParliamentaryStatus(value: string): value is ParliamentaryStatus {
+  return (PARLIAMENTARY_STATUSES as readonly string[]).includes(value);
 }
 
 function assert(condition: unknown, message: string): asserts condition {
@@ -166,6 +230,8 @@ export function assertScorecardDataset(dataset: ScorecardDataset): void {
     assert(party.partyNameHe.trim().length > 0, `empty party name ${party.partyId}`);
     assert(party.leaderHe.trim().length > 0, `empty leader ${party.partyId}`);
     assert(isPartyBlock(party.block), `bad block ${party.partyId}`);
+    assert(isParliamentaryStatus(party.parliamentaryStatus), `bad parliamentary status ${party.partyId}`);
+    if (party.rosterUrl) assert(OFFICIAL_HOST.test(party.rosterUrl), `non-official roster URL ${party.partyId}`);
     for (const criterionId of CRITERION_IDS) {
       const status = party.scores[criterionId];
       assert(isComplianceStatus(status), `bad score ${party.partyId}/${criterionId}`);

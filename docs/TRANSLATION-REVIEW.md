@@ -68,3 +68,13 @@ other locales are machine translations. Party and leader names remain Hebrew-onl
 matching the candidate directory. No locale may omit the `/scorecard` page.
 Named legal/political review is still required before treating non-Hebrew scorecard
 copy as launch-ready.
+
+## Scorecard roster and reading path — 2026-09-25 (unreviewed)
+
+The scorecard now lists the 38 slates filed with the Central Elections Committee for the
+26th Knesset (`https://www.gov.il/he/pages/candidates-lists-26`, updated 25.9.2026).
+Those lists are submitted, not finally approved. Incumbent scores still rest on 25th
+Knesset votes and agreements. Challenger rows stay uncommitted: a missing vote is not a
+failure, and filing a list is not a platform clause or a signed pledge. New chrome in
+`src/scorecard-copy.ts` (segments, sort, share sentence, reading steps) is unreviewed
+in every locale, including Hebrew and Russian.

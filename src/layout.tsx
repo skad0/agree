@@ -52,7 +52,7 @@ export function Shell({ locale, title, bodyClass, shareMeta, children }: { local
   </html>;
 }
 
-export function Layout({ locale, title, path, languageQuery = "", languageHref, shareMeta, children }: { locale: Locale; title: string; path: string; languageQuery?: string; languageHref?: (locale: Locale) => string; shareMeta?: ShareMeta; children: Child }) {
+export function Layout({ locale, title, path, languageQuery = "", languageHref, shareMeta, mainClass, children }: { locale: Locale; title: string; path: string; languageQuery?: string; languageHref?: (locale: Locale) => string; shareMeta?: ShareMeta; mainClass?: string; children: Child }) {
   // Strip only a complete registered locale segment. Keeping this derived from `locales` means
   // newly registered locales (and paths such as /uk/...) retain their route when switching.
   const localePrefix = locales.find((option) => path === `/${option}` || path.startsWith(`/${option}/`) || path.startsWith(`/${option}?`));
@@ -78,7 +78,7 @@ export function Layout({ locale, title, path, languageQuery = "", languageHref, 
           </li>)}</ul>
         </details>
       </header>
-      <main id="content" tabIndex={-1} class="wrap">{children}</main>
+      <main id="content" tabIndex={-1} class={mainClass ? `wrap ${mainClass}` : "wrap"}>{children}</main>
       <footer class="wrap">
         <a href={`/${locale}/standard`}>{t(locale,"navStandard")}</a>
         <a href={`/${locale}/first-100-days`}>{t(locale,"navPlan")}</a>

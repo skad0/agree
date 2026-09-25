@@ -3,7 +3,9 @@ import {
   L,
   type Criterion,
   type EvidenceRecord,
+  type PartyBlock,
   type PartyCompliance,
+  type PartyId,
   type ScorecardDataset
 } from "../types/scorecard.js";
 
@@ -411,6 +413,31 @@ const evidence: EvidenceRecord[] = [
     }),
     officialSourceUrl: "https://fs.knesset.gov.il/25/law/25_lst_10244471.pdf",
     verified: true
+  },
+  {
+    id: "ev-cec-submitted-lists-26",
+    type: "OFFICIAL_PLATFORM",
+    referenceNumber: L({
+      he: "ועדת הבחירות המרכזית — רשימות המועמדים לכנסת ה-26, כפי שהוגשו (עודכן 25.9.2026)",
+      ar: "لجنة الانتخابات المركزية — قوائم المرشحين للكنيست الـ26 كما قُدّمت (حُدّث في 25.9.2026)",
+      yi: "צענטראַלע וואַלן־קאָמיסיע — קאַנדידאַטן־רשימות צום 26סטן כנסת, ווי אײַנגעגעבן (דערהײַנטיקט 25.9.2026)",
+      ru: "Центральная избирательная комиссия — списки кандидатов в Кнессет 26-го созыва, как поданы (обновлено 25.9.2026)",
+      uk: "Центральна виборча комісія — списки кандидатів до Кнесету 26-го скликання, як подані (оновлено 25.9.2026)",
+      en: "Central Elections Committee — candidate lists for the 26th Knesset, as submitted (updated 25.9.2026)",
+      am: "ማዕከላዊ የምርጫ ኮሚቴ — ለ26ኛው ንስት የቀረቡ የእጩ ዝርዝሮች (የዘመነው 25.9.2026)"
+    }),
+    date: "2026-09-08",
+    summary: L({
+      he: "עמוד ועדת הבחירות המרכזית מציג את רשימות המועמדים שהוגשו לכנסת ה-26. הוועדה מציינת שהרשימות אינן סופיות וטרם אושרו. הגשת רשימה מתעדת את דבר ההתמודדות; היא אינה סעיף מצע בקריטריון אזרחי ואינה כתב התחייבות חתום לרף משותף.",
+      ar: "تعرض صفحة لجنة الانتخابات المركزية قوائم المرشحين المقدّمة للكنيست الـ26. توضّح اللجنة أن القوائم ليست نهائية ولم تُعتمد بعد. تقديم القائمة يوثّق الترشح؛ وهو ليس بند برنامج في معيار مدني ولا تعهدًا موقّعًا بالعتبة المشتركة.",
+      yi: "דער בלאַט פֿון דער צענטראַלער וואַלן־קאָמיסיע ווײַזט די קאַנדידאַטן־רשימות וואָס זײַנען אײַנגעגעבן געוואָרן צום 26סטן כנסת. די קאָמיסיע באַטאָנט אַז די רשימות זײַנען נישט סופֿיק און נאָך נישט באַשטעטיקט. אײַנגעבן אַ רשימה דאָקומענטירט די קאַנדידאַטור; ס׳איז נישט קיין מצע־סעיף אין אַ בירגערלעכן קריטעריון און נישט קיין אונטערגעשריבענער כתב־התחייבות צום געמיינזאַמען שוועל.",
+      ru: "Страница Центральной избирательной комиссии показывает списки кандидатов, поданные в Кнессет 26-го созыва. Комиссия указывает, что списки не окончательны и ещё не утверждены. Подача списка фиксирует участие; это не пункт платформы по гражданскому критерию и не подписанное обязательство по общему порогу.",
+      uk: "Сторінка Центральної виборчої комісії показує списки кандидатів, подані до Кнесету 26-го скликання. Комісія зазначає, що списки не остаточні й ще не затверджені. Подання списку фіксує участь; це не пункт платформи за громадянським критерієм і не підписане зобов’язання щодо спільного порогу.",
+      en: "The Central Elections Committee page lists the candidate slates submitted for the 26th Knesset. The committee states the lists are not final and have not yet been approved. Filing a list records the candidacy; it is not a platform clause on a civic criterion and not a signed Shared Threshold pledge.",
+      am: "የማዕከላዊ የምርጫ ኮሚቴ ገጽ ለ26ኛው ንስት የቀረቡትን የእጩ ዝርዝሮች ያሳያል። ኮሚቴው ዝርዝሮቹ የመጨረሻ እንዳልሆኑ እና ገና እንዳልጸደቁ ይገልጻል። ዝርዝር ማቅረብ እጩነትን ይመዘግባል፤ የዜጋ መስፈርት የመድረክ አንቀጽ ወይም የተፈረመ የጋራ ደረጃ ቃል ኪዳን አይደለም።"
+    }),
+    officialSourceUrl: "https://www.gov.il/he/pages/candidates-lists-26",
+    verified: true
   }
 ];
 
@@ -554,12 +581,68 @@ const equalUncommitted = L({
   am: "በተጠቀሱት ኦፊሴላዊ ምንጮች ውስጥ ፓርቲው በ10.6.2024 ቀጣይነት መተግበር ላይ አንድ ወጥ የፓርቲ ድምጽ አልተገኘም፤ ሁኔታው እስከ ኦፊሴላዊ ዝማኔ ድረስ እንደ ያልተገደደ ተመዝግቧል።"
 });
 
+const challengerBasis = L({
+  he: "לרשימה אין מושבים בכנסת ה-25, ולכן אין הצבעת מליאה לזקוף לחובתה או לזכותה. היעדר הצבעה אינו אי-עמידה. הרשימה הוגשה לוועדת הבחירות המרכזית (עמוד הרשימות, 8.9.2026, טרם אישור סופי). לא אותרו סעיף מצע מאומת או כתב התחייבות חתום לרף משותף בקריטריון זה, והסטטוס נשאר 'טרם התחייב'.",
+  ar: "ليس للقائمة مقاعد في الكنيست الـ25، لذلك لا يُنسب إليها تصويت في الهيئة العامة. غياب التصويت ليس عدم امتثال. قُدّمت القائمة إلى لجنة الانتخابات المركزية (صفحة القوائم، 8.9.2026، قبل الاعتماد النهائي). لم يُعثر على بند برنامج موثّق أو تعهد موقّع بالعتبة المشتركة في هذا المعيار، وتبقى الحالة «لم يلتزم بعد».",
+  yi: "די רשימה האָט נישט קיין זיצן אין דער 25סטער כנסת, דעריבער איז נישטאָ קיין מליאה־שטימונג צו רעכענען איר פֿאַר אָדער קעגן. דאָס פֿעלן פֿון אַ שטימונג איז נישט קיין דורכפֿאַל. די רשימה איז אײַנגעגעבן געוואָרן צו דער צענטראַלער וואַלן־קאָמיסיע (רשימות־בלאַט, 8.9.2026, נאָך פֿאַר דער סופֿיקער באַשטעטיקונג). ס׳איז נישט געפֿונען געוואָרן קיין באַשטעטיקטער מצע־סעיף אָדער אונטערגעשריבענער כתב־התחייבות צום געמיינזאַמען שוועל אין דעם קריטעריון, און דער סטאַטוס בלײַבט 'נאָך נישט מתחייב'.",
+  ru: "У списка нет мест в 25-м Кнессете, поэтому пленарное голосование ему не засчитывается. Отсутствие голосования не является несоответствием. Список подан в Центральную избирательную комиссию (страница списков, 8.9.2026, до окончательного утверждения). Проверенный пункт платформы или подписанное обязательство по общему порогу по этому критерию не найдены, статус остаётся «пока нет обязательства».",
+  uk: "Список не має місць у 25-му Кнесеті, тому пленарне голосування йому не зараховується. Відсутність голосування не є невідповідністю. Список подано до Центральної виборчої комісії (сторінка списків, 8.9.2026, до остаточного затвердження). Перевіреного пункту платформи або підписаного зобов’язання щодо спільного порогу за цим критерієм не знайдено, статус лишається «ще немає зобов’язання».",
+  en: "This list held no seats in the 25th Knesset, so no plenum vote is counted for or against it. A missing vote is not a failure. The list was filed with the Central Elections Committee (lists page, 8.9.2026, before final approval). No verified platform clause or signed Shared Threshold pledge was found on this criterion, so the status stays uncommitted.",
+  am: "ይህ ዝርዝር በ25ኛው ንስት ወንበር አልነበረውም፣ ስለዚህ የምክር ቤት ድምጽ አይቆጠርለትም። ድምጽ አለመኖር ውድቀት አይደለም። ዝርዝሩ ለማዕከላዊ የምርጫ ኮሚቴ ቀርቧል (የዝርዝሮች ገጽ፣ 8.9.2026፣ ከመጨረሻ ማጽደቅ በፊት)። በዚህ መስፈርት የተረጋገጠ የመድረክ አንቀጽ ወይም የተፈረመ የጋራ ደረጃ ቃል ኪዳን አልተገኘም፤ ሁኔታው ያልተገደደ ሆኖ ይቆያል።"
+});
+
+const cecEvidence = ["ev-cec-submitted-lists-26"];
+
+function challenger(input: {
+  partyId: PartyId;
+  partyNameHe: string;
+  leaderHe: string;
+  block?: PartyBlock;
+  searchAliasesHe?: string;
+  ballotNoteHe?: string;
+  rosterUrl?: string;
+}): PartyCompliance {
+  const status = "UNCOMMITTED" as const;
+  return {
+    partyId: input.partyId,
+    partyNameHe: input.partyNameHe,
+    leaderHe: input.leaderHe,
+    searchAliasesHe: input.searchAliasesHe,
+    ballotNoteHe: input.ballotNoteHe ?? "רשימה שהוגשה לוועדת הבחירות לכנסת ה-26. אין לה היסטוריית הצבעה בכנסת ה-25.",
+    rosterUrl: input.rosterUrl,
+    block: input.block ?? "other",
+    parliamentaryStatus: "CHALLENGER",
+    scores: {
+      "equal-service": status,
+      "core-curriculum": status,
+      "budget-integrity": status,
+      "judicial-independence": status,
+      "term-limits": status
+    },
+    basis: {
+      "equal-service": challengerBasis,
+      "core-curriculum": challengerBasis,
+      "budget-integrity": challengerBasis,
+      "judicial-independence": challengerBasis,
+      "term-limits": challengerBasis
+    },
+    evidenceMap: {
+      "equal-service": cecEvidence,
+      "core-curriculum": cecEvidence,
+      "budget-integrity": cecEvidence,
+      "judicial-independence": cecEvidence,
+      "term-limits": cecEvidence
+    }
+  };
+}
+
 const parties: PartyCompliance[] = [
   {
     partyId: "likud",
     partyNameHe: "הליכוד",
     leaderHe: "בנימין נתניהו",
     block: "coalition-37",
+    parliamentaryStatus: "INCUMBENT",
     scores: {
       "equal-service": "FAIL",
       "core-curriculum": "FAIL",
@@ -583,10 +666,13 @@ const parties: PartyCompliance[] = [
     }
   },
   {
-    partyId: "yesh-atid",
-    partyNameHe: "יש עתיד",
-    leaderHe: "יאיר לפיד",
+    partyId: "beyachad",
+    partyNameHe: "ביחד",
+    leaderHe: "נפתלי בנט",
+    searchAliasesHe: "יאיר לפיד יש עתיד בנט רק",
+    ballotNoteHe: "רשימת 2026 של בנט ולפיד. הציון משקף את הצבעות יש עתיד בכנסת ה-25.",
     block: "opposition",
+    parliamentaryStatus: "INCUMBENT",
     scores: {
       "equal-service": "PASS",
       "core-curriculum": "PASS",
@@ -610,10 +696,13 @@ const parties: PartyCompliance[] = [
     }
   },
   {
-    partyId: "national-unity",
-    partyNameHe: "המחנה הממלכתי",
-    leaderHe: "בני גנץ",
+    partyId: "yashar",
+    partyNameHe: "ישר!",
+    leaderHe: "גדי איזנקוט",
+    searchAliasesHe: "המחנה הממלכתי איזנקוט דרך",
+    ballotNoteHe: "רשימת 2026 בראשות איזנקוט. הציון משקף הצבעות אופוזיציה של יוצאי המחנה הממלכתי בכנסת ה-25.",
     block: "opposition",
+    parliamentaryStatus: "INCUMBENT",
     scores: {
       "equal-service": "PASS",
       "core-curriculum": "PASS",
@@ -641,6 +730,7 @@ const parties: PartyCompliance[] = [
     partyNameHe: "הדמוקרטים",
     leaderHe: "יאיר גולן",
     block: "opposition",
+    parliamentaryStatus: "INCUMBENT",
     scores: {
       "equal-service": "PASS",
       "core-curriculum": "PASS",
@@ -668,6 +758,7 @@ const parties: PartyCompliance[] = [
     partyNameHe: "ישראל ביתנו",
     leaderHe: "אביגדור ליברמן",
     block: "opposition",
+    parliamentaryStatus: "INCUMBENT",
     scores: {
       "equal-service": "PASS",
       "core-curriculum": "PASS",
@@ -695,6 +786,7 @@ const parties: PartyCompliance[] = [
     partyNameHe: "ש\"ס",
     leaderHe: "אריה דרעי",
     block: "coalition-37",
+    parliamentaryStatus: "INCUMBENT",
     scores: {
       "equal-service": "FAIL",
       "core-curriculum": "FAIL",
@@ -720,8 +812,11 @@ const parties: PartyCompliance[] = [
   {
     partyId: "utj",
     partyNameHe: "יהדות התורה",
-    leaderHe: "יצחק גולדקנופף",
+    leaderHe: "יעקב אשר",
+    searchAliasesHe: "יצחק גולדקנופף אגודת ישראל דגל התורה ג",
+    ballotNoteHe: "בראש הרשימה שהוגשה יעקב אשר. גולדקנופף במקום השני.",
     block: "coalition-37",
+    parliamentaryStatus: "INCUMBENT",
     scores: {
       "equal-service": "FAIL",
       "core-curriculum": "FAIL",
@@ -746,9 +841,12 @@ const parties: PartyCompliance[] = [
   },
   {
     partyId: "religious-zionism",
-    partyNameHe: "הציונות הדתית",
+    partyNameHe: "הציונות הדתית וזהות",
     leaderHe: "בצלאל סמוטריץ'",
+    searchAliasesHe: "משה פייגלין זהות ט",
+    ballotNoteHe: "רשימה משותפת עם זהות. הציון משקף את הציונות הדתית בכנסת ה-25.",
     block: "coalition-37",
+    parliamentaryStatus: "INCUMBENT",
     scores: {
       "equal-service": "FAIL",
       "core-curriculum": "PARTIAL",
@@ -776,6 +874,7 @@ const parties: PartyCompliance[] = [
     partyNameHe: "עוצמה יהודית",
     leaderHe: "איתמר בן גביר",
     block: "coalition-37",
+    parliamentaryStatus: "INCUMBENT",
     scores: {
       "equal-service": "FAIL",
       "core-curriculum": "PARTIAL",
@@ -803,6 +902,7 @@ const parties: PartyCompliance[] = [
     partyNameHe: "רע\"ם",
     leaderHe: "מנסור עבאס",
     block: "arab",
+    parliamentaryStatus: "INCUMBENT",
     scores: {
       "equal-service": "UNCOMMITTED",
       "core-curriculum": "PASS",
@@ -826,10 +926,13 @@ const parties: PartyCompliance[] = [
     }
   },
   {
-    partyId: "hadash-taal",
-    partyNameHe: "חד\"ש-תע\"ל",
-    leaderHe: "איימן עודה",
+    partyId: "joint-list",
+    partyNameHe: "הרשימה המשותפת",
+    leaderHe: "יוסף ג'בארין",
+    searchAliasesHe: "חדש תעל בלד חד\"ש תע\"ל בל\"ד איימן עודה אחמד טיבי סאמי אבו שחאדה ודם",
+    ballotNoteHe: "חד\"ש, תע\"ל ובל\"ד ברשימה אחת. הציון משקף את חד\"ש-תע\"ל בכנסת ה-25; לבל\"ד לא היו מושבים בכנסת ה-25.",
     block: "arab",
+    parliamentaryStatus: "INCUMBENT",
     scores: {
       "equal-service": "UNCOMMITTED",
       "core-curriculum": "PASS",
@@ -851,8 +954,223 @@ const parties: PartyCompliance[] = [
       "judicial-independence": ["ev-reasonableness-plenum-2023-07-24", "ev-bagatz-5658-23"],
       "term-limits": []
     }
-  }
+  },
+  {
+    partyId: "blue-white",
+    partyNameHe: "כחול לבן",
+    leaderHe: "בני גנץ",
+    searchAliasesHe: "המחנה הממלכתי כן",
+    ballotNoteHe: "רשימת 2026 בראשות גנץ. הציון משקף את הצבעות האופוזיציה של המחנה הממלכתי בכנסת ה-25.",
+    block: "opposition",
+    parliamentaryStatus: "INCUMBENT",
+    scores: {
+      "equal-service": "PASS",
+      "core-curriculum": "PASS",
+      "budget-integrity": "PASS",
+      "judicial-independence": "PASS",
+      "term-limits": "PASS"
+    },
+    basis: {
+      "equal-service": oppositionEqualPass,
+      "core-curriculum": outsideCorePass,
+      "budget-integrity": oppositionBudgetPass,
+      "judicial-independence": oppositionJudicialPass,
+      "term-limits": termLimitsPassSponsors
+    },
+    evidenceMap: {
+      "equal-service": ["ev-draft-continuity-2024-06-10", "ev-bagatz-6198-23"],
+      "core-curriculum": ["ev-coalition-agreements-index-37"],
+      "budget-integrity": ["ev-budget-2023-lawbill", "ev-coalition-funds-obudget-2024"],
+      "judicial-independence": ["ev-reasonableness-plenum-2023-07-24", "ev-bagatz-5658-23"],
+      "term-limits": ["ev-term-limits-press-2021-11-22", "ev-term-limits-bill-25"]
+    }
+  },
+  {
+    partyId: "noam",
+    partyNameHe: "נעם לישראל",
+    leaderHe: "אבי מעוז",
+    searchAliasesHe: "נעם ני",
+    ballotNoteHe: "אבי מעוז היה חבר כנסת בקואליציה ה-37. הציון משקף את הצבעות הקואליציה בכנסת ה-25.",
+    block: "coalition-37",
+    parliamentaryStatus: "INCUMBENT",
+    scores: {
+      "equal-service": "FAIL",
+      "core-curriculum": "PARTIAL",
+      "budget-integrity": "FAIL",
+      "judicial-independence": "FAIL",
+      "term-limits": "FAIL"
+    },
+    basis: {
+      "equal-service": coalitionEqualFail,
+      "core-curriculum": coalitionPartnerCorePartial,
+      "budget-integrity": coalitionBudgetFail,
+      "judicial-independence": coalitionJudicialFail,
+      "term-limits": termLimitsFailCoalition
+    },
+    evidenceMap: {
+      "equal-service": ["ev-draft-continuity-2024-06-10", "ev-bagatz-6198-23"],
+      "core-curriculum": ["ev-coalition-agreements-index-37"],
+      "budget-integrity": ["ev-budget-2023-lawbill", "ev-coalition-funds-obudget-2024"],
+      "judicial-independence": ["ev-reasonableness-plenum-2023-07-24", "ev-bagatz-5658-23"],
+      "term-limits": ["ev-term-limits-press-2021-11-22"]
+    }
+  },
+  challenger({
+    partyId: "reservists-economy",
+    partyNameHe: "המילואימניקים והכלכלית",
+    leaderHe: "יועז הנדל",
+    searchAliasesHe: "ירון זליכה עינת וילף די",
+    ballotNoteHe: "רשימת מילואים וכלכלה שהוגשה לכנסת ה-26. אין למוביליה מושבים בכנסת ה-25."
+  }),
+  challenger({
+    partyId: "amcha-yisrael",
+    partyNameHe: "עמך ישראל",
+    leaderHe: "עופר וינטר",
+    searchAliasesHe: "יוסף חדאד ך"
+  }),
+  challenger({
+    partyId: "israel-first",
+    partyNameHe: "ישראל תחילה",
+    leaderHe: "שרן השכל",
+    searchAliasesHe: "עלה ירוק",
+    ballotNoteHe: "לרשימה הצטרפה עלה ירוק. אין לה מושבים בכנסת ה-25."
+  }),
+  challenger({
+    partyId: "pirates",
+    partyNameHe: "הפיראטים",
+    leaderHe: "אוהד שם טוב",
+    searchAliasesHe: "נועם קוזר צף פיראטים"
+  }),
+  challenger({ partyId: "sharshar", partyNameHe: "שרשר", leaderHe: "איתן שווילי", searchAliasesHe: "צדק" }),
+  challenger({
+    partyId: "partnership-for-all",
+    partyNameHe: "השותפות לכולם",
+    leaderHe: "טלאל אלקרינאוי",
+    block: "arab",
+    searchAliasesHe: "רהט"
+  }),
+  challenger({
+    partyId: "together-succeed",
+    partyNameHe: "ביחד נצליח",
+    leaderHe: "אבי שקד",
+    block: "arab",
+    searchAliasesHe: "דראר אמריח ערבית יהודית"
+  }),
+  challenger({
+    partyId: "womens-voice",
+    partyNameHe: "קול הנשים",
+    leaderHe: "עמיר שדמי",
+    searchAliasesHe: "מזל שאול"
+  }),
+  challenger({ partyId: "gan-eden", partyNameHe: "גן עדן", leaderHe: "ישועה בן דוד" }),
+  challenger({ partyId: "justice-law", partyNameHe: "משפט צדק", leaderHe: "לריסה עמיר", searchAliasesHe: "קץ" }),
+  challenger({ partyId: "shema", partyNameHe: "שמע", leaderHe: "נפתלי גולדמן" }),
+  challenger({ partyId: "new-order", partyNameHe: "סדר חדש", leaderHe: "אביטל אופק" }),
+  challenger({
+    partyId: "haredi-public",
+    partyNameHe: "הציבור החרדי",
+    leaderHe: "מוטי ליטנר",
+    searchAliasesHe: "פנחס ליטנר לייטנר זך"
+  }),
+  challenger({ partyId: "ani-veata", partyNameHe: "אני ואתה", leaderHe: "אלון גלעדי", searchAliasesHe: "מפלגת העם הישראלית" }),
+  challenger({ partyId: "brit-olam", partyNameHe: "ברית עולם", leaderHe: "עופר ליפשיץ", searchAliasesHe: "לגאולת ישראל" }),
+  challenger({
+    partyId: "electoral-reform",
+    partyNameHe: "התיקון לשיטת הבחירות והממשל",
+    leaderHe: "משה סלומוביץ"
+  }),
+  challenger({
+    partyId: "biblical-bloc",
+    partyNameHe: "הגוש התנ\"כי",
+    leaderHe: "משה ליפקין",
+    searchAliasesHe: "גה\"ת דניס ליפקין"
+  }),
+  challenger({
+    partyId: "social-security",
+    partyNameHe: "בטח",
+    leaderHe: "סמיון גרפמן",
+    searchAliasesHe: "ביטחון חברתי"
+  }),
+  challenger({
+    partyId: "orot-hashachar",
+    partyNameHe: "אורות השחר",
+    leaderHe: "נסים לוק",
+    searchAliasesHe: "בניהו הר-שמש"
+  }),
+  challenger({
+    partyId: "personal-security",
+    partyNameHe: "ביטחון אישי",
+    leaderHe: "מיכאל טופצ'יאשווילי"
+  }),
+  challenger({
+    partyId: "black-banner",
+    partyNameHe: "צבע שחור",
+    leaderHe: "אליהו בוימרינד",
+    searchAliasesHe: "מגן עולם התורה"
+  }),
+  challenger({
+    partyId: "ahi",
+    partyNameHe: "תנועת אח\"י",
+    leaderHe: "יובל אלימלך",
+    searchAliasesHe: "יורם אברג'ל"
+  }),
+  challenger({
+    partyId: "tzomet-beit-yisrael",
+    partyNameHe: "צומת – בית ישראל",
+    leaderHe: "דסטה יברקן",
+    searchAliasesHe: "גדי יברקן משה גרין צומת"
+  }),
+  challenger({ partyId: "tkuma", partyNameHe: "תקומה", leaderHe: "אלקנה פדרמן" }),
+  challenger({
+    partyId: "hakahal",
+    partyNameHe: "הקהל",
+    leaderHe: "שלמה אלבוים",
+    searchAliasesHe: "מפלגה כלל-חרדית"
+  })
 ];
+
+const rosterUrls: Partial<Record<PartyId, string>> = {
+  beyachad: "https://www.gov.il/he/pages/beyahad_list1",
+  yashar: "https://www.gov.il/he/pages/yashar_list_2",
+  sharshar: "https://www.gov.il/he/pages/sharshar_list3",
+  "partnership-for-all": "https://www.gov.il/he/pages/hashutafut-lekulam_iist",
+  pirates: "https://www.gov.il/he/pages/pirates_list_5",
+  "amcha-yisrael": "https://www.gov.il/he/pages/amcha-israel_list6",
+  "israel-first": "https://www.gov.il/he/pages/israel-tchila_list7",
+  "gan-eden": "https://www.gov.il/he/pages/gan-eden_list_8",
+  "womens-voice": "https://www.gov.il/he/pages/kol-ha-nashim_list9",
+  "together-succeed": "https://www.gov.il/he/pages/beyachad-natzliah_list10",
+  "yisrael-beiteinu": "https://www.gov.il/he/pages/israel-beitenu_list11",
+  "justice-law": "https://www.gov.il/he/pages/mishpat-tzedek_list12",
+  shema: "https://www.gov.il/he/pages/shama",
+  "otzma-yehudit": "https://www.gov.il/he/pages/yehudit-meuhedet_list14",
+  "new-order": "https://www.gov.il/he/pages/seder-chadash_list15",
+  "reservists-economy": "https://www.gov.il/he/pages/hamiluimnikim-vehakalkalit_list16",
+  "the-democrats": "https://www.gov.il/he/pages/hademokratim_list17",
+  raam: "https://www.gov.il/he/pages/raam_list18",
+  shas: "https://www.gov.il/he/pages/shas_list19",
+  "haredi-public": "https://www.gov.il/he/pages/tzibur-charedi_list20",
+  "ani-veata": "https://www.gov.il/he/pages/miflegat-am-israelit_list21",
+  "brit-olam": "https://www.gov.il/he/pages/brit-olam_list22",
+  "electoral-reform": "https://www.gov.il/he/pages/tikun_list23",
+  "biblical-bloc": "https://www.gov.il/he/pages/gush-tanachi_list24",
+  "social-security": "https://www.gov.il/he/pages/betach_list25",
+  "orot-hashachar": "https://www.gov.il/he/pages/orot_list26",
+  "personal-security": "https://www.gov.il/he/pages/demokratura_list27",
+  "black-banner": "https://www.gov.il/he/pages/shachor_list28",
+  likud: "https://www.gov.il/he/pages/halikud-tikvahadasha_iist29",
+  "blue-white": "https://www.gov.il/he/pages/kachol-lavan_list30",
+  "religious-zionism": "https://www.gov.il/he/pages/tzionutdatit-zehut_list31",
+  ahi: "https://www.gov.il/he/pages/chozrim-leshorashim_list32",
+  "tzomet-beit-yisrael": "https://www.gov.il/he/pages/tzomet-beit-israel_list33",
+  tkuma: "https://www.gov.il/he/pages/tekuma_list34",
+  "joint-list": "https://www.gov.il/he/pages/hareshima-hameshutefet_list35",
+  hakahal: "https://www.gov.il/he/pages/machane-israel_list36",
+  utj: "https://www.gov.il/he/pages/yahadut-degel_list37",
+  noam: "https://www.gov.il/he/pages/noam_list38"
+};
+
+for (const party of parties) party.rosterUrl = rosterUrls[party.partyId];
 
 export const scorecard2026: ScorecardDataset = {
   electionLabel: L({

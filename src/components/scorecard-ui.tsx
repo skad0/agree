@@ -8,28 +8,46 @@ import type {
   Criterion,
   CriterionId,
   EvidenceRecord,
+  EvidenceType,
   PartyBlock,
   PartyCompliance,
   ScorecardDataset
 } from "../types/scorecard.js";
-import { isComplianceStatus, isCriterionId, isPartyBlock, isPartyId } from "../types/scorecard.js";
+import { complianceMetrics, isComplianceStatus, isCriterionId, isPartyBlock, isPartyId } from "../types/scorecard.js";
 import { normalizeHebrew } from "../integrations/elections/normalize-hebrew.js";
 import { s } from "../share-copy.js";
+
+export const SCORECARD_SEGMENTS = ["all", "incumbent", "challenger", "high"] as const;
+export type ScorecardSegment = (typeof SCORECARD_SEGMENTS)[number];
+export const SCORECARD_SORTS = ["group", "compliance", "alpha"] as const;
+export type ScorecardSort = (typeof SCORECARD_SORTS)[number];
 
 export type ScorecardFilters = {
   q: string;
   block?: PartyBlock;
   criterion?: CriterionId;
   status?: ComplianceStatus;
+  segment: ScorecardSegment;
+  sort: ScorecardSort;
   party?: string;
   evidenceCriterion?: CriterionId;
 };
+
+function isSegment(value: string): value is ScorecardSegment {
+  return (SCORECARD_SEGMENTS as readonly string[]).includes(value);
+}
+
+function isSort(value: string): value is ScorecardSort {
+  return (SCORECARD_SORTS as readonly string[]).includes(value);
+}
 
 export function parseScorecardFilters(query: {
   q?: string;
   block?: string;
   criterion?: string;
   status?: string;
+  segment?: string;
+  sort?: string;
   party?: string;
   evidence?: string;
 }): { filters: ScorecardFilters; reset: boolean } {
@@ -39,7 +57,19 @@ export function parseScorecardFilters(query: {
   const statusRaw = query.status ?? "";
   const partyRaw = (query.party ?? "").slice(0, 64).trim();
   const evidenceRaw = query.evidence ?? "";
+  const segmentRaw = query.segment ?? "";
+  const sortRaw = query.sort ?? "";
   let reset = false;
+  let segment: ScorecardSegment = "all";
+  let sort: ScorecardSort = "group";
+  if (segmentRaw) {
+    if (isSegment(segmentRaw)) segment = segmentRaw;
+    else reset = true;
+  }
+  if (sortRaw) {
+    if (isSort(sortRaw)) sort = sortRaw;
+    else reset = true;
+  }
   let block: PartyBlock | undefined;
   let criterion: CriterionId | undefined;
   let status: ComplianceStatus | undefined;
@@ -67,6 +97,8 @@ export function parseScorecardFilters(query: {
       block,
       criterion,
       status,
+      segment,
+      sort,
       party: partyRaw && isPartyId(partyRaw) ? partyRaw : partyRaw || undefined,
       evidenceCriterion
     },
@@ -78,7 +110,9 @@ export function filterParties(dataset: ScorecardDataset, filters: ScorecardFilte
   const terms = normalizeHebrew(filters.q).split(/\s+/).filter(Boolean);
   return dataset.parties.filter((party) => {
     if (filters.block && party.block !== filters.block) return false;
-    if (filters.party && party.partyId !== filters.party) return false;
+    if (filters.segment === "incumbent" && party.parliamentaryStatus !== "INCUMBENT") return false;
+    if (filters.segment === "challenger" && party.parliamentaryStatus !== "CHALLENGER") return false;
+    if (filters.segment === "high" && complianceMetrics(party).passedCount < 3) return false;
     if (filters.criterion && filters.status && party.scores[filters.criterion] !== filters.status) return false;
     if (filters.criterion && !filters.status) {
       /* criterion alone still shows all parties; matrix highlights that column */
@@ -88,9 +122,33 @@ export function filterParties(dataset: ScorecardDataset, filters: ScorecardFilte
       if (!hit) return false;
     }
     if (!terms.length) return true;
-    const haystack = normalizeHebrew(`${party.partyNameHe} ${party.leaderHe} ${party.partyId}`);
+    const haystack = normalizeHebrew(`${party.partyNameHe} ${party.leaderHe} ${party.searchAliasesHe ?? ""} ${party.ballotNoteHe ?? ""} ${party.partyId}`);
     return terms.every((term) => haystack.includes(term));
-  });
+  }).sort((a, b) => compareParties(a, b, filters.sort));
+}
+
+function compareParties(a: PartyCompliance, b: PartyCompliance, sort: ScorecardSort): number {
+  const byName = () => a.partyNameHe.localeCompare(b.partyNameHe, "he");
+  const byScore = () => {
+    const delta = complianceMetrics(b).passedCount - complianceMetrics(a).passedCount;
+    return delta !== 0 ? delta : byName();
+  };
+  switch (sort) {
+    case "alpha":
+      return byName();
+    case "compliance":
+      return byScore();
+    case "group": {
+      if (a.parliamentaryStatus !== b.parliamentaryStatus) {
+        return a.parliamentaryStatus === "INCUMBENT" ? -1 : 1;
+      }
+      return byScore();
+    }
+    default: {
+      const _exhaustive: never = sort;
+      return _exhaustive;
+    }
+  }
 }
 
 export function scorecardQuery(filters: ScorecardFilters, extras: Record<string, string | undefined> = {}): string {
@@ -99,6 +157,8 @@ export function scorecardQuery(filters: ScorecardFilters, extras: Record<string,
   if (filters.block) params.set("block", filters.block);
   if (filters.criterion) params.set("criterion", filters.criterion);
   if (filters.status) params.set("status", filters.status);
+  if (filters.segment !== "all") params.set("segment", filters.segment);
+  if (filters.sort !== "group") params.set("sort", filters.sort);
   const party = extras.party ?? filters.party;
   const evidence = extras.evidence ?? filters.evidenceCriterion;
   if (party) params.set("party", party);
@@ -129,24 +189,46 @@ export function StatusBadge({
   locale,
   status,
   href,
-  criterionTitle
+  criterionTitle,
+  preview
 }: {
   locale: Locale;
   status: ComplianceStatus;
   href: string;
   criterionTitle: string;
+  preview: string;
 }) {
   const label = statusLabel(locale, status);
+  const tip = `${preview} — ${sc(locale, "previewMore")}`;
   return (
     <a
       class={`score-badge score-${status.toLowerCase()}`}
       href={href}
-      title={`${criterionTitle}: ${label}`}
-      aria-label={`${criterionTitle}: ${label}. ${sc(locale, "openEvidence")}`}
+      title={tip}
+      aria-label={`${criterionTitle}: ${label}. ${tip}`}
     >
       <span class="score-badge-mark" aria-hidden="true">{statusMark(status)}</span>
       <span class="score-badge-label">{label}</span>
+      <span class="score-tip">{tip}</span>
     </a>
+  );
+}
+
+function ComplianceGauge({ locale, party }: { locale: Locale; party: PartyCompliance }) {
+  const metrics = complianceMetrics(party);
+  const width = Math.round((metrics.passedCount / metrics.totalCriteria) * 72);
+  const label = `${metrics.passedCount}/${metrics.totalCriteria}`;
+  return (
+    <span class="score-gauge" title={`${label} · ${metrics.compliancePercentage}%`}>
+      <svg width="72" height="8" viewBox="0 0 72 8" aria-hidden="true">
+        <rect class="score-gauge-track" x="0" y="0" width="72" height="8" rx="2" />
+        <rect class="score-gauge-fill" x="0" y="0" width={String(width)} height="8" rx="2" />
+      </svg>
+      <span class="score-gauge-fraction">
+        <bdi dir="ltr">{label}</bdi>
+      </span>
+      <span class="sr-only">{sc(locale, "sortCompliance")}: {metrics.compliancePercentage}%</span>
+    </span>
   );
 }
 
@@ -191,20 +273,52 @@ export function PledgeBanner({ locale, shareUrl }: { locale: Locale; shareUrl: s
   );
 }
 
+function evidenceTypeLabel(locale: Locale, type: EvidenceType): string {
+  switch (type) {
+    case "KNESSET_PLENUM_VOTE":
+      return sc(locale, "evidenceKind");
+    case "COALITION_AGREEMENT":
+      return sc(locale, "evidenceKind");
+    case "BAGATZ_RULING":
+      return sc(locale, "evidenceKind");
+    case "OFFICIAL_BILL":
+      return sc(locale, "evidenceKind");
+    case "OFFICIAL_PLATFORM":
+      return sc(locale, "evidenceKind");
+    case "SIGNED_PLEDGE":
+      return sc(locale, "evidenceKind");
+    default: {
+      const _exhaustive: never = type;
+      return _exhaustive;
+    }
+  }
+}
+
+function fillShare(template: string, party: string, passed: number, total: number): string {
+  return template.replaceAll("{party}", party).replaceAll("{passed}", String(passed)).replaceAll("{total}", String(total));
+}
+
 export function EvidenceDrawer({
   locale,
   party,
   criterion,
   records,
-  closeHref
+  closeHref,
+  pageUrl
 }: {
   locale: Locale;
   party: PartyCompliance;
   criterion: Criterion;
   records: EvidenceRecord[];
   closeHref: string;
+  pageUrl: string;
 }) {
   const status = party.scores[criterion.id];
+  const metrics = complianceMetrics(party);
+  const template = party.parliamentaryStatus === "CHALLENGER" ? sc(locale, "sharePartyPlatform") : sc(locale, "sharePartyVote");
+  const sentence = `${fillShare(template, party.partyNameHe, metrics.passedCount, metrics.totalCriteria)} ${pageUrl}`;
+  const whatsapp = `https://wa.me/?${new URLSearchParams({ text: sentence })}`;
+  const xShare = `https://x.com/intent/post?${new URLSearchParams({ text: sentence })}`;
   return (
     <section class="scorecard-evidence" id={`evidence-${party.partyId}-${criterion.id}`} tabIndex={-1}>
       <div class="scorecard-evidence-header">
@@ -224,11 +338,22 @@ export function EvidenceDrawer({
         <h3>{sc(locale, "statusBasis")}</h3>
         <p>{party.basis[criterion.id][locale]}</p>
       </div>
+      {party.rosterUrl ? (
+        <p><a href={party.rosterUrl} rel="noreferrer">{sc(locale, "evidenceLink")}</a></p>
+      ) : null}
+      <div class="scorecard-share">
+        <h3>{sc(locale, "shareCivicId")}</h3>
+        <p lang={locale} dir={dirOf(locale)}>{sentence}</p>
+        <p class="scorecard-share-actions">
+          <a class="primary-action" href={whatsapp} rel="noreferrer">WhatsApp</a>
+          <a href={xShare} rel="noreferrer">X</a>
+        </p>
+      </div>
       {!records.length ? <p role="status">{sc(locale, "noEvidence")}</p> : null}
       <ol class="scorecard-evidence-list">
         {records.map((record) => (
           <li key={record.id} class="scorecard-evidence-item">
-            <p class="scorecard-trust"><span class="badge on">{sc(locale, "trustBadge")}</span></p>
+            <p class="scorecard-trust"><span class="badge on">{sc(locale, "trustBadge")}</span> <span class="scorecard-evidence-kind">{evidenceTypeLabel(locale, record.type)}</span></p>
             <dl class="scorecard-evidence-fields">
               <dt>{sc(locale, "evidenceDate")}</dt>
               <dd><time dateTime={record.date}><bdi dir="ltr">{formatIsraeliDate(record.date)}</bdi></time></dd>
@@ -267,17 +392,39 @@ export function ScorecardFiltersForm({
   dataset: ScorecardDataset;
   filters: ScorecardFilters;
 }) {
+  const segmentHref = (segment: ScorecardSegment) => {
+    const query = scorecardQuery({ ...filters, segment, party: undefined, evidenceCriterion: undefined });
+    return query ? `${path}?${query}` : path;
+  };
+  const sortHref = (sort: ScorecardSort) => {
+    const query = scorecardQuery({ ...filters, sort, party: undefined, evidenceCriterion: undefined });
+    return query ? `${path}?${query}` : path;
+  };
   return (
+    <>
+    <nav class="scorecard-segments" aria-label={sc(locale, "filters")}>
+      {SCORECARD_SEGMENTS.map((segment) => (
+        <a href={segmentHref(segment)} aria-current={filters.segment === segment ? "true" : undefined}>{segmentLabel(locale, segment)}</a>
+      ))}
+    </nav>
+    <nav class="scorecard-sort" aria-label={sc(locale, "sortBy")}>
+      <span>{sc(locale, "sortBy")}</span>
+      {SCORECARD_SORTS.map((sort) => (
+        <a href={sortHref(sort)} aria-current={filters.sort === sort ? "true" : undefined}>{sortLabel(locale, sort)}</a>
+      ))}
+    </nav>
     <form method="get" action={path} class="scorecard-filters" role="search" aria-label={sc(locale, "filters")}>
+      {filters.segment !== "all" ? <input type="hidden" name="segment" value={filters.segment} /> : null}
+      {filters.sort !== "group" ? <input type="hidden" name="sort" value={filters.sort} /> : null}
       <label>
         {sc(locale, "search")}
-        <input type="search" name="q" value={filters.q} maxLength={100} autocomplete="off" />
+        <input type="search" name="q" value={filters.q} maxLength={100} autocomplete="off" data-scorecard-q />
       </label>
       <label>
         {sc(locale, "block")}
         <select name="block">
           <option value="">{sc(locale, "allBlocks")}</option>
-          {(["coalition-37", "opposition", "arab"] as const).map((block) => (
+          {(["coalition-37", "opposition", "arab", "other"] as const).map((block) => (
             <option value={block} selected={filters.block === block}>{blockLabel(locale, block)}</option>
           ))}
         </select>
@@ -305,7 +452,62 @@ export function ScorecardFiltersForm({
       <button type="submit">{sc(locale, "search")}</button>
       <a href={path}>{sc(locale, "clear")}</a>
     </form>
+    </>
   );
+}
+
+function segmentLabel(locale: Locale, segment: ScorecardSegment): string {
+  switch (segment) {
+    case "all":
+      return sc(locale, "segmentAll");
+    case "incumbent":
+      return sc(locale, "segmentIncumbent");
+    case "challenger":
+      return sc(locale, "segmentChallenger");
+    case "high":
+      return sc(locale, "segmentHigh");
+    default: {
+      const _exhaustive: never = segment;
+      return _exhaustive;
+    }
+  }
+}
+
+function sortLabel(locale: Locale, sort: ScorecardSort): string {
+  switch (sort) {
+    case "group":
+      return sc(locale, "sortGroup");
+    case "compliance":
+      return sc(locale, "sortCompliance");
+    case "alpha":
+      return sc(locale, "sortAlpha");
+    default: {
+      const _exhaustive: never = sort;
+      return _exhaustive;
+    }
+  }
+}
+
+function parliamentaryLabel(locale: Locale, party: PartyCompliance): string {
+  switch (party.parliamentaryStatus) {
+    case "INCUMBENT":
+      return sc(locale, "incumbentBadge");
+    case "CHALLENGER":
+      return sc(locale, "challengerBadge");
+    default: {
+      const _exhaustive: never = party.parliamentaryStatus;
+      return _exhaustive;
+    }
+  }
+}
+
+function partySearchKey(party: PartyCompliance): string {
+  return normalizeHebrew(`${party.partyNameHe} ${party.leaderHe} ${party.searchAliasesHe ?? ""} ${party.ballotNoteHe ?? ""}`);
+}
+
+function statusPreview(locale: Locale, party: PartyCompliance, criterionId: CriterionId): string {
+  const text = party.basis[criterionId][locale].replace(/\s+/g, " ").trim();
+  return text.length > 140 ? `${text.slice(0, 137)}…` : text;
 }
 
 export function ScorecardTable({
@@ -344,11 +546,13 @@ export function ScorecardTable({
           </thead>
           <tbody>
             {parties.map((party) => (
-              <tr>
+              <tr data-scorecard-party={party.partyId} data-search={partySearchKey(party)}>
                 <th scope="row" lang="he" dir="rtl">
                   <span class="scorecard-party-name">{party.partyNameHe}</span>
                   <span class="scorecard-party-leader">{party.leaderHe}</span>
-                  <span class="scorecard-party-block" lang={locale} dir={dirOf(locale)}>{blockLabel(locale, party.block)}</span>
+                  {party.ballotNoteHe ? <span class="scorecard-party-note">{party.ballotNoteHe}</span> : null}
+                  <span class="scorecard-party-block" lang={locale} dir={dirOf(locale)}>{parliamentaryLabel(locale, party)} · {blockLabel(locale, party.block)}</span>
+                  <ComplianceGauge locale={locale} party={party} />
                 </th>
                 {criteria.map((criterion) => {
                   const href = `${path}?${scorecardQuery(filters, { party: party.partyId, evidence: criterion.id })}#evidence`;
@@ -359,6 +563,7 @@ export function ScorecardTable({
                         status={party.scores[criterion.id]}
                         href={href}
                         criterionTitle={criterion.title[locale]}
+                        preview={statusPreview(locale, party, criterion.id)}
                       />
                     </td>
                   );
@@ -371,13 +576,15 @@ export function ScorecardTable({
 
       <ul class="scorecard-cards">
         {parties.map((party) => (
-          <li key={party.partyId}>
+          <li key={party.partyId} data-scorecard-party={party.partyId} data-search={partySearchKey(party)}>
             <details class="scorecard-card" open={filters.party === party.partyId}>
               <summary>
                 <span lang="he" dir="rtl" class="scorecard-party-name">{party.partyNameHe}</span>
                 <span lang="he" dir="rtl" class="scorecard-party-leader">{party.leaderHe}</span>
+                <ComplianceGauge locale={locale} party={party} />
               </summary>
-              <p class="scorecard-party-block">{blockLabel(locale, party.block)}</p>
+              <p class="scorecard-party-block">{parliamentaryLabel(locale, party)} · {blockLabel(locale, party.block)}</p>
+              {party.ballotNoteHe ? <p class="scorecard-party-note" lang="he" dir="rtl">{party.ballotNoteHe}</p> : null}
               <ul class="scorecard-card-scores">
                 {criteria.map((criterion) => {
                   const href = `${path}?${scorecardQuery(filters, { party: party.partyId, evidence: criterion.id })}#evidence`;
@@ -389,6 +596,7 @@ export function ScorecardTable({
                         status={party.scores[criterion.id]}
                         href={href}
                         criterionTitle={criterion.title[locale]}
+                        preview={statusPreview(locale, party, criterion.id)}
                       />
                     </li>
                   );
@@ -427,6 +635,12 @@ export function ScorecardIntro({ locale, children }: { locale: Locale; children?
       <p class="eyebrow">{sc(locale, "nav")}</p>
       <h1>{sc(locale, "title")}</h1>
       <p class="lede">{sc(locale, "lede")}</p>
+      <p class="scorecard-pending">{sc(locale, "listsPending")}</p>
+      <ol class="scorecard-steps">
+        <li>{sc(locale, "stepSegment")}</li>
+        <li>{sc(locale, "stepSearch")}</li>
+        <li>{sc(locale, "stepOpen")}</li>
+      </ol>
       <p class="neutrality">{s(locale, "neutrality")}</p>
       {children}
     </section>

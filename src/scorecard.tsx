@@ -34,6 +34,8 @@ export function registerScorecardRoutes(app: Hono, db: Db, config: Config) {
       block: context.req.query("block"),
       criterion: context.req.query("criterion"),
       status: context.req.query("status"),
+      segment: context.req.query("segment"),
+      sort: context.req.query("sort"),
       party: context.req.query("party"),
       evidence: context.req.query("evidence")
     });
@@ -52,7 +54,9 @@ export function registerScorecardRoutes(app: Hono, db: Db, config: Config) {
       q: filters.q,
       block: filters.block,
       criterion: filters.criterion,
-      status: filters.status
+      status: filters.status,
+      segment: filters.segment,
+      sort: filters.sort
     });
     const evidence = resolveEvidence(scorecard2026, filters.party, filters.evidenceCriterion);
     const closeHref = query ? `${path}?${query}` : path;
@@ -62,6 +66,7 @@ export function registerScorecardRoutes(app: Hono, db: Db, config: Config) {
         locale={locale}
         title={sc(locale, "title")}
         path={context.req.path}
+        mainClass="scorecard-wide"
         languageHref={(next) => `/${next}/scorecard?lang=1${query ? `&${query}` : ""}`}
         shareMeta={{
           url: shareUrl,
@@ -73,10 +78,11 @@ export function registerScorecardRoutes(app: Hono, db: Db, config: Config) {
       >
         <ScorecardIntro locale={locale} />
         <PledgeBanner locale={locale} shareUrl={shareUrl} />
+        <div data-scorecard>
         <ScorecardFiltersForm locale={locale} path={path} dataset={scorecard2026} filters={filters} />
         {reset ? <p role="status">{sc(locale, "filterReset")}</p> : null}
         <p role="status">
-          {sc(locale, "results")}: {parties.length}
+          {sc(locale, "results")}: <span data-scorecard-count>{parties.length}</span>
           {" · "}
           <bdi lang={locale} dir={dirOf(locale)}>{scorecard2026.electionLabel[locale]}</bdi>
         </p>
@@ -96,10 +102,12 @@ export function registerScorecardRoutes(app: Hono, db: Db, config: Config) {
               party={evidence.party}
               criterion={evidence.criterion}
               records={evidence.records}
-              closeHref={closeHref}
-            />
+            closeHref={closeHref}
+            pageUrl={`${shareUrl}${query ? `?${query}` : ""}`}
+          />
           </div>
         ) : null}
+        </div>
         <p><a href={`/${locale}`}>{sc(locale, "backHome")}</a></p>
         <p class="neutrality">{s(locale, "neutrality")}</p>
       </Layout>

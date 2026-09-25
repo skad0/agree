@@ -699,19 +699,46 @@ button.danger:hover { background: var(--caution); color: var(--paper); border-co
 .scorecard-filters label { flex: 1 1 12rem; min-inline-size: 0; }
 .scorecard-filters button, .scorecard-filters a { inline-size: auto; min-block-size: 44px; margin-block-end: 1rem; }
 .scorecard-mobile-hint { display: none; font-size: .9rem; color: var(--mute); }
-.scorecard-table-wrap { overflow-x: auto; margin-block: 1rem 2rem; border: 1px solid var(--rule); border-radius: 4px; background: var(--card); }
-.scorecard-table { width: 100%; margin: 0; border-collapse: collapse; font-size: .9rem; }
-.scorecard-table th, .scorecard-table td { padding: .75rem .65rem; border-block-end: 1px solid var(--rule); vertical-align: top; text-align: start; }
-.scorecard-table thead th { font-size: .78rem; color: var(--mute); font-weight: 650; background: var(--paper); position: sticky; inset-block-start: 0; }
+.wrap.scorecard-wide { max-inline-size: 76rem; }
+.scorecard-steps { margin: .5rem 0 0; padding-inline-start: 1.25rem; color: var(--ink); }
+.scorecard-steps li { margin-block: .25rem; }
+.scorecard-pending { font-size: .9rem; color: var(--mute); }
+.scorecard-segments, .scorecard-sort { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; margin-block: .75rem; }
+.scorecard-segments a, .scorecard-sort a {
+  display: inline-flex; align-items: center; min-block-size: 44px; padding: .4rem .8rem;
+  border: 1px solid var(--rule); border-radius: 4px; background: var(--card); text-decoration: none; color: var(--ink);
+}
+.scorecard-segments a[aria-current], .scorecard-sort a[aria-current] { background: var(--seal); color: var(--pico-primary-inverse); border-color: var(--seal); font-weight: 650; }
+.scorecard-table-wrap { overflow: auto; max-block-size: 70vh; margin-block: 1rem 2rem; border: 1px solid var(--rule); border-radius: 4px; background: var(--card); }
+.scorecard-table { width: max-content; min-inline-size: 100%; margin: 0; border-collapse: separate; border-spacing: 0; font-size: .9rem; }
+.scorecard-table th, .scorecard-table td { padding: .75rem .65rem; border-block-end: 1px solid var(--rule); vertical-align: top; text-align: start; background: var(--card); }
+.scorecard-table thead th { font-size: .78rem; color: var(--mute); font-weight: 650; background: var(--paper); position: sticky; inset-block-start: 0; z-index: 2; }
+.scorecard-table tbody th { position: sticky; inset-inline-start: 0; z-index: 1; min-inline-size: 12rem; max-inline-size: 16rem; background: var(--card); box-shadow: -1px 0 0 var(--rule); }
+.scorecard-table thead th:first-child { z-index: 3; inset-inline-start: 0; background: var(--paper); }
 .scorecard-criterion-title { display: block; color: var(--ink); font-size: .92rem; font-weight: 700; }
 .scorecard-criterion-cat { display: block; font-size: .72rem; color: var(--mute); margin-block-start: .2rem; }
 .scorecard-party-name { display: block; font-size: 1.05rem; font-weight: 700; }
 .scorecard-party-leader, .scorecard-party-block { display: block; font-size: .82rem; color: var(--mute); font-weight: 400; }
 .score-badge {
-  display: inline-flex; flex-direction: column; align-items: flex-start; gap: .15rem;
+  display: inline-flex; flex-direction: column; align-items: flex-start; gap: .15rem; position: relative;
   min-block-size: 44px; min-inline-size: 7rem; padding: .45rem .6rem; border-radius: 4px;
   border: 1px solid var(--rule); background: var(--paper); text-decoration: none; color: var(--ink);
 }
+.score-tip {
+  display: none; position: absolute; inset-inline-start: 0; inset-block-end: calc(100% + .35rem); z-index: 5;
+  inline-size: min(18rem, 70vw); padding: .55rem .7rem; border-radius: 4px; background: var(--ink); color: var(--paper);
+  font-size: .78rem; line-height: 1.35; font-weight: 500;
+}
+.score-badge:hover .score-tip, .score-badge:focus .score-tip, .score-badge:focus-visible .score-tip { display: block; }
+.score-gauge { display: inline-flex; align-items: center; gap: .4rem; margin-block-start: .35rem; }
+.score-gauge-track { fill: var(--rule); }
+.score-gauge-fill { fill: var(--seal); }
+.score-gauge-fraction { font-size: .82rem; font-weight: 700; color: var(--ink); }
+.scorecard-party-note { display: block; font-size: .78rem; color: var(--mute); font-weight: 400; margin-block-start: .15rem; }
+.scorecard-share { margin-block: 1rem; padding: .85rem 1rem; border: 1px solid var(--rule); border-radius: 4px; background: var(--paper); }
+.scorecard-share h3 { margin: 0 0 .4rem; font-size: 1rem; }
+.scorecard-share-actions { display: flex; flex-wrap: wrap; gap: .5rem; }
+.scorecard-share-actions a { min-block-size: 44px; display: inline-flex; align-items: center; padding-inline: .9rem; }
 .score-badge:hover { border-color: var(--seal); }
 .score-badge-mark { font-weight: 700; line-height: 1; }
 .score-badge-label { font-size: .78rem; line-height: 1.25; font-weight: 650; }
@@ -824,6 +851,7 @@ function mark() {
 }
 mark();
 directorySearch();
+scorecardLive();
 questionHelp();
 function directorySearch() {
   const form = document.querySelector('[data-directory-search]');
@@ -957,6 +985,24 @@ function directorySearch() {
     accept(row);
   });
   input.addEventListener('blur', () => { window.setTimeout(close, 0); });
+}
+function scorecardLive() {
+  const root = document.querySelector('[data-scorecard]');
+  const input = root?.querySelector('[data-scorecard-q]');
+  const count = root?.querySelector('[data-scorecard-count]');
+  if (!root || !input) return;
+  const norm = (value) => value.normalize('NFKC').replace(/\s+/g, ' ').trim();
+  input.addEventListener('input', () => {
+    const terms = norm(input.value).split(' ').filter(Boolean);
+    const seen = new Set();
+    for (const row of root.querySelectorAll('[data-scorecard-party]')) {
+      const hay = row.getAttribute('data-search') || '';
+      const ok = terms.every((term) => hay.includes(term));
+      row.hidden = !ok;
+      if (ok) seen.add(row.getAttribute('data-scorecard-party'));
+    }
+    if (count) count.textContent = String(seen.size);
+  });
 }
 function questionHelp() {
   document.addEventListener('keydown', (event) => {

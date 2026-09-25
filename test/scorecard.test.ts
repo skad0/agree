@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 import { createApp } from "../src/app.js";
 import { scorecard2026 } from "../src/data/scorecard-2026.js";
-import { assertScorecardDataset, PARTY_IDS, CRITERION_IDS } from "../src/types/scorecard.js";
+import { assertScorecardDataset, PARTY_IDS, CRITERION_IDS, complianceMetrics } from "../src/types/scorecard.js";
 import { filterParties, parseScorecardFilters } from "../src/components/scorecard-ui.js";
 import { locales } from "../src/i18n.js";
 import { sc } from "../src/scorecard-copy.js";
@@ -17,12 +17,30 @@ test("scorecard dataset is complete and only cites official hosts", () => {
   for (const record of scorecard2026.evidence) {
     assert.match(
       record.officialSourceUrl,
-      /^https:\/\/(main\.knesset\.gov\.il|fs\.knesset\.gov\.il|supremedecisions\.court\.gov\.il|next\.obudget\.org)\//i
+      /^https:\/\/(main\.knesset\.gov\.il|fs\.knesset\.gov\.il|supremedecisions\.court\.gov\.il|next\.obudget\.org|www\.gov\.il)\//i
     );
     assert.equal(record.verified, true);
   }
   assert.ok(scorecard2026.evidence.some((row) => row.referenceNumber.he.includes("6198/23")));
   assert.ok(!scorecard2026.evidence.some((row) => Object.values(row.referenceNumber).some((text) => text.includes("4398/24"))));
+});
+
+test("challenger lists are not failed for a missing 25th-Knesset vote", () => {
+  const challengers = scorecard2026.parties.filter((party) => party.parliamentaryStatus === "CHALLENGER");
+  assert.ok(challengers.length >= 20);
+  for (const party of challengers) {
+    for (const status of Object.values(party.scores)) assert.notEqual(status, "FAIL");
+    const metrics = complianceMetrics(party);
+    assert.equal(metrics.totalCriteria, 5);
+    assert.equal(metrics.passedCount, 0);
+    assert.equal(metrics.compliancePercentage, 0);
+  }
+  assert.ok(scorecard2026.evidence.some((row) => row.type === "OFFICIAL_PLATFORM" && row.officialSourceUrl.includes("www.gov.il")));
+  const { filters } = parseScorecardFilters({ q: "בלד", segment: "challenger" });
+  const rows = filterParties(scorecard2026, filters);
+  assert.ok(rows.some((row) => row.partyId === "joint-list") === false);
+  const balad = filterParties(scorecard2026, parseScorecardFilters({ q: "בלד" }).filters);
+  assert.ok(balad.some((row) => row.partyId === "joint-list"));
 });
 
 test("scorecard filters search and compliance levels", () => {
@@ -43,6 +61,8 @@ test("scorecard route renders Hebrew matrix, evidence drawer, pledge and Open Gr
     assert.match(html, /מדד רף משותף לבחירות לכנסת ה-26/);
     assert.match(html, /class="scorecard-table"/);
     assert.match(html, /class="scorecard-cards"/);
+    assert.match(html, /כל הרשימות/);
+    assert.match(html, /המילואימניקים/);
     assert.match(html, /desk@rafmeshutaf\.org\.il/);
     assert.match(
       html,
@@ -60,6 +80,9 @@ test("scorecard route renders Hebrew matrix, evidence drawer, pledge and Open Gr
     assert.match(evidenceHtml, /main\.knesset\.gov\.il/);
     assert.match(evidenceHtml, /6198\/23/);
     assert.match(evidenceHtml, /10\.06\.2024/);
+    assert.match(evidenceHtml, /שתף תעודת זהות אזרחית/);
+    assert.match(evidenceHtml, /wa\.me/);
+    assert.match(evidenceHtml, /x\.com\/intent\/post/);
     assert.equal(evidence.headers.get("cache-control"), "private, no-store");
   } finally {
     close();
