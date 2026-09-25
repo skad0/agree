@@ -9,7 +9,7 @@ test("public pages never publish owner contacts or contact placeholders",async()
     const runtime=createApp({sqlitePath:":memory:",env:{NODE_ENV:"test",PRIVACY_CONTACT_EMAIL:contact}});
     try{
       for(const locale of locales){
-        for(const suffix of ["","/about","/methodology","/privacy","/candidates","/scorecard","/standard","/coalition-agreement","/first-100-days","/government-model","/delete-data",...issueSlugs.map(slug=>`/issues/${slug}`)]){
+        for(const suffix of ["","/about","/methodology","/privacy","/scorecard","/standard","/coalition-agreement","/first-100-days","/government-model","/delete-data",...issueSlugs.map(slug=>`/issues/${slug}`)]){
           const response=await runtime.app.request(`/${locale}${suffix}`);
           assert.equal(response.status,200);
           assert.doesNotMatch(await response.text(),/owner-contact@campaign\.org|(?:mailto|tel):|(?:name|rel)="author"|privacy@example|CAMPAIGN OPERATOR CONTACT|\{\{PRIVACY_CONTACT_EMAIL\}\}|\[personal funds|\[מקורות עצמיים/);

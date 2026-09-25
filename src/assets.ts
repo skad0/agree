@@ -646,6 +646,42 @@ button.danger:hover { background: var(--caution); color: var(--paper); border-co
 .public-site nav.primary { flex-wrap: wrap; overflow: visible; gap: .25rem 1rem; }
 .public-site nav.primary a { white-space: normal; }
 .public-site nav.primary [aria-current] { color: var(--seal); text-decoration: underline; text-underline-offset: .3em; font-weight: 700; }
+.public-site nav.primary a.nav-threshold {
+  position: relative;
+  color: var(--ink);
+  font-weight: 700;
+}
+.public-site nav.primary a.nav-threshold::after {
+  content: "";
+  position: absolute;
+  /* left is physical: the chip must not swap sides in RTL. */
+  left: 50%;
+  bottom: .3rem;
+  width: 1.25rem;
+  height: 6px;
+  transform: translateX(-50%);
+  background: #10b981;
+  pointer-events: none;
+}
+@media (prefers-color-scheme: dark) {
+  :root:root:root:not([data-theme=light]) .public-site nav.primary a.nav-threshold::after {
+    background: var(--seal);
+  }
+}
+:root:root:root[data-theme=dark] .public-site nav.primary a.nav-threshold::after {
+  background: var(--seal);
+}
+.public-site nav.primary a.nav-threshold[aria-current="page"] {
+  color: var(--ink);
+  text-decoration: none;
+}
+.public-site nav.primary a.nav-threshold[aria-current="location"] {
+  color: var(--seal);
+  text-underline-offset: .15em;
+}
+.public-site nav.primary a.nav-threshold:hover {
+  color: var(--seal);
+}
 .public-site .site-header { margin-block-end: 1.5rem; }
 .issue-intro { max-inline-size: 48rem; margin-block-end: 2rem; }
 .issue-intro h1 { font-size: clamp(2rem, 5vw, 3.4rem); line-height: 1.12; }

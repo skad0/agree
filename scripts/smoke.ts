@@ -10,8 +10,8 @@ child.stdout.pipe(process.stdout); child.stderr.pipe(process.stderr);
 try {
   await waitFor(`http://127.0.0.1:${port}/health`);
   for (const path of ["/en/candidates", "/he/issues/elections-on-time", "/health", "/en", "/he", "/ar", "/yi", "/ru", "/uk", "/am", "/en/demands", "/uk/demands", "/en/support", "/uk/support", "/en/request", "/uk/request", "/en/responses/new", "/uk/responses/new", "/en/privacy", "/uk/privacy", "/en/delete-data", "/uk/delete-data", "/admin"]) {
-    const response = await fetch(`http://127.0.0.1:${port}${path}`); console.log(`${response.status} ${path}`);
-    const expected = path === "/admin" ? 403 : (path.endsWith("/support") || path.endsWith("/responses/new")) ? 503 : 200; if (response.status !== expected) throw new Error(`Expected ${expected} for ${path}`);
+    const response = await fetch(`http://127.0.0.1:${port}${path}`, path === "/en/candidates" ? { redirect: "manual" } : undefined); console.log(`${response.status} ${path}`);
+    const expected = path === "/admin" ? 403 : path === "/en/candidates" ? 302 : (path.endsWith("/support") || path.endsWith("/responses/new")) ? 503 : 200; if (response.status !== expected) throw new Error(`Expected ${expected} for ${path}`);
   }
 } finally { if (child.exitCode === null) child.kill("SIGTERM"); await exited; rmSync(directory, { recursive: true, force: true }); }
 

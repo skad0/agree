@@ -78,3 +78,35 @@ test("stable identity downloads, manifest targets, and legacy ICO are usable", a
     assert.equal((await runtime.app.request("/source/NotoSans.ttf")).status, 404);
   } finally { runtime.close(); }
 });
+
+test("primary nav marks Problems and the candidates url leaves the index", async () => {
+  const runtime = createApp({ sqlitePath: ":memory:", env: { NODE_ENV: "test", APP_BASE_URL: "https://rafmeshutaf.org.il" } });
+  try {
+    const home = await runtime.app.request("/en");
+    assert.equal(home.status, 200);
+    const homeHtml = await home.text();
+    assert.match(homeHtml, /<a class="nav-threshold" href="\/en" aria-current="page">/);
+    assert.doesNotMatch(homeHtml, /href="\/en\/candidates"/);
+    assert.doesNotMatch(homeHtml, /\sstyle=/);
+
+    const about = await runtime.app.request("/en/about");
+    assert.equal(about.status, 200);
+    const aboutHtml = await about.text();
+    assert.match(aboutHtml, /href="\/en\/about"/);
+    assert.match(aboutHtml, /class="nav-threshold"/);
+    assert.doesNotMatch(aboutHtml, /href="\/en\/candidates"/);
+    assert.match(aboutHtml, /<a href="\/en\/about" aria-current="page">/);
+    assert.match(aboutHtml, /<a class="nav-threshold" href="\/en">/);
+    assert.doesNotMatch(aboutHtml, /<a class="nav-threshold"[^>]*aria-current/);
+
+    const issue = await runtime.app.request("/en/issues/elections-on-time");
+    assert.equal(issue.status, 200);
+    const issueHtml = await issue.text();
+    assert.doesNotMatch(issueHtml, /href="\/en\/candidates"/);
+    assert.match(issueHtml, /<a class="nav-threshold" href="\/en" aria-current="location">/);
+
+    const candidates = await runtime.app.request("/en/candidates");
+    assert.equal(candidates.status, 302);
+    assert.equal(candidates.headers.get("location"), "/en");
+  } finally { runtime.close(); }
+});

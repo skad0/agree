@@ -1,10 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { readFileSync } from "node:fs";
 import { createApp } from "../src/app.js";
 import { locales } from "../src/i18n.js";
 import { issueSlugs, socialLinks } from "../src/issues.js";
-import { importCandidateSource, parseCandidateSource, activatePublication } from "../src/integrations/elections/import.js";
 
 const setup = () => createApp({sqlitePath:":memory:",env:{NODE_ENV:"test",APP_BASE_URL:"https://example.org"}});
 
@@ -77,26 +75,12 @@ test("historical results stay private, read-only and retain Hebrew name fallback
   } finally {close();}
 });
 
-test("candidate directory uses only an activated snapshot and bounds filters and paging",async()=>{
-  const {app,db,close}=setup();
+test("the candidates url redirects to the index",async()=>{
+  const {app,close}=setup();
   try {
-    assert.match(await (await app.request('/en/candidates')).text(),/not published here yet/);
-    const source=parseCandidateSource(JSON.parse(readFileSync('data/elections/knesset-26-lists.json','utf8')));
-    const draft=importCandidateSource(db,source,JSON.stringify(source));assert.ok(draft.ok);if(!draft.ok)return;
-    assert.match(await (await app.request('/en/candidates')).text(),/not published here yet/);
-    assert.ok(activatePublication(db,draft.publicationId).ok);
-    for(const locale of locales){
-      const response=await app.request(`/${locale}/candidates`);const html=await response.text();
-      assert.equal(response.status,200);assert.match(html,/38\/38/);assert.match(html,/1379/);
-      assert.equal((html.match(/<h2><bdi lang="he"/g)||[]).length,20);
-      assert.doesNotMatch(html,/mailto:|\/request\?|name="email"/);
-    }
-    const bad=await app.request('/en/candidates?list=999999&page=9999999');const body=await bad.text();
-    assert.match(bad.headers.get('cache-control')!,/no-store/);assert.equal(bad.headers.get('x-robots-tag'),'noindex');
-    assert.match(body,/Results have been adjusted/);
-    const searched=await app.request('/en/candidates?q='+encodeURIComponent(source.rows[0]!.fullNameHe));
-    assert.match(await searched.text(),/lang="he" dir="rtl"/);
-    assert.equal(db.prepare("SELECT count(*) n FROM recipient_entity_links").get()?.n,0);
+    const response=await app.request('/en/candidates');
+    assert.equal(response.status,302);
+    assert.equal(response.headers.get('location'),'/en');
   }finally{close();}
 });
 
@@ -116,7 +100,7 @@ test("campaign pause leaves privacy available and locale preferences uncached",a
       const r=await app.request(path);assert.match(r.headers.get('cache-control')!,/no-store/);assert.match(r.headers.get('set-cookie')!,/locale=en/);
     }
     db.prepare("UPDATE campaigns SET status='archived'").run();
-    for(const path of ['/en','/en/issues/elections-on-time','/en/candidates'])assert.equal((await app.request(path)).status,503);
+    for(const path of ['/en','/en/issues/elections-on-time'])assert.equal((await app.request(path)).status,503);
     assert.equal((await app.request('/en/privacy')).status,200);
   }finally{close();}
 });

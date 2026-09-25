@@ -8,7 +8,7 @@ Read this brief, then only the detailed sections relevant to the current slice. 
 
 - **Keep:** Hono SSR, SQLite, existing canonical clauses/locales, CSP, themes, historical read links, privacy/deletion, and admin protections.
 - **Public product:** ten equal problem cards → stable issue page or inline Share → named social destination. Candidates are a secondary read-only directory. No campaign mail, signup, message editing, reply intake, or share tracking.
-- **Interaction:** one ShareOptions component; Share always expands native details. Copy has truthful live feedback; More apps is progressive enhancement. Header is Problems/Candidates/About, wrapping at narrow widths. No hidden horizontal navigation.
+- **Interaction:** one ShareOptions component; Share always expands native details. Copy has truthful live feedback; More apps is progressive enhancement. Header is Problems, Scorecard, About. Problems is the marked index. The row wraps at narrow widths. No hidden horizontal navigation.
 - **URLs/content:** ten fixed slugs mapped to verified demand IDs; use the catalog below. Canonical summaries feed cards, social text, and metadata. Candidate filters use explicit server-rendered forms. Follow the exact route table for legacy links and all nine retired POST routes.
 - **Candidate data:** retain the local full-name transcript format; add immutable snapshot metadata/list versions. Directory reads the active snapshot directly, without creating/deactivating recipient contacts. Approval requires official evidence and remains separate from activation.
 - **Integration:** preserve uncommitted work first; use main plus the checkpoint as the baseline. Selectively adapt PR #7; leave unrelated branches and PR #1 out of the core changes.
@@ -77,7 +77,7 @@ Recommended display now: **“Submitted candidate lists — awaiting CEC approva
 
 Use a short explanation and a visible grid of the ten existing standard commitments, written as plain-language questions. Keep their existing canonical order; no popularity ranking. Use the complete catalog below. Each card contains its numbered heading as the only detail-page link, a short explanation, and a directly available Share disclosure. Do not add a duplicate Read more link. Full document text stays on its existing document page.
 
-Public navigation: **Problems · Candidates · About**, language picker, theme control. The full standard, coalition agreement, 100-day plan, methodology, privacy, and informational pages remain accessible as supporting material. Remove the numbered write/reply journey.
+Public navigation: **Problems · Scorecard · About**, with Problems marked as the index. Language picker and theme control stay. The full standard, coalition agreement, 100-day plan, methodology, privacy, and informational pages remain accessible as supporting material. Remove the numbered write/reply journey.
 
 ### One durable page per problem
 

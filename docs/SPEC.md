@@ -8,7 +8,7 @@ Read a problem → expand Share → choose a platform or copy its stable link. O
 
 Ten fixed issue slugs map to existing standard demand IDs 1–10. Questions are in `src/issue-headings.ts`; commitments, rationale, verification and exceptions use the existing localized canonical content. Proposals must not be presented as candidate promises. Missing/disabled issues return 404; paused campaigns return 503 with a privacy recovery link.
 
-Problems, Candidates, About appear in the same header order everywhere. Documents, methodology, privacy and appearance remain in the footer. Hebrew, Arabic and Yiddish use RTL. Directory names remain in their original Hebrew, marked with language and bidirectional isolation. Language switching preserves the issue or validated directory filters.
+The header is Problems, Scorecard, and About. Problems is the index and the marked item. Candidates is not in the header. Documents, methodology, privacy and appearance remain in the footer. Hebrew, Arabic and Yiddish use RTL. Directory names remain in their original Hebrew, marked with language and bidirectional isolation. Language switching preserves the issue or validated directory filters.
 
 ## Sharing
 
@@ -23,9 +23,9 @@ Problems, Candidates, About appear in the same header order everywhere. Document
 | --- | --- |
 | `GET /:locale` | Ten problem cards; share directly from each card |
 | `GET /:locale/issues/:slug` | Explanation, proposed commitment, share, optional verification/exceptions |
-| `GET /:locale/candidates` | Active snapshot only; search, list filter, 20-row pagination |
+| `GET /:locale/candidates` | 302 to the index |
 | `GET /:locale/scorecard` | Civic accountability matrix for Shared Threshold criteria with verified Knesset/HCJ evidence, filters, pledge banner and share metadata |
-| `GET /:locale/request`, `/request/build` | 302: known demand → issue; known recipient → directory with retirement notice; otherwise home |
+| `GET /:locale/request`, `/request/build` | 302: known demand → issue; otherwise home |
 | `POST /:locale/request` and `/selection`, `/review`, `/build`, `/suggest`, `/preview`, `/action`, `/copy`, `/report-sent` | 410, no writes, independent of old feature flags |
 | `GET /:locale/request/result?request=…` | Historical recipient/issues; private/no-store, noindex, no share metadata |
 | `/:locale/responses`, `/responses/new`, `/responses/thanks`, `/support` | 503 for all methods; new intake paused |

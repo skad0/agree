@@ -70,8 +70,7 @@ export function Layout({ locale, title, path, languageQuery = "", languageHref, 
         <a class="wordmark" href={`/${locale}`}><img src={identityPath("favicon.svg")} width="32" height="32" alt="" />{t(locale, "siteName")}</a>
         {/* The same three destinations appear in the same order on every public page. */}
         <nav class="primary" aria-label={s(locale,"problems")}>
-          <a href={`/${locale}`} aria-current={suffix === "" ? "page" : suffix.startsWith("/issues/") ? "location" : undefined}>{s(locale,"problems")}</a>
-          <a href={`/${locale}/candidates`} aria-current={suffix === "/candidates" ? "page" : undefined}>{s(locale,"candidates")}</a>
+          <a class="nav-threshold" href={`/${locale}`} aria-current={suffix === "" ? "page" : suffix.startsWith("/issues/") ? "location" : undefined}>{s(locale,"problems")}</a>
           <a href={`/${locale}/scorecard`} aria-current={suffix === "/scorecard" ? "page" : undefined}>{scNav(locale)}</a>
           <a href={`/${locale}/about`} aria-current={suffix === "/about" ? "page" : undefined}>{s(locale,"about")}</a>
         </nav>

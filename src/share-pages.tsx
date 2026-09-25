@@ -48,7 +48,6 @@ export function registerShareRoutes(app: Hono, db: Db, config: Config) {
         {issue.verification ? <details class="issue-explanation"><summary>{t(locale,"verification")}</summary><p>{issue.verification}</p></details> : null}
         {issue.exceptions ? <details class="issue-explanation"><summary>{t(locale,"exceptions")}</summary><p>{issue.exceptions}</p></details> : null}
         <p><a href={`/${locale}/standard#clause-${issue.sortOrder}`}>{t(locale,"readFull")}</a></p>
-        <p><a href={`/${locale}/candidates`}>{s(locale,"candidates")}</a></p>
         <p class="neutrality">{s(locale,"neutrality")}</p>
       </article>
     </Layout>);
@@ -59,9 +58,7 @@ export function registerShareRoutes(app: Hono, db: Db, config: Config) {
     privateNoStore(context);
     const demand = Number(context.req.query("demand"));
     const issue = listIssues(db,locale).find(row => row.id === demand);
-    const recipient = Number(context.req.query("recipient"));
-    const known = Number.isSafeInteger(recipient) && recipient > 0 && db.prepare("SELECT id FROM recipients WHERE id=?").get(recipient);
-    return context.redirect(issue ? `/${locale}/issues/${issue.slug}` : known ? `/${locale}/candidates?notice=retired` : `/${locale}`,302);
+    return context.redirect(issue ? `/${locale}/issues/${issue.slug}` : `/${locale}`,302);
   });
   for (const suffix of ["", "/selection", "/review", "/build", "/suggest", "/preview", "/action", "/copy", "/report-sent"]) {
     app.post(`/:locale/request${suffix}`, context => {
