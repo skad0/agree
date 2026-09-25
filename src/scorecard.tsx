@@ -19,7 +19,7 @@ import {
 } from "./components/scorecard-ui.js";
 import { privateNoStore, publicCache, publicCampaignActive, rememberLocale } from "./public-state.js";
 import { unavailable } from "./share-pages.js";
-import { t } from "./i18n.js";
+import { dirOf, t } from "./i18n.js";
 import { shareImagePath } from "./share-images.js";
 
 export function registerScorecardRoutes(app: Hono, db: Db, config: Config) {
@@ -78,9 +78,9 @@ export function registerScorecardRoutes(app: Hono, db: Db, config: Config) {
         <p role="status">
           {sc(locale, "results")}: {parties.length}
           {" · "}
-          <bdi lang="he" dir="rtl">{scorecard2026.electionLabelHe}</bdi>
+          <bdi lang={locale} dir={dirOf(locale)}>{scorecard2026.electionLabel[locale]}</bdi>
         </p>
-        {!parties.length ? <p>{t(locale, "directoryEmpty")}</p> : (
+        {!parties.length ? <p>{sc(locale, "noResults")}</p> : (
           <ScorecardTable
             locale={locale}
             path={path}

@@ -4,6 +4,8 @@
  * Zod is not used: the project keeps a zero-new-runtime-dependency policy.
  */
 
+import { locales, type Locale } from "../i18n.js";
+
 export const CRITERION_IDS = [
   "equal-service",
   "core-curriculum",
@@ -16,10 +18,13 @@ export type CriterionId = (typeof CRITERION_IDS)[number];
 export const CRITERION_CATEGORIES = ["fiscal", "constitutional", "civic"] as const;
 export type CriterionCategory = (typeof CRITERION_CATEGORIES)[number];
 
+/** Every public scorecard string must exist in all seven site locales. */
+export type Localized = Record<Locale, string>;
+
 export type Criterion = {
   id: CriterionId;
-  titleHe: string;
-  descriptionHe: string;
+  title: Localized;
+  description: Localized;
   category: CriterionCategory;
 };
 
@@ -34,9 +39,9 @@ export type EvidenceType = (typeof EVIDENCE_TYPES)[number];
 export type EvidenceRecord = {
   id: string;
   type: EvidenceType;
-  referenceNumber: string;
+  referenceNumber: Localized;
   date: string;
-  summaryHe: string;
+  summary: Localized;
   officialSourceUrl: string;
   verified: true;
 };
@@ -63,24 +68,25 @@ export const PARTY_BLOCKS = ["coalition-37", "opposition", "arab"] as const;
 export type PartyBlock = (typeof PARTY_BLOCKS)[number];
 
 export type OfficialResponse = {
-  textHe: string;
+  text: Localized;
   receivedAt: string;
 };
 
 export type PartyCompliance = {
   partyId: PartyId;
+  /** Official Hebrew list/party name; always rendered with lang=he like the candidate directory. */
   partyNameHe: string;
   leaderHe: string;
   block: PartyBlock;
   scores: Record<CriterionId, ComplianceStatus>;
-  /** Neutral parliamentary/legal basis for each status, shown next to evidence. */
-  basisHe: Record<CriterionId, string>;
+  /** Neutral parliamentary/legal basis for each status, localized. */
+  basis: Record<CriterionId, Localized>;
   evidenceMap: Record<CriterionId, string[]>;
   officialResponse?: OfficialResponse;
 };
 
 export type ScorecardDataset = {
-  electionLabelHe: string;
+  electionLabel: Localized;
   publishedAt: string;
   criteria: Criterion[];
   evidence: EvidenceRecord[];
@@ -111,16 +117,30 @@ function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(`Scorecard dataset invalid: ${message}`);
 }
 
+export function assertLocalized(value: Localized, label: string): void {
+  for (const locale of locales) {
+    const text = value[locale];
+    assert(typeof text === "string" && text.trim().length > 0, `missing ${locale} text for ${label}`);
+  }
+}
+
+/** Build a fully populated locale map; fails if any site locale is omitted. */
+export function L(parts: Localized): Localized {
+  assertLocalized(parts, "L()");
+  return parts;
+}
+
 /** Fails fast if a published dataset drifts from the verified-evidence contract. */
 export function assertScorecardDataset(dataset: ScorecardDataset): void {
+  assertLocalized(dataset.electionLabel, "electionLabel");
   assert(dataset.criteria.length === CRITERION_IDS.length, "expected five criteria");
   const criterionIds = new Set<string>();
   for (const criterion of dataset.criteria) {
     assert(isCriterionId(criterion.id), `unknown criterion ${criterion.id}`);
     assert(!criterionIds.has(criterion.id), `duplicate criterion ${criterion.id}`);
     criterionIds.add(criterion.id);
-    assert(criterion.titleHe.trim().length > 0, `empty title for ${criterion.id}`);
-    assert(criterion.descriptionHe.trim().length > 0, `empty description for ${criterion.id}`);
+    assertLocalized(criterion.title, `criterion ${criterion.id} title`);
+    assertLocalized(criterion.description, `criterion ${criterion.id} description`);
     assert((CRITERION_CATEGORIES as readonly string[]).includes(criterion.category), `bad category for ${criterion.id}`);
   }
   for (const id of CRITERION_IDS) assert(criterionIds.has(id), `missing criterion ${id}`);
@@ -132,8 +152,8 @@ export function assertScorecardDataset(dataset: ScorecardDataset): void {
     evidenceIds.add(record.id);
     assert((EVIDENCE_TYPES as readonly string[]).includes(record.type), `bad evidence type ${record.id}`);
     assert(ISO_DATE.test(record.date), `bad date on ${record.id}`);
-    assert(record.referenceNumber.trim().length > 0, `empty reference on ${record.id}`);
-    assert(record.summaryHe.trim().length > 0, `empty summary on ${record.id}`);
+    assertLocalized(record.referenceNumber, `evidence ${record.id} reference`);
+    assertLocalized(record.summary, `evidence ${record.id} summary`);
     assert(OFFICIAL_HOST.test(record.officialSourceUrl), `non-official URL on ${record.id}`);
     assert(record.verified === true, `unverified evidence ${record.id}`);
   }
@@ -149,8 +169,7 @@ export function assertScorecardDataset(dataset: ScorecardDataset): void {
     for (const criterionId of CRITERION_IDS) {
       const status = party.scores[criterionId];
       assert(isComplianceStatus(status), `bad score ${party.partyId}/${criterionId}`);
-      const basis = party.basisHe[criterionId];
-      assert(typeof basis === "string" && basis.trim().length > 0, `missing basis ${party.partyId}/${criterionId}`);
+      assertLocalized(party.basis[criterionId], `basis ${party.partyId}/${criterionId}`);
       const linked = party.evidenceMap[criterionId] ?? [];
       assert(Array.isArray(linked), `evidence map missing ${party.partyId}/${criterionId}`);
       for (const evidenceId of linked) {
@@ -161,7 +180,7 @@ export function assertScorecardDataset(dataset: ScorecardDataset): void {
       }
     }
     if (party.officialResponse) {
-      assert(party.officialResponse.textHe.trim().length > 0, `empty official response ${party.partyId}`);
+      assertLocalized(party.officialResponse.text, `official response ${party.partyId}`);
       assert(ISO_DATE.test(party.officialResponse.receivedAt.slice(0, 10)), `bad response date ${party.partyId}`);
     }
   }

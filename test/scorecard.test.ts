@@ -7,6 +7,8 @@ import { createApp } from "../src/app.js";
 import { scorecard2026 } from "../src/data/scorecard-2026.js";
 import { assertScorecardDataset, PARTY_IDS, CRITERION_IDS } from "../src/types/scorecard.js";
 import { filterParties, parseScorecardFilters } from "../src/components/scorecard-ui.js";
+import { locales } from "../src/i18n.js";
+import { sc } from "../src/scorecard-copy.js";
 
 test("scorecard dataset is complete and only cites official hosts", () => {
   assertScorecardDataset(scorecard2026);
@@ -19,8 +21,8 @@ test("scorecard dataset is complete and only cites official hosts", () => {
     );
     assert.equal(record.verified, true);
   }
-  assert.ok(scorecard2026.evidence.some((row) => row.referenceNumber.includes("6198/23")));
-  assert.ok(!scorecard2026.evidence.some((row) => row.referenceNumber.includes("4398/24")));
+  assert.ok(scorecard2026.evidence.some((row) => row.referenceNumber.he.includes("6198/23")));
+  assert.ok(!scorecard2026.evidence.some((row) => Object.values(row.referenceNumber).some((text) => text.includes("4398/24"))));
 });
 
 test("scorecard filters search and compliance levels", () => {
@@ -75,8 +77,32 @@ test("scorecard route is available in English chrome with Hebrew evidence langua
     assert.match(html, /Shared Threshold Scorecard/);
     assert.match(html, /lang="he" dir="rtl"/);
     assert.match(html, /הליכוד/);
+    assert.match(html, /Equal burden of service/);
   } finally {
     close();
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("scorecard route returns 200 with localized chrome in every site locale", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "agree-scorecard-all-"));
+  const { app, close } = createApp({ sqlitePath: join(dir, "app.db") });
+  try {
+    for (const locale of locales) {
+      const response = await app.request(`/${locale}/scorecard`);
+      assert.equal(response.status, 200, locale);
+      const html = await response.text();
+      assert.match(html, new RegExp(escapeRegExp(sc(locale, "title"))));
+      assert.match(html, new RegExp(escapeRegExp(scorecard2026.electionLabel[locale])));
+      assert.match(html, new RegExp(escapeRegExp(scorecard2026.criteria[0]!.title[locale])));
+      assert.match(html, /הליכוד/);
+    }
+  } finally {
+    close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
