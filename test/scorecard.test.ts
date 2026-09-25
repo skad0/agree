@@ -41,6 +41,9 @@ test("challenger lists are not failed for a missing 25th-Knesset vote", () => {
   assert.ok(rows.some((row) => row.partyId === "joint-list") === false);
   const balad = filterParties(scorecard2026, parseScorecardFilters({ q: "בלד" }).filters);
   assert.ok(balad.some((row) => row.partyId === "joint-list"));
+  const likud = filterParties(scorecard2026, parseScorecardFilters({ q: "Likud" }).filters);
+  assert.deepEqual(likud.map((row) => row.partyId), ["likud"]);
+  assert.equal(scorecard2026.parties.find((row) => row.partyId === "likud")?.partyName.he, "הליכוד");
 });
 
 test("scorecard filters search and compliance levels", () => {
@@ -100,6 +103,8 @@ test("scorecard route is available in English chrome with Hebrew evidence langua
     assert.match(html, /Shared Threshold Scorecard/);
     assert.match(html, /lang="he" dir="rtl"/);
     assert.match(html, /הליכוד/);
+    assert.match(html, /Likud/);
+    assert.match(html, /Benjamin Netanyahu/);
     assert.match(html, /Equal burden of service/);
   } finally {
     close();
@@ -119,6 +124,9 @@ test("scorecard route returns 200 with localized chrome in every site locale", a
       assert.match(html, new RegExp(escapeRegExp(scorecard2026.electionLabel[locale])));
       assert.match(html, new RegExp(escapeRegExp(scorecard2026.criteria[0]!.title[locale])));
       assert.match(html, /הליכוד/);
+      if (locale === "he") assert.doesNotMatch(html, /Likud/);
+      if (locale === "ar") assert.match(html, /الليكود/);
+      if (locale === "ru") assert.match(html, /Ликуд/);
     }
   } finally {
     close();

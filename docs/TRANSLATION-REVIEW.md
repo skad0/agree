@@ -78,3 +78,8 @@ Knesset votes and agreements. Challenger rows stay uncommitted: a missing vote i
 failure, and filing a list is not a platform clause or a signed pledge. New chrome in
 `src/scorecard-copy.ts` (segments, sort, share sentence, reading steps) is unreviewed
 in every locale, including Hebrew and Russian.
+
+Party and leader readings in `src/data/scorecard-entity-glosses.ts` sit beside the
+official Hebrew ballot name. They are unreviewed drafts in Arabic, Yiddish, Russian,
+Ukrainian, English, and Amharic. Hebrew is copied from the ballot string and is not
+a second translation.

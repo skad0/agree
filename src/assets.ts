@@ -719,6 +719,11 @@ button.danger:hover { background: var(--caution); color: var(--paper); border-co
 .scorecard-criterion-cat { display: block; font-size: .72rem; color: var(--mute); margin-block-start: .2rem; }
 .scorecard-party-name { display: block; font-size: 1.05rem; font-weight: 700; }
 .scorecard-party-leader, .scorecard-party-block { display: block; font-size: .82rem; color: var(--mute); font-weight: 400; }
+.scorecard-entity { display: flex; flex-direction: column; align-items: flex-start; gap: .05rem; }
+.scorecard-entity-he { color: var(--ink); }
+.scorecard-entity-gloss { font-size: .78rem; font-weight: 500; color: var(--mute); line-height: 1.3; }
+.scorecard-party-name .scorecard-entity-he { font-weight: 700; }
+.scorecard-entity:not(.scorecard-party-name) .scorecard-entity-he { font-size: .82rem; color: var(--mute); font-weight: 400; }
 .score-badge {
   display: inline-flex; flex-direction: column; align-items: flex-start; gap: .15rem; position: relative;
   min-block-size: 44px; min-inline-size: 7rem; padding: .45rem .6rem; border-radius: 4px;
@@ -991,7 +996,7 @@ function scorecardLive() {
   const input = root?.querySelector('[data-scorecard-q]');
   const count = root?.querySelector('[data-scorecard-count]');
   if (!root || !input) return;
-  const norm = (value) => value.normalize('NFKC').replace(/\s+/g, ' ').trim();
+  const norm = (value) => value.normalize('NFKC').replace(/\s+/g, ' ').trim().toLowerCase();
   input.addEventListener('input', () => {
     const terms = norm(input.value).split(' ').filter(Boolean);
     const seen = new Set();

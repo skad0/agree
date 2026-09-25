@@ -107,7 +107,7 @@ export function parseScorecardFilters(query: {
 }
 
 export function filterParties(dataset: ScorecardDataset, filters: ScorecardFilters): PartyCompliance[] {
-  const terms = normalizeHebrew(filters.q).split(/\s+/).filter(Boolean);
+  const terms = normalizeHebrew(filters.q).toLowerCase().split(/\s+/).filter(Boolean);
   return dataset.parties.filter((party) => {
     if (filters.block && party.block !== filters.block) return false;
     if (filters.segment === "incumbent" && party.parliamentaryStatus !== "INCUMBENT") return false;
@@ -122,7 +122,7 @@ export function filterParties(dataset: ScorecardDataset, filters: ScorecardFilte
       if (!hit) return false;
     }
     if (!terms.length) return true;
-    const haystack = normalizeHebrew(`${party.partyNameHe} ${party.leaderHe} ${party.searchAliasesHe ?? ""} ${party.ballotNoteHe ?? ""} ${party.partyId}`);
+    const haystack = partySearchKey(party);
     return terms.every((term) => haystack.includes(term));
   }).sort((a, b) => compareParties(a, b, filters.sort));
 }
@@ -316,7 +316,7 @@ export function EvidenceDrawer({
   const status = party.scores[criterion.id];
   const metrics = complianceMetrics(party);
   const template = party.parliamentaryStatus === "CHALLENGER" ? sc(locale, "sharePartyPlatform") : sc(locale, "sharePartyVote");
-  const sentence = `${fillShare(template, party.partyNameHe, metrics.passedCount, metrics.totalCriteria)} ${pageUrl}`;
+  const sentence = `${fillShare(template, sharePartyLabel(locale, party), metrics.passedCount, metrics.totalCriteria)} ${pageUrl}`;
   const whatsapp = `https://wa.me/?${new URLSearchParams({ text: sentence })}`;
   const xShare = `https://x.com/intent/post?${new URLSearchParams({ text: sentence })}`;
   return (
@@ -326,9 +326,9 @@ export function EvidenceDrawer({
         <a class="scorecard-evidence-close" href={closeHref}>{sc(locale, "closeEvidence")}</a>
       </div>
       <p class="scorecard-evidence-party">
-        <strong lang="he" dir="rtl">{party.partyNameHe}</strong>
+        <PoliticalName locale={locale} officialHe={party.partyNameHe} reading={party.partyName} emphasis />
         {" · "}
-        <span lang="he" dir="rtl">{party.leaderHe}</span>
+        <PoliticalName locale={locale} officialHe={party.leaderHe} reading={party.leaderName} />
         {" · "}
         <span lang={locale} dir={dirOf(locale)}>{criterion.title[locale]}</span>
         {" · "}
@@ -502,7 +502,35 @@ function parliamentaryLabel(locale: Locale, party: PartyCompliance): string {
 }
 
 function partySearchKey(party: PartyCompliance): string {
-  return normalizeHebrew(`${party.partyNameHe} ${party.leaderHe} ${party.searchAliasesHe ?? ""} ${party.ballotNoteHe ?? ""}`);
+  const readings = [party.partyName, party.leaderName].flatMap((row) => Object.values(row));
+  return normalizeHebrew(`${party.partyNameHe} ${party.leaderHe} ${party.searchAliasesHe ?? ""} ${party.ballotNoteHe ?? ""} ${readings.join(" ")}`).toLowerCase();
+}
+
+function sharePartyLabel(locale: Locale, party: PartyCompliance): string {
+  const gloss = party.partyName[locale];
+  if (gloss.trim() === party.partyNameHe.trim()) return party.partyNameHe;
+  return `${party.partyNameHe} (${gloss})`;
+}
+
+function PoliticalName({
+  locale,
+  officialHe,
+  reading,
+  emphasis
+}: {
+  locale: Locale;
+  officialHe: string;
+  reading: PartyCompliance["partyName"];
+  emphasis?: boolean;
+}) {
+  const gloss = reading[locale];
+  const showGloss = gloss.trim() !== officialHe.trim();
+  return (
+    <span class={emphasis ? "scorecard-entity scorecard-party-name" : "scorecard-entity"}>
+      <bdi class="scorecard-entity-he" lang="he" dir="rtl">{officialHe}</bdi>
+      {showGloss ? <bdi class="scorecard-entity-gloss" lang={locale} dir={dirOf(locale)}>{gloss}</bdi> : null}
+    </span>
+  );
 }
 
 function statusPreview(locale: Locale, party: PartyCompliance, criterionId: CriterionId): string {
@@ -547,9 +575,9 @@ export function ScorecardTable({
           <tbody>
             {parties.map((party) => (
               <tr data-scorecard-party={party.partyId} data-search={partySearchKey(party)}>
-                <th scope="row" lang="he" dir="rtl">
-                  <span class="scorecard-party-name">{party.partyNameHe}</span>
-                  <span class="scorecard-party-leader">{party.leaderHe}</span>
+                <th scope="row">
+                  <PoliticalName locale={locale} officialHe={party.partyNameHe} reading={party.partyName} emphasis />
+                  <PoliticalName locale={locale} officialHe={party.leaderHe} reading={party.leaderName} />
                   {party.ballotNoteHe ? <span class="scorecard-party-note">{party.ballotNoteHe}</span> : null}
                   <span class="scorecard-party-block" lang={locale} dir={dirOf(locale)}>{parliamentaryLabel(locale, party)} · {blockLabel(locale, party.block)}</span>
                   <ComplianceGauge locale={locale} party={party} />
@@ -579,8 +607,8 @@ export function ScorecardTable({
           <li key={party.partyId} data-scorecard-party={party.partyId} data-search={partySearchKey(party)}>
             <details class="scorecard-card" open={filters.party === party.partyId}>
               <summary>
-                <span lang="he" dir="rtl" class="scorecard-party-name">{party.partyNameHe}</span>
-                <span lang="he" dir="rtl" class="scorecard-party-leader">{party.leaderHe}</span>
+                <PoliticalName locale={locale} officialHe={party.partyNameHe} reading={party.partyName} emphasis />
+                <PoliticalName locale={locale} officialHe={party.leaderHe} reading={party.leaderName} />
                 <ComplianceGauge locale={locale} party={party} />
               </summary>
               <p class="scorecard-party-block">{parliamentaryLabel(locale, party)} · {blockLabel(locale, party.block)}</p>

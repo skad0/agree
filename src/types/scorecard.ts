@@ -116,6 +116,10 @@ export type PartyCompliance = {
   /** Official Hebrew list/party name; always rendered with lang=he like the candidate directory. */
   partyNameHe: string;
   leaderHe: string;
+  /** Reading of the ballot name. Hebrew repeats the official name; other locales sit beside it. */
+  partyName: Localized;
+  /** Reading of the leader's name. Hebrew repeats the official name. */
+  leaderName: Localized;
   /** Extra Hebrew search terms: predecessor factions, joint-list partners, ballot letters. */
   searchAliasesHe?: string;
   /** One Hebrew line explaining the 2026 ballot name. Rendered with lang=he. */
@@ -229,6 +233,10 @@ export function assertScorecardDataset(dataset: ScorecardDataset): void {
     partyIds.add(party.partyId);
     assert(party.partyNameHe.trim().length > 0, `empty party name ${party.partyId}`);
     assert(party.leaderHe.trim().length > 0, `empty leader ${party.partyId}`);
+    assertLocalized(party.partyName, `party name ${party.partyId}`);
+    assertLocalized(party.leaderName, `leader name ${party.partyId}`);
+    assert(party.partyName.he === party.partyNameHe, `Hebrew party gloss drifted ${party.partyId}`);
+    assert(party.leaderName.he === party.leaderHe, `Hebrew leader gloss drifted ${party.partyId}`);
     assert(isPartyBlock(party.block), `bad block ${party.partyId}`);
     assert(isParliamentaryStatus(party.parliamentaryStatus), `bad parliamentary status ${party.partyId}`);
     if (party.rosterUrl) assert(OFFICIAL_HOST.test(party.rosterUrl), `non-official roster URL ${party.partyId}`);

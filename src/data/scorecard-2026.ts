@@ -8,6 +8,7 @@ import {
   type PartyId,
   type ScorecardDataset
 } from "../types/scorecard.js";
+import { entityReadings, localizedName } from "./scorecard-entity-glosses.js";
 
 /**
  * Verified historical evidence for מדד רף משותף — 25th Knesset (2022–2026) record,
@@ -601,7 +602,7 @@ function challenger(input: {
   searchAliasesHe?: string;
   ballotNoteHe?: string;
   rosterUrl?: string;
-}): PartyCompliance {
+}): Omit<PartyCompliance, "partyName" | "leaderName"> {
   const status = "UNCOMMITTED" as const;
   return {
     partyId: input.partyId,
@@ -636,7 +637,7 @@ function challenger(input: {
   };
 }
 
-const parties: PartyCompliance[] = [
+const partyRows: Array<Omit<PartyCompliance, "partyName" | "leaderName">> = [
   {
     partyId: "likud",
     partyNameHe: "הליכוד",
@@ -1170,7 +1171,16 @@ const rosterUrls: Partial<Record<PartyId, string>> = {
   noam: "https://www.gov.il/he/pages/noam_list38"
 };
 
-for (const party of parties) party.rosterUrl = rosterUrls[party.partyId];
+for (const party of partyRows) party.rosterUrl = rosterUrls[party.partyId];
+
+const parties: PartyCompliance[] = partyRows.map((party) => {
+  const gloss = entityReadings[party.partyId];
+  return {
+    ...party,
+    partyName: localizedName(party.partyNameHe, gloss.party),
+    leaderName: localizedName(party.leaderHe, gloss.leader)
+  };
+});
 
 export const scorecard2026: ScorecardDataset = {
   electionLabel: L({
