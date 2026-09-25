@@ -2,7 +2,7 @@ import type { Child } from "hono/jsx";
 import { ShareOptions } from "./share-options.js";
 import { Callout } from "./public-ui.js";
 import { sc, statusLabel, blockLabel, type ScorecardKey } from "../scorecard-copy.js";
-import type { Locale } from "../i18n.js";
+import { dirOf, type Locale } from "../i18n.js";
 import type {
   ComplianceStatus,
   Criterion,
@@ -211,18 +211,18 @@ export function EvidenceDrawer({
         <h2>{sc(locale, "evidenceHeading")}</h2>
         <a class="scorecard-evidence-close" href={closeHref}>{sc(locale, "closeEvidence")}</a>
       </div>
-      <p class="scorecard-evidence-party" lang="he" dir="rtl">
-        <strong>{party.partyNameHe}</strong>
+      <p class="scorecard-evidence-party">
+        <strong lang="he" dir="rtl">{party.partyNameHe}</strong>
         {" · "}
-        {party.leaderHe}
+        <span lang="he" dir="rtl">{party.leaderHe}</span>
         {" · "}
-        {criterion.titleHe}
+        <span lang={locale} dir={dirOf(locale)}>{criterion.title[locale]}</span>
         {" · "}
         {statusLabel(locale, status)}
       </p>
-      <div class="scorecard-basis" lang="he" dir="rtl">
+      <div class="scorecard-basis" lang={locale} dir={dirOf(locale)}>
         <h3>{sc(locale, "statusBasis")}</h3>
-        <p>{party.basisHe[criterion.id]}</p>
+        <p>{party.basis[criterion.id][locale]}</p>
       </div>
       {!records.length ? <p role="status">{sc(locale, "noEvidence")}</p> : null}
       <ol class="scorecard-evidence-list">
@@ -233,9 +233,9 @@ export function EvidenceDrawer({
               <dt>{sc(locale, "evidenceDate")}</dt>
               <dd><time dateTime={record.date}><bdi dir="ltr">{formatIsraeliDate(record.date)}</bdi></time></dd>
               <dt>{sc(locale, "evidenceReference")}</dt>
-              <dd lang="he" dir="rtl">{record.referenceNumber}</dd>
+              <dd lang={locale} dir={dirOf(locale)}>{record.referenceNumber[locale]}</dd>
               <dt>{sc(locale, "evidenceSummary")}</dt>
-              <dd lang="he" dir="rtl">{record.summaryHe}</dd>
+              <dd lang={locale} dir={dirOf(locale)}>{record.summary[locale]}</dd>
             </dl>
             <p>
               <a class="primary-action scorecard-source-link" href={record.officialSourceUrl} rel="noreferrer">
@@ -248,7 +248,7 @@ export function EvidenceDrawer({
       {party.officialResponse ? (
         <Callout tone="blue">
           <p><strong>{sc(locale, "officialReply")}</strong></p>
-          <p lang="he" dir="rtl">{party.officialResponse.textHe}</p>
+          <p lang={locale} dir={dirOf(locale)}>{party.officialResponse.text[locale]}</p>
           <p><time dateTime={party.officialResponse.receivedAt}>{party.officialResponse.receivedAt.slice(0, 10)}</time></p>
         </Callout>
       ) : null}
@@ -287,8 +287,8 @@ export function ScorecardFiltersForm({
         <select name="criterion">
           <option value="">{sc(locale, "allCriteria")}</option>
           {dataset.criteria.map((criterion) => (
-            <option value={criterion.id} selected={filters.criterion === criterion.id} lang="he" dir="rtl">
-              {criterion.titleHe}
+            <option value={criterion.id} selected={filters.criterion === criterion.id} lang={locale} dir={dirOf(locale)}>
+              {criterion.title[locale]}
             </option>
           ))}
         </select>
@@ -335,8 +335,8 @@ export function ScorecardTable({
             <tr>
               <th scope="col">{sc(locale, "party")}</th>
               {criteria.map((criterion) => (
-                <th scope="col" lang="he" dir="rtl">
-                  <span class="scorecard-criterion-title">{criterion.titleHe}</span>
+                <th scope="col" lang={locale} dir={dirOf(locale)}>
+                  <span class="scorecard-criterion-title">{criterion.title[locale]}</span>
                   <span class="scorecard-criterion-cat">{sc(locale, categoryKey(criterion.category))}</span>
                 </th>
               ))}
@@ -348,7 +348,7 @@ export function ScorecardTable({
                 <th scope="row" lang="he" dir="rtl">
                   <span class="scorecard-party-name">{party.partyNameHe}</span>
                   <span class="scorecard-party-leader">{party.leaderHe}</span>
-                  <span class="scorecard-party-block">{blockLabel(locale, party.block)}</span>
+                  <span class="scorecard-party-block" lang={locale} dir={dirOf(locale)}>{blockLabel(locale, party.block)}</span>
                 </th>
                 {criteria.map((criterion) => {
                   const href = `${path}?${scorecardQuery(filters, { party: party.partyId, evidence: criterion.id })}#evidence`;
@@ -358,7 +358,7 @@ export function ScorecardTable({
                         locale={locale}
                         status={party.scores[criterion.id]}
                         href={href}
-                        criterionTitle={criterion.titleHe}
+                        criterionTitle={criterion.title[locale]}
                       />
                     </td>
                   );
@@ -383,12 +383,12 @@ export function ScorecardTable({
                   const href = `${path}?${scorecardQuery(filters, { party: party.partyId, evidence: criterion.id })}#evidence`;
                   return (
                     <li>
-                      <span lang="he" dir="rtl">{criterion.titleHe}</span>
+                      <span lang={locale} dir={dirOf(locale)}>{criterion.title[locale]}</span>
                       <StatusBadge
                         locale={locale}
                         status={party.scores[criterion.id]}
                         href={href}
-                        criterionTitle={criterion.titleHe}
+                        criterionTitle={criterion.title[locale]}
                       />
                     </li>
                   );
@@ -407,13 +407,13 @@ export function ScorecardTable({
 function CriteriaLegend({ locale, criteria }: { locale: Locale; criteria: Criterion[] }) {
   return (
     <section class="scorecard-legend">
-      <h2 lang="he" dir="rtl">קריטריוני רף משותף</h2>
+      <h2>{sc(locale, "criteriaLegend")}</h2>
       <ol>
         {criteria.map((criterion) => (
-          <li key={criterion.id} lang="he" dir="rtl">
-            <h3>{criterion.titleHe}</h3>
+          <li key={criterion.id} lang={locale} dir={dirOf(locale)}>
+            <h3>{criterion.title[locale]}</h3>
             <p class="scorecard-criterion-cat">{sc(locale, categoryKey(criterion.category))}</p>
-            <p>{criterion.descriptionHe}</p>
+            <p>{criterion.description[locale]}</p>
           </li>
         ))}
       </ol>

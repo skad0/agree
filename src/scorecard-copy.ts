@@ -1,6 +1,7 @@
 import type { Locale } from "./i18n.js";
 import type { ComplianceStatus, PartyBlock } from "./types/scorecard.js";
 
+// Implementation translations. Human review is tracked in docs/TRANSLATION-REVIEW.md.
 const keys = [
   "nav",
   "title",
@@ -46,7 +47,9 @@ const keys = [
   "mobileHint",
   "filterReset",
   "officialReply",
-  "backHome"
+  "backHome",
+  "criteriaLegend",
+  "noResults"
 ] as const;
 
 export type ScorecardKey = (typeof keys)[number];
@@ -97,7 +100,9 @@ const values: Record<Locale, string[]> = {
     "במסך צר כל מפלגה מוצגת ככרטיס מתקפל.",
     "המסנן או הבחירה אינם זמינים. התוצאות עודכנו.",
     "תגובה רשמית מהמפלגה",
-    "חזרה לסוגיות"
+    "חזרה לסוגיות",
+    "הקריטריונים במדד",
+    "לא נמצאו מפלגות התואמות לסינון."
   ],
   en: [
     "Scorecard",
@@ -144,7 +149,9 @@ const values: Record<Locale, string[]> = {
     "On narrow screens each party collapses into an accordion card.",
     "That filter or selection is no longer available. Results were adjusted.",
     "Official party reply",
-    "Back to problems"
+    "Back to problems",
+    "Scorecard criteria",
+    "No parties match these filters."
   ],
   ar: [
     "المؤشر",
@@ -191,7 +198,9 @@ const values: Record<Locale, string[]> = {
     "على الشاشات الضيقة يظهر كل حزب كبطاقة قابلة للطي.",
     "المرشح أو الاختيار لم يعد متاحًا. تم تعديل النتائج.",
     "رد رسمي من الحزب",
-    "العودة إلى القضايا"
+    "العودة إلى القضايا",
+    "معايير المؤشر",
+    "لا توجد أحزاب تطابق هذه المرشحات."
   ],
   ru: [
     "Индекс",
@@ -238,7 +247,9 @@ const values: Record<Locale, string[]> = {
     "На узком экране каждая партия показана сворачиваемой карточкой.",
     "Фильтр или выбор недоступны. Результаты скорректированы.",
     "Официальный ответ партии",
-    "Назад к вопросам"
+    "Назад к вопросам",
+    "Критерии индекса",
+    "Нет партий, соответствующих фильтрам."
   ],
   uk: [
     "Індекс",
@@ -285,7 +296,9 @@ const values: Record<Locale, string[]> = {
     "На вузькому екрані кожна партія показана як картка, що згортається.",
     "Фільтр або вибір недоступні. Результати скориговано.",
     "Офіційна відповідь партії",
-    "Назад до питань"
+    "Назад до питань",
+    "Критерії індексу",
+    "Немає партій, що відповідають фільтрам."
   ],
   yi: [
     "מאָסשטאַב",
@@ -332,7 +345,9 @@ const values: Record<Locale, string[]> = {
     "אויף אַ שמאָלן עקראַן ווערט יעדע פּאַרטיי געוויזן ווי אַ צוזאַמענפֿאָלדיקע קאַרטל.",
     "דער פֿילטער אָדער אויסוואַל איז מער נישט בנימצא. די רעזולטאַטן זײַנען צוגעפּאַסט.",
     "אָפֿיציעלע ענטפֿער פֿון דער פּאַרטיי",
-    "צוריק צו די פֿראַגעס"
+    "צוריק צו די פֿראַגעס",
+    "די קריטעריעס אינעם מאָסשטאַב",
+    "ס׳איז נישטאָ קיין פּאַרטייען וואָס פּאַסן צו די פֿילטערס."
   ],
   am: [
     "መለኪያ",
@@ -379,7 +394,9 @@ const values: Record<Locale, string[]> = {
     "በጠባብ ማያ ገጽ እያንዳንዱ ፓርቲ እንደ ተሽከርካሪ ካርድ ይታያል።",
     "ማጣሪያው ወይም ምርጫው አይገኝም። ውጤቶቹ ተስተካክለዋል።",
     "ኦፊሴላዊ የፓርቲ ምላሽ",
-    "ወደ ጉዳዮች ተመለስ"
+    "ወደ ጉዳዮች ተመለስ",
+    "የመለኪያ መስፈርቶች",
+    "ከእነዚህ ማጣሪያዎች ጋር የሚዛመድ ፓርቲ የለም።"
   ]
 };
 

@@ -58,3 +58,13 @@ They are unusually sensitive because they state the legal status of a candidate 
 A translation that blurs submitted into approved misstates an official act during an election
 period. Review these against the Hebrew source wording on the CEC page —
 `רשימות אלה אינן סופיות וועדת הבחירות המרכזית טרם אישרה אותן` — before public launch.
+
+## Scorecard dataset and chrome — 2026-03 (unreviewed)
+
+Civic scorecard UI (`src/scorecard-copy.ts`) and verified evidence/basis strings
+(`src/data/scorecard-2026.ts`) now ship in all seven locales. Hebrew is the factual
+source for criteria, evidence summaries, reference labels, and party basis text;
+other locales are machine translations. Party and leader names remain Hebrew-only,
+matching the candidate directory. No locale may omit the `/scorecard` page.
+Named legal/political review is still required before treating non-Hebrew scorecard
+copy as launch-ready.
