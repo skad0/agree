@@ -2,6 +2,7 @@ import { s } from "./share-copy.js";
 import { sc } from "./scorecard-copy.js";
 import type { Child } from "hono/jsx";
 import { cssPath, jsPath, themePath } from "./assets.js";
+import { identityPath } from "./identity-assets.js";
 import { dirOf, localeNames, locales, t, type Locale } from "./i18n.js";
 
 function scNav(locale: Locale) {
@@ -23,8 +24,12 @@ export function Shell({ locale, title, bodyClass, shareMeta, children }: { local
       <meta charSet="utf-8" />
       <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
       <meta name="color-scheme" content="light dark" />
+      <link rel="icon" href={identityPath("favicon.ico")} sizes="16x16 32x32 48x48" />
+      <link rel="icon" href={identityPath("favicon.svg")} type="image/svg+xml" sizes="any" />
+      <link rel="apple-touch-icon" href={identityPath("apple-touch-icon.png")} sizes="180x180" />
+      <link rel="manifest" href={identityPath("manifest.json")} />
       <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
-      <meta name="theme-color" content="#0f1826" media="(prefers-color-scheme: dark)" />
+      <meta name="theme-color" content="#0B1120" media="(prefers-color-scheme: dark)" />
       <title>{fullTitle}</title>
       {shareMeta ? <>
         <meta property="og:type" content="website" />
@@ -62,7 +67,7 @@ export function Layout({ locale, title, path, languageQuery = "", languageHref, 
       <a class="skip-link" href="#content">{t(locale, "skip")}</a>
       <div class="public-rule" aria-hidden="true"><span></span><span></span></div>
       <header class="wrap site-header">
-        <a class="wordmark" href={`/${locale}`}>{t(locale, "siteName")}</a>
+        <a class="wordmark" href={`/${locale}`}><img src={identityPath("favicon.svg")} width="32" height="32" alt="" />{t(locale, "siteName")}</a>
         {/* The same three destinations appear in the same order on every public page. */}
         <nav class="primary" aria-label={s(locale,"problems")}>
           <a href={`/${locale}`} aria-current={suffix === "" ? "page" : suffix.startsWith("/issues/") ? "location" : undefined}>{s(locale,"problems")}</a>

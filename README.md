@@ -1,4 +1,7 @@
-# Contract in Advance · Договор заранее
+# רף משותף · Common Bar
+
+Identity exports, logo usage, social images, and regeneration instructions are in
+[the brand guide](docs/brand/README.md).
 
 A multilingual civic transparency platform. It puts the same set of questions to every registered party before an election — which coalitions they would join, how large a government they would form, whether they will comply with final court rulings, the inquiry into 7 October, and their first 100 days — and lets visitors understand a problem and share a short explanation and public link.
 

@@ -11,8 +11,17 @@ import { registerScorecardRoutes } from "./scorecard.js";
 import { shareImages } from "./share-images.js";
 import { registerPrivacyRoutes } from "./privacy.js";
 import { registerSupportRoutes } from "./support.js";
+import { identityAssets } from "./identity-assets.js";
 
 export function registerPublicRoutes(app: Hono, db: Db, config: Config) {
+  for (const asset of identityAssets) {
+    for (const path of [asset.path, asset.hashedPath]) app.get(path, context => {
+      context.header("Content-Type", asset.type);
+      context.header("Cache-Control", path === asset.hashedPath
+        ? "public, max-age=31536000, immutable" : "public, max-age=0, must-revalidate");
+      return context.body(asset.body as any);
+    });
+  }
   // The URL carries the content hash, so these may be cached forever without stranding a deploy.
   const asset = (path: string, type: string, body: string) => app.get(path, (context) => {
     context.header("Content-Type", `${type}; charset=utf-8`);

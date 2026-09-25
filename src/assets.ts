@@ -10,9 +10,9 @@ export const amharicRegularPath = `/assets/noto-sans-ethiopic-400-${fingerprint(
 export const amharicBoldPath = `/assets/noto-sans-ethiopic-700-${fingerprint(AMHARIC_BOLD)}.woff2`;
 
 /**
- * "Techelet" — the national blue and white. Two hues only: techelet carries every action,
- * link, counter and clause number; amber appears nowhere except the caveats, where a warning
- * colour is the accurate signal. Rank is expressed by scale and weight rather than by hue.
+ * Common Bar uses slate foundations and emerald accents. Dark emerald carries accessible
+ * links and actions on white; the brighter identity accent is used on dark backgrounds.
+ * Amber remains reserved for caveats. Rank is expressed by scale and weight rather than hue.
  * Noto Sans Ethiopic is scoped to the Amharic document so the other five scripts keep their
  * system-font rendering and the font bytes are only requested by pages that need them.
  * Pico is retuned through its own custom properties rather than by overriding its selectors.
@@ -36,15 +36,11 @@ export const CSS = `
 }
 /* Pico declares its tokens at ':root:not([data-theme=dark])', so a bare ':root' here would lose
    the specificity contest and silently leave every button Pico blue. Hence the repeated ':root'. */
-/* Palette: techelet and white, the national colours.
-   The Flag and Emblem Law describes the colour but fixes no hex; #0038b8 is the value in common
-   use. These are the *national* colours, deliberately not the gov.il service palette: the
-   canonical package states the project does not represent a state body, and looking like an
-   official government service would work against that. Amber is the one non-blue hue, reserved
-   for the caveat callout, where a warning colour is the accurate signal. */
+/* The independent civic identity is slate, white, and emerald. The bright #10B981 logo
+   accent is decorative; darker emerald text/buttons keep adequate contrast on white. */
 :root:root:root {
   color-scheme: light;
-  --ink: #101a2c; --paper: #ffffff; --seal: #0038b8; --seal-deep: #002a8c;
+  --ink: #0b1120; --paper: #ffffff; --seal: #047857; --seal-deep: #065f46;
   --caution: #9a5b00; --rule: #ccd7ea; --mute: #4d5a72; --card: #f5f8fd;
   --font: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans Hebrew", "Noto Sans Arabic",
     "Noto Sans Ethiopic", "Helvetica Neue", sans-serif;
@@ -63,39 +59,39 @@ export const CSS = `
   --pico-primary-border: var(--seal);
   --pico-primary-hover-border: var(--seal-deep);
   --pico-primary-inverse: #ffffff;
-  --pico-primary-focus: rgba(0, 56, 184, .3);
+  --pico-primary-focus: rgba(4, 120, 87, .3);
   --pico-form-element-background-color: var(--card);
   --pico-form-element-border-color: var(--rule);
   --pico-form-element-active-border-color: var(--seal);
   --pico-border-radius: 4px;
   --pico-spacing: 1rem;
 }
-/* Dark mode is a lit room, not a void. Techelet at full strength is unreadable on a dark ground,
-   so it lifts toward sky while staying recognisably the same blue.
+/* Dark mode lifts emerald to the identity accent on a deep slate ground.
    The block is stated twice because CSS cannot share one declaration list between a media query
    and an attribute selector: once for "system says dark and the reader has not forced light",
    once for "the reader chose dark". Keep the two lists identical. */
 @media (prefers-color-scheme: dark) {
   :root:root:root:not([data-theme=light]) {
     color-scheme: dark;
-    --ink: #eaf0fa; --paper: #0f1826; --seal: #6ea3f5; --seal-deep: #8fbaff;
+    --ink: #f8fafc; --paper: #0b1120; --seal: #10b981; --seal-deep: #6ee7b7;
     --caution: #e0a33f; --rule: #2b3a52; --mute: #a9b8d0; --card: #182338;
     --pico-primary-inverse: #08101c;
-    --pico-primary-focus: rgba(110, 163, 245, .4);
+    --pico-primary-focus: rgba(16, 185, 129, .4);
   }
 }
 :root:root:root[data-theme=dark] {
   color-scheme: dark;
-  --ink: #eaf0fa; --paper: #0f1826; --seal: #6ea3f5; --seal-deep: #8fbaff;
+  --ink: #f8fafc; --paper: #0b1120; --seal: #10b981; --seal-deep: #6ee7b7;
   --caution: #e0a33f; --rule: #2b3a52; --mute: #a9b8d0; --card: #182338;
   --pico-primary-inverse: #08101c;
-  --pico-primary-focus: rgba(110, 163, 245, .4);
+  --pico-primary-focus: rgba(16, 185, 129, .4);
 }
 
 body { overflow-wrap: anywhere; background: var(--paper); }
 .public-site { min-block-size: 100vh; }
-.public-site .public-rule { display: flex; gap: 3px; block-size: 8px; }
-.public-site .public-rule span { flex: 1; background: var(--seal); }
+.public-site .public-rule { display: flex; block-size: 6px; background: #0b1120; }
+.public-site .public-rule span:first-child { flex: 1; }
+.public-site .public-rule span:last-child { flex: 0 0 25%; background: #10b981; }
 /* Our own spine rather than Pico's .container, so header, main and footer align on one measure.
    Sized in rem on purpose: Pico scales the root font-size with the viewport, so this holds a
    constant line length in characters rather than a constant pixel width. */
@@ -126,7 +122,8 @@ html[lang=am] { --font: var(--amharic-font); }
 header.wrap { display: flex; flex-wrap: wrap; gap: .5rem 1.5rem; align-items: baseline; padding-block: 1.25rem; border-block-end: 1px solid var(--rule); margin-block-end: 1.5rem; }
 .public-site .site-header { border-block-end: 0; margin-block-end: .5rem; }
 .wordmark { font-weight: 750; letter-spacing: -.015em; color: var(--ink); text-decoration: none; font-size: 1.05rem; }
-.public-site .wordmark { display: inline-flex; align-items: center; min-block-size: 44px; }
+.public-site .wordmark { display: inline-flex; gap: .5rem; align-items: center; min-block-size: 44px; }
+.public-site .wordmark img { flex: none; inline-size: 32px; block-size: 32px; }
 /* Pico sets nav { justify-content: space-between }, which strands these links at the edges. */
 nav.primary { display: flex; flex-wrap: wrap; justify-content: flex-start; gap: .35rem 1.1rem; flex: 1 1 auto; }
 nav.primary a { text-decoration: none; color: var(--mute); font-size: .95rem; padding-block: .35rem; min-block-size: 2.75rem; display: inline-flex; align-items: center; }

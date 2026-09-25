@@ -1,4 +1,4 @@
-import { copyFileSync, mkdirSync, readdirSync } from "node:fs";
+import { copyFileSync, cpSync, mkdirSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
 const sourceDir = join("src", "assets");
@@ -7,3 +7,4 @@ mkdirSync(targetDir, { recursive: true });
 for (const name of readdirSync(sourceDir).filter((entry) => /\.(woff2|png)$/.test(entry))) {
   copyFileSync(join(sourceDir, name), join(targetDir, name));
 }
+cpSync("public", join("dist", "public"), { recursive: true });
