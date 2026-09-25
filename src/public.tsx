@@ -7,6 +7,7 @@ import type { Db } from "./db.js";
 import { localeFromRequest } from "./i18n.js";
 import { registerShareRoutes } from "./share-pages.js";
 import { registerCandidateRoutes } from "./candidates.js";
+import { registerScorecardRoutes } from "./scorecard.js";
 import { shareImages } from "./share-images.js";
 import { registerPrivacyRoutes } from "./privacy.js";
 import { registerSupportRoutes } from "./support.js";
@@ -31,6 +32,7 @@ export function registerPublicRoutes(app: Hono, db: Db, config: Config) {
 
   registerShareRoutes(app, db, config);
   registerCandidateRoutes(app, db, config);
+  registerScorecardRoutes(app, db, config);
   registerSupportRoutes(app, db, config);
   for (const asset of shareImages) app.get(asset.path, context => {
     context.header("Content-Type", "image/png");

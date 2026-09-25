@@ -684,6 +684,75 @@ button.danger:hover { background: var(--caution); color: var(--paper); border-co
 .candidate-list h2 { font-size: 1.15rem; margin-block-end: .4rem; }
 .candidate-pages { display: flex; gap: 1rem; justify-content: start; }
 .candidate-pages a { min-block-size: 44px; padding: .6rem; }
+
+/* Civic scorecard: matrix + accordion. Status colour is a second signal beside the Hebrew label. */
+.scorecard-intro { max-inline-size: 48rem; margin-block-end: 1.5rem; }
+.scorecard-intro h1 { font-size: clamp(1.8rem, 4vw, 2.8rem); line-height: 1.15; }
+.scorecard-pledge { margin-block: 1.5rem 2rem; }
+.scorecard-pledge .share-options { margin-block-start: 1rem; }
+.scorecard-methodology { font-size: .92rem; color: var(--mute); }
+.scorecard-desk { font-weight: 700; unicode-bidi: isolate; }
+.scorecard-basis { margin-block: 1rem; padding: .85rem 1rem; border-inline-start: 3px solid var(--seal); background: var(--paper); }
+.scorecard-basis h3 { margin: 0 0 .4rem; font-size: .95rem; }
+.scorecard-basis p { margin: 0; }
+.scorecard-filters { display: flex; flex-wrap: wrap; gap: 1rem; align-items: end; margin-block: 1rem 1.5rem; }
+.scorecard-filters label { flex: 1 1 12rem; min-inline-size: 0; }
+.scorecard-filters button, .scorecard-filters a { inline-size: auto; min-block-size: 44px; margin-block-end: 1rem; }
+.scorecard-mobile-hint { display: none; font-size: .9rem; color: var(--mute); }
+.scorecard-table-wrap { overflow-x: auto; margin-block: 1rem 2rem; border: 1px solid var(--rule); border-radius: 4px; background: var(--card); }
+.scorecard-table { width: 100%; margin: 0; border-collapse: collapse; font-size: .9rem; }
+.scorecard-table th, .scorecard-table td { padding: .75rem .65rem; border-block-end: 1px solid var(--rule); vertical-align: top; text-align: start; }
+.scorecard-table thead th { font-size: .78rem; color: var(--mute); font-weight: 650; background: var(--paper); position: sticky; inset-block-start: 0; }
+.scorecard-criterion-title { display: block; color: var(--ink); font-size: .92rem; font-weight: 700; }
+.scorecard-criterion-cat { display: block; font-size: .72rem; color: var(--mute); margin-block-start: .2rem; }
+.scorecard-party-name { display: block; font-size: 1.05rem; font-weight: 700; }
+.scorecard-party-leader, .scorecard-party-block { display: block; font-size: .82rem; color: var(--mute); font-weight: 400; }
+.score-badge {
+  display: inline-flex; flex-direction: column; align-items: flex-start; gap: .15rem;
+  min-block-size: 44px; min-inline-size: 7rem; padding: .45rem .6rem; border-radius: 4px;
+  border: 1px solid var(--rule); background: var(--paper); text-decoration: none; color: var(--ink);
+}
+.score-badge:hover { border-color: var(--seal); }
+.score-badge-mark { font-weight: 700; line-height: 1; }
+.score-badge-label { font-size: .78rem; line-height: 1.25; font-weight: 650; }
+/* Status colour stays inside the project palette: techelet for pass, amber for fail/partial, mute for uncommitted. */
+.score-pass { border-color: var(--seal); color: var(--seal-deep); border-inline-start-width: 4px; }
+.score-pass .score-badge-mark { color: var(--seal); }
+.score-fail { border-color: var(--caution); color: var(--caution); border-inline-start-width: 4px; }
+.score-fail .score-badge-mark { color: var(--caution); }
+.score-partial { border-color: var(--caution); color: var(--ink); border-style: dashed; border-inline-start-width: 4px; }
+.score-partial .score-badge-mark { color: var(--caution); }
+.score-uncommitted { border-color: var(--rule); color: var(--mute); }
+.score-uncommitted .score-badge-mark { color: var(--mute); }
+.scorecard-cards { display: none; list-style: none; padding: 0; margin: 0 0 2rem; }
+.scorecard-cards > li { list-style: none; margin: 0; border-block-end: 1px solid var(--rule); }
+.scorecard-card > summary { display: flex; flex-direction: column; gap: .2rem; min-block-size: 48px; padding-block: .85rem; cursor: pointer; }
+.scorecard-card-scores { list-style: none; padding: 0 0 1rem; margin: 0; display: grid; gap: .75rem; }
+.scorecard-card-scores > li { list-style: none; display: flex; flex-wrap: wrap; justify-content: space-between; gap: .5rem; align-items: center; }
+.scorecard-legend { margin-block: 2rem; max-inline-size: 48rem; }
+.scorecard-legend ol { padding-inline-start: 1.25rem; }
+.scorecard-legend h3 { font-size: 1.1rem; margin-block: .75rem .35rem; }
+.scorecard-evidence {
+  margin-block: 2rem; padding: 1.25rem 1.35rem; border: 1px solid var(--seal);
+  border-radius: 4px; background: var(--card); scroll-margin-block-start: 1rem;
+}
+.scorecard-evidence-header { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .75rem; align-items: baseline; }
+.scorecard-evidence-header h2 { margin: 0; font-size: 1.25rem; }
+.scorecard-evidence-close { min-block-size: 44px; display: inline-flex; align-items: center; }
+.scorecard-evidence-list { list-style: none; padding: 0; margin: 1rem 0 0; display: grid; gap: 1.25rem; }
+.scorecard-evidence-item { list-style: none; padding: 1rem; border: 1px solid var(--rule); border-radius: 4px; background: var(--paper); }
+.scorecard-evidence-fields { display: grid; grid-template-columns: minmax(6rem, 9rem) 1fr; gap: .35rem 1rem; margin: .75rem 0 1rem; }
+.scorecard-evidence-fields dt { font-size: .75rem; color: var(--mute); font-weight: 650; }
+.scorecard-evidence-fields dd { margin: 0; }
+.scorecard-source-link { min-block-size: 3rem; padding-inline: 1.25rem; font-size: 1rem; }
+.scorecard-trust { margin: 0; }
+@media (max-width: 47.99rem) {
+  .scorecard-mobile-hint { display: block; }
+  .scorecard-table-wrap { display: none; }
+  .scorecard-cards { display: block; }
+  .scorecard-evidence-fields { grid-template-columns: 1fr; }
+}
+
 .public-site footer.wrap { display: flex; flex-wrap: wrap; gap: .5rem 1rem; }
 .public-site main { overflow-wrap: anywhere; }
 @media (max-width: 47.99rem) { .issue-grid { grid-template-columns: minmax(0,1fr); } .issue-grid > li { padding: 1rem; } }

@@ -286,7 +286,7 @@ test("every locale has every key used by the templates", async () => {
   try {
     const { app, db, close } = createApp({ sqlitePath: join(dir, "app.db") });
     db.prepare("UPDATE campaigns SET support_enabled = 1 WHERE id = 1").run();
-    const paths = ["", "/standard", "/coalition-agreement", "/first-100-days", "/government-model", "/about", "/methodology", "/candidates", "/issues/elections-on-time", "/privacy"];
+    const paths = ["", "/standard", "/coalition-agreement", "/first-100-days", "/government-model", "/about", "/methodology", "/candidates", "/scorecard", "/issues/elections-on-time", "/privacy"];
     for (const locale of ["he", "ar", "yi", "ru", "uk", "en", "am"]) {
       for (const path of paths) {
         const response = await app.request(`/${locale}${path}`);

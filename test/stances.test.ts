@@ -213,7 +213,7 @@ test("only admins can publish stances and private replies never appear on the di
     assert.match(directoryHtml, /https:\/\/example.org\/ada/);
     assert.doesNotMatch(directoryHtml, new RegExp(PRIVATE_TEXT));
     assert.doesNotMatch(directoryHtml, new RegExp(PRIVATE_EMAIL.replace(".", "\\.")));
-    assert.doesNotMatch(directoryHtml, /endorsement|leaderboard|score/i);
+    assert.doesNotMatch(directoryHtml, /endorsement|leaderboard|(?<![A-Za-z])score(?![A-Za-z])/i);
 
     const retracted = await postForm(runtime.app, "/admin/stances", {
       csrf: page.csrf, action: "retract", id: String(stanceId)
