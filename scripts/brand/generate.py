@@ -3,6 +3,8 @@ from pathlib import Path
 from io import BytesIO
 from html import escape
 import json
+import re
+import sys
 from zipfile import ZipFile, ZIP_DEFLATED
 
 from fontTools.ttLib import TTFont
@@ -38,26 +40,76 @@ ARABIC = font(SOURCE / "NotoSansArabic.ttf")
 ETHIOPIC = font(ROOT / "src/assets/NotoSansEthiopic-400.woff2")
 
 
-def text_path(text, x, baseline, size, face=HE, fill=WHITE, align="right", max_width=None):
-    """HarfBuzz supplies real RTL shaping; bake positioned glyphs into one path."""
+STRONG_RTL = re.compile(r"[֐-ࣿיִ-﷿ﹰ-﻿]")
+LTR_WORD = re.compile(r"[0-9A-Za-zЀ-ӿሀ-᎟]")
+
+
+def runs(text, face, fallback):
+    """Split text into shaping runs in logical order: (text, face, direction).
+
+    HarfBuzz shapes one run in one direction and does no bidi reordering, so a right-to-left
+    paragraph is split at digits and Latin, which keep their own left-to-right order ("100", not
+    "001"). Characters the face lacks, such as ASCII digits in the Ethiopic face, go to `fallback`.
+    """
+    rtl = bool(STRONG_RTL.search(text))
+    cmap = face[0].getBestCmap()
+    out = []
+    for ch in text:
+        use = fallback if fallback and not ch.isspace() and ord(ch) not in cmap else face
+        # With a fallback named, nothing may render as a missing-glyph box: fail the build instead.
+        if fallback and not ch.isspace() and ord(ch) not in use[0].getBestCmap():
+            raise ValueError(f"no glyph for {ch!r} (U+{ord(ch):04X}) in {text!r}")
+        direction = "ltr" if not rtl or LTR_WORD.match(ch) else "rtl"
+        if out and out[-1][1] is use and out[-1][2] == direction:
+            out[-1][0] += ch
+        else:
+            out.append([ch, use, direction])
+    return rtl, out
+
+
+def shape(text, face, direction):
     ft, hf = face
     buf = hb.Buffer()
     buf.add_str(text)
     buf.guess_segment_properties()
+    buf.direction = direction
     hb.shape(hf, buf)
-    scale = size / ft["head"].unitsPerEm
-    width = sum(p.x_advance for p in buf.glyph_positions) * scale
-    if max_width and width > max_width:
-        scale *= max_width / width
-        width = max_width
-    cursor = x - width if align == "right" else x
-    glyphs = ft.getGlyphSet()
-    pen = SVGPathPen(glyphs, ntos=lambda v: f"{v:.2f}".rstrip("0").rstrip("."))
-    for info, pos in zip(buf.glyph_infos, buf.glyph_positions):
-        glyphs[ft.getGlyphName(info.codepoint)].draw(TransformPen(pen, (
-            scale, 0, 0, -scale, cursor + pos.x_offset * scale, baseline - pos.y_offset * scale)))
-        cursor += pos.x_advance * scale
-    return f'<path fill="{fill}" d="{pen.getCommands()}"/>'
+    return buf
+
+
+def measure(text, size, face, fallback=None):
+    _, parts = runs(text, face, fallback)
+    return sum(sum(p.x_advance for p in shape(t, f, d).glyph_positions) * size / f[0]["head"].unitsPerEm
+               for t, f, d in parts)
+
+
+def text_path(text, x, baseline, size, face=HE, fill=WHITE, align="right", max_width=None, fallback=None):
+    """HarfBuzz supplies real shaping per run; runs are placed in visual order and baked into one path."""
+    rtl, parts = runs(text, face, fallback)
+    shaped = [(shape(t, f, d), f) for t, f, d in parts]
+    widths = [sum(p.x_advance for p in buf.glyph_positions) * size / f[0]["head"].unitsPerEm for buf, f in shaped]
+    width = sum(widths)
+    squeeze = max_width / width if max_width and width > max_width else 1
+    width *= squeeze
+    left = x - width if align == "right" else x
+    commands = []
+    # A right-to-left paragraph lays its runs out from the right edge; a left-to-right one from the left.
+    order = list(zip(shaped, widths))
+    cursor = left + width if rtl else left
+    for (buf, (ft, _)), run_width in order:
+        run_width *= squeeze
+        start = cursor - run_width if rtl else cursor
+        scale = size / ft["head"].unitsPerEm * squeeze
+        glyphs = ft.getGlyphSet()
+        pen = SVGPathPen(glyphs, ntos=lambda v: f"{v:.2f}".rstrip("0").rstrip("."))
+        pen_x = start
+        for info, pos in zip(buf.glyph_infos, buf.glyph_positions):
+            glyphs[ft.getGlyphName(info.codepoint)].draw(TransformPen(pen, (
+                scale, 0, 0, -scale, pen_x + pos.x_offset * scale, baseline - pos.y_offset * scale)))
+            pen_x += pos.x_advance * scale
+        commands.append(pen.getCommands())
+        cursor = start if rtl else cursor + run_width
+    return f'<path fill="{fill}" d="{" ".join(commands)}"/>'
 
 
 def mark(x=0, y=0, size=32, ink=WHITE, accent=GREEN):
@@ -87,6 +139,88 @@ def ledger(x, y, width, height):
             f'<path d="M{x} {y + 96}h{width}" stroke="{GREEN}" stroke-width="3"/>'
             f'<path fill="{GREEN}" d="M{x + 93} {y + 93}h6v6h-6zM{x + 237} {y + 93}h6v6h-6z"/>')
 
+
+LOCALES = ["he", "ar", "yi", "ru", "uk", "en", "am"]
+RTL = {"he", "ar", "yi"}
+ARABIC_BOLD = font(SOURCE / "NotoSansArabic.ttf", 700)
+ETHIOPIC_BOLD = font(ROOT / "src/assets/NotoSansEthiopic-700.woff2")
+
+
+def wrap(text, size, face, width, fallback=None):
+    lines, line = [], ""
+    for word in text.split():
+        trial = f"{line} {word}".strip()
+        if line and measure(trial, size, face, fallback) > width:
+            lines.append(line)
+            line = word
+        else:
+            line = trial
+    return lines + [line]
+
+
+def ts_locale_arrays(path):
+    """Copy tables keep one `  xx: [...]` line per locale; each such line is a JSON array."""
+    rows = {}
+    for line in path.read_text(encoding="utf-8").splitlines():
+        match = re.match(r'^\s+(he|ar|yi|ru|uk|en|am): (\[.*\]),?$', line)
+        if match:
+            rows[match.group(1)] = json.loads(match.group(2))
+    return rows
+
+
+def positions_copy(key):
+    """Read one key from src/positions-copy.ts, whose locale blocks hold one JSON string per line."""
+    source = (ROOT / "src/positions-copy.ts").read_text(encoding="utf-8")
+    keys = json.loads("[" + re.search(r"const keys = \[(.*?)\] as const;", source, re.S).group(1) + "]")
+    out = {}
+    for locale in LOCALES:
+        block = re.search(rf"\n  {locale}: \[\n(.*?)\n  \]", source, re.S).group(1)
+        out[locale] = json.loads("[" + block + "]")[keys.index(key)]
+    return out
+
+
+def question_card(locale, number, heading, subtitle):
+    """One card per question: brand, number, the question itself, and where it leads. No counts, so it cannot go stale."""
+    rtl = locale in RTL
+    face = ARABIC_BOLD if locale == "ar" else ETHIOPIC_BOLD if locale == "am" else HE_BOLD if locale in ("he", "yi") else LATIN_BOLD
+    small = ARABIC if locale == "ar" else ETHIOPIC if locale == "am" else HE if locale in ("he", "yi") else LATIN
+    x, align = (1104, "right") if rtl else (96, "left")
+    far, far_align = (96, "left") if rtl else (1104, "right")
+    body = mark(60 if rtl else 1048, 40, 96)
+    brand, brand_face = ("רף משותף", HE_BOLD) if locale == "he" else ("COMMON BAR", LATIN_BOLD)
+    body += text_path(brand, x, 88, 30, brand_face, GREEN, align)
+    body += text_path(number, x, 186, 64, LATIN_BOLD, GREEN, align)
+    size = 68
+    while True:
+        lines = wrap(heading, size, face, 1000, LATIN_BOLD)
+        if len(lines) <= 3 or size <= 44:
+            break
+        size -= 4
+    baseline = 186 + size * 1.35
+    for line in lines:
+        body += text_path(line, x, baseline, size, face, WHITE, align, max_width=1008, fallback=LATIN_BOLD)
+        baseline += size * 1.25
+    body += '<path d="M72 531h1056" stroke="#26354A"/>'
+    body += text_path(subtitle, x, 584, 30, small, GREEN, align, max_width=700, fallback=LATIN)
+    body += text_path("rafmeshutaf.org.il", far, 584, 22, LATIN, MUTED, far_align)
+    return svg(1200, 630, body, f"{number} {heading}")
+
+
+def generate_question_cards():
+    headings = ts_locale_arrays(ROOT / "src/issue-headings.ts")
+    slugs = json.loads(re.search(r"issueSlugs = (\[.*?\]) as const", (ROOT / "src/issues.ts").read_text(encoding="utf-8")).group(1))
+    subtitles = positions_copy("title")
+    for locale in LOCALES:
+        for index, slug in enumerate(slugs):
+            card = question_card(locale, f"{index + 1:02d}", headings[locale][index], subtitles[locale])
+            (ROOT / f"src/assets/share-q-{slug}-{locale}.png").write_bytes(
+                resvg_py.svg_to_bytes(svg_string=card, skip_system_fonts=True))
+    print(f"Generated {len(slugs) * len(LOCALES)} question cards.")
+
+
+if "--question-cards" in sys.argv:
+    generate_question_cards()
+    raise SystemExit(0)
 
 OUT.mkdir(exist_ok=True)
 favicon = svg(32, 32, mark(), "רף משותף — Common Bar")
@@ -140,6 +274,7 @@ save("og-image", share_card("he"))
 for locale in ["he", "en", "ar", "yi", "ru", "uk", "am"]:
     (ROOT / f"src/assets/share-{locale}.png").write_bytes(
         resvg_py.svg_to_bytes(svg_string=share_card(locale), skip_system_fonts=True))
+generate_question_cards()
 
 manifest = {
     "id": "/", "name": "רף משותף | Common Bar", "short_name": "רף משותף",

@@ -2,12 +2,13 @@ import type { Locale } from "../i18n.js";
 import { s } from "../share-copy.js";
 import { socialLinks } from "../issues.js";
 
-export function ShareOptions({locale, id, title, text, url}: {locale: Locale; id: string; title: string; text: string; url: string}) {
+/** `showText` false where the text being shared is already on screen right above the control. */
+export function ShareOptions({locale, id, title, text, url, showText = true}: {locale: Locale; id: string; title: string; text: string; url: string; showText?: boolean}) {
   return <details class="share-options" data-share data-share-title={title} data-share-text={text} data-share-url={url}
     data-copied={s(locale,"copied")} data-copy-failed={s(locale,"copyFailed")} data-share-failed={s(locale,"shareFailed")}>
     <summary>{s(locale,"share")}<span class="sr-only">: {title}</span></summary>
     <div class="share-content">
-      <p>{text}</p>
+      {showText ? <p>{text}</p> : null}
       <label for={`share-url-${id}`}>{s(locale,"link")}</label>
       <input id={`share-url-${id}`} class="share-url" type="text" dir="ltr" readOnly value={url} />
       <div class="share-controls">

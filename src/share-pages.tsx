@@ -14,7 +14,7 @@ import { isIssueSlug } from "./types/positions.js";
 
 export function registerShareRoutes(app: Hono, db: Db, config: Config) {
   const issueUrl = (locale: Locale, issue: Issue) => `${config.appBaseUrl}/${locale}/issues/${issue.slug}`;
-  const meta = (locale: Locale, url: string, description: string) => ({url,description,image:`${config.appBaseUrl}${shareImagePath(locale)}`,imageAlt:t(locale,"siteName")});
+  const meta = (locale: Locale, url: string, description: string, slug?: string) => ({url,description,image:`${config.appBaseUrl}${shareImagePath(locale,slug)}`,imageAlt:t(locale,"siteName")});
   const share = (locale: Locale, issue: Issue) => <ShareOptions locale={locale} id={issue.slug} title={issue.title} text={issue.rationale ?? issue.title} url={issueUrl(locale,issue)} />;
 
   app.get("/:locale", context => {
@@ -45,7 +45,7 @@ export function registerShareRoutes(app: Hono, db: Db, config: Config) {
     if (!issue) return unavailable(context,locale,t(locale,"unavailable"),404);
     publicCache(context);
     return context.html(<Layout locale={locale} title={issue.title} path={context.req.path}
-      shareMeta={meta(locale,issueUrl(locale,issue),issue.rationale ?? issue.title)}>
+      shareMeta={meta(locale,issueUrl(locale,issue),issue.rationale ?? issue.title,issue.slug)}>
       <article class="issue-detail">
         <a href={`/${locale}`}>{s(locale,"all")}</a>
         <h1>{issue.title}</h1><p class="lede">{issue.rationale}</p>
@@ -54,7 +54,7 @@ export function registerShareRoutes(app: Hono, db: Db, config: Config) {
         {share(locale,issue)}
         {issue.verification ? <details class="issue-explanation"><summary>{t(locale,"verification")}</summary><p>{issue.verification}</p></details> : null}
         {issue.exceptions ? <details class="issue-explanation"><summary>{t(locale,"exceptions")}</summary><p>{issue.exceptions}</p></details> : null}
-        {isIssueSlug(issue.slug) ? <IssuePositions locale={locale} slug={issue.slug} dataset={positions2026} /> : null}
+        {isIssueSlug(issue.slug) ? <IssuePositions locale={locale} slug={issue.slug} dataset={positions2026} baseUrl={config.appBaseUrl} /> : null}
         <p><a href={`/${locale}/standard#clause-${issue.sortOrder}`}>{t(locale,"readFull")}</a></p>
         <p class="neutrality">{s(locale,"neutrality")}</p>
       </article>

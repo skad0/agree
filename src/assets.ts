@@ -888,6 +888,18 @@ button.danger:hover { background: var(--caution); color: var(--paper); border-co
 .positions-silent a { display: inline-block; min-inline-size: 1.75rem; padding-block: .25rem; text-align: center; }
 .positions-fold-body .positions-other-card { margin-block-start: 1rem; background: var(--paper); }
 .positions-row-link { text-decoration: none; color: inherit; }
+/* Per-statement link and share stay quiet (outlined, small) so 40-odd of them never outshout the statements. */
+.position-actions { display: flex; flex-wrap: wrap; align-items: flex-start; gap: .4rem 1rem; margin-block-start: .6rem; padding-block-start: .5rem; border-block-start: 1px dashed var(--rule); }
+.position-permalink { display: inline-flex; align-items: center; gap: .25rem; min-block-size: 44px; font-size: .85rem; font-weight: 650; text-decoration: none; }
+.position-actions .share-options, .positions-intro .share-options { margin: 0; flex: 1 1 12rem; min-inline-size: 0; }
+.public-site .position-actions .share-options > summary, .public-site .positions-intro .share-options > summary { display: inline-flex; align-items: center; min-block-size: 44px; padding: .35rem .9rem; background: transparent; color: var(--seal); border: 1px solid var(--seal); font-size: .85rem; }
+.position-actions .share-options > summary::after, .positions-intro .share-options > summary::after { filter: none; }
+/* Pico colours an open summary with its accordion colour; naming details and :not([role]) outranks it. */
+.public-site .position-actions details.share-options[open] > summary:not([role]), .public-site .positions-intro details.share-options[open] > summary:not([role]) { background: var(--seal); color: var(--pico-primary-inverse); }
+.public-site .position-actions .share-options[open] > summary::after, .public-site .positions-intro .share-options[open] > summary::after { filter: brightness(0) invert(1); }
+.position-actions .share-content { padding-block: .5rem 0; }
+/* Inside a fold the sticky section header sits on top, so a linked statement must land below it. */
+.positions-fold .position-item { scroll-margin-block-start: 10rem; }
 .scorecard-positions-link { display: inline-flex; align-items: center; min-block-size: 44px; margin-block-start: .25rem; font-size: .85rem; font-weight: 650; }
 .stance { display: inline-flex; align-items: center; gap: .45rem; font-size: .82rem; font-weight: 650; color: var(--ink); }
 .stance-mark, .stance-cell { display: inline-grid; place-items: center; flex: none; border-radius: 50%; border: 1.5px solid var(--rule); font-weight: 700; line-height: 1; color: var(--mute); background: var(--card); }

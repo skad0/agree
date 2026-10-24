@@ -66,7 +66,7 @@ test("positions page, issue sections and index counts render in every locale", a
 
       const issue = await (await app.request(`/${locale}/issues/october-7-inquiry`)).text();
       assert.match(issue, /id="positions"/);
-      assert.match(issue, /id="pos-yashar"/);
+      assert.match(issue, /id="pos-yashar-inquiry"/);
       assert.match(issue, /https:\/\/www\.ynet\.co\.il\/news\/elections2026\/article\/yokra14915209/);
 
       const home = await (await app.request(`/${locale}`)).text();
@@ -88,11 +88,45 @@ test("positions page, issue sections and index counts render in every locale", a
     assert.match(opened, /id="list-yashar"><details class="positions-fold" open/);
     const question = await (await app.request("/en/positions?q=october-7-inquiry")).text();
     assert.match(question, /id="q-october-7-inquiry"><details class="positions-fold" open/);
-    const bogus = await app.request("/en/positions?view=nope&list=nobody&q=nothing");
+    const bogus = await app.request("/en/positions?view=nope&list=nobody&q=nothing&entry=nope");
     assert.equal(bogus.status, 200);
     assert.doesNotMatch(await bogus.text(), /positions-fold" open/);
+
+    // Every statement has its own link, and no id repeats in either view.
+    for (const view of ["", "?view=list"]) {
+      const page = await (await app.request(`/en/positions${view}`)).text();
+      const ids = [...page.matchAll(/\sid="([^"]+)"/g)].map((match) => match[1]);
+      const repeated = ids.filter((id, index) => ids.indexOf(id) !== index);
+      assert.deepEqual(repeated, [], `repeated ids on /en/positions${view}`);
+    }
+    const sample = positions2026.records.find((record) => record.id === "pos-yb-coalition")!;
+    const byQuestion = await (await app.request("/en/positions")).text();
+    assert.match(byQuestion, /href="\/en\/positions\?entry=pos-yb-coalition#pos-yb-coalition"/);
+    assert.match(byQuestion, /id="share-url-pos-yb-coalition"[^>]*value="[^"]*\/en\/positions\?entry=pos-yb-coalition#pos-yb-coalition"/);
+    assert.match(byQuestion, /id="share-url-positions"/, "the page itself can be shared");
+
+    // Each question previews with its own card, and that card is actually served.
+    for (const locale of locales) {
+      const issuePage = await (await app.request(`/${locale}/issues/october-7-inquiry`)).text();
+      const image = issuePage.match(/<meta property="og:image" content="[^"]*(\/assets\/share-q-october-7-inquiry-[a-z]{2}-[0-9a-f]{12}\.png)"/);
+      assert.ok(image, `${locale} question card in og:image`);
+      const served = await app.request(image[1]!);
+      assert.equal(served.status, 200);
+      assert.equal(served.headers.get("content-type"), "image/png");
+    }
+    assert.match(await (await app.request("/en/positions?entry=pos-yb-coalition")).text(), /og:image" content="[^"]*share-q-coalition-choices-en-/);
+
+    // A statement permalink opens its question on the server and previews as that statement.
+    const permalink = await (await app.request("/en/positions?entry=pos-yb-coalition")).text();
+    assert.match(permalink, new RegExp(`id="q-${sample.question}"><details class="positions-fold" open`));
+    assert.match(permalink, /<meta property="og:title" content="ישראל ביתנו \(Yisrael Beiteinu\) — Who could form a coalition together\?"/);
+    assert.match(permalink, new RegExp(`<meta property="og:description" content="${escapeRegExp(sample.summary.en).replace(/'/g, "(?:'|&#39;)")}"`));
   } finally {
     close();
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
