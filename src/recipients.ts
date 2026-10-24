@@ -235,7 +235,7 @@ export function directoryElectionState(db: Db): DirectoryElectionState {
   if (!row) return { kind: "none" };
   if (row.approvalState === "approved") return { kind: "approved", electionNumber: Number(row.number) };
   if (row.approvalState !== "submitted_not_approved") return { kind: "unknown", electionNumber: Number(row.number) };
-  const missing = db.prepare(`SELECT count(*) AS n FROM electoral_list_versions l WHERE l.snapshot_id=? AND l.roster_published = 0`).get(row.snapshotId) as { n: number };
+  const missing = db.prepare(`SELECT count(*) AS n FROM electoral_list_versions l WHERE l.snapshot_id=? AND l.roster_published = 0 AND l.running = 1`).get(row.snapshotId) as { n: number };
   return { kind: "submitted", electionNumber: Number(row.number), listsWithoutRoster: Number(missing.n) };
 }
 

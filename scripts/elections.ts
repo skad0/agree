@@ -3,12 +3,14 @@ import { loadConfig } from "../src/config.js";
 import { openDatabase } from "../src/db.js";
 import {
   activatePublication,
+  diffTranscripts,
   electionCoverage,
   fetchBounded,
   gateSourceResource,
   importCandidateSource,
   loadSourceManifest,
   parseCandidateSource,
+  renderTranscriptDiff,
   runEnrichmentPipeline
 } from "../src/integrations/elections/index.js";
 
@@ -34,16 +36,19 @@ switch (command) {
   case "activate":
     runActivate(process.argv[3]);
     break;
+  case "diff":
+    runDiff(process.argv[3], process.argv[4]);
+    break;
   default: {
     const _exhaustive: never = command;
     throw new Error(_exhaustive);
   }
 }
 
-type Command = "source-check" | "dry-run" | "report" | "import" | "activate";
+type Command = "source-check" | "dry-run" | "report" | "import" | "activate" | "diff";
 
 function parseCommand(value: string | undefined): Command {
-  const commands: Command[] = ["source-check", "dry-run", "report", "import", "activate"];
+  const commands: Command[] = ["source-check", "dry-run", "report", "import", "activate", "diff"];
   if (commands.includes(value as Command)) return value as Command;
   console.error(`usage: elections ${commands.join("|")}`);
   process.exit(1);
@@ -66,6 +71,16 @@ function runImport(path: string | undefined) {
   } finally {
     db.close();
   }
+}
+
+/** Prints the refresh-report tables for two transcripts. Reads files only; no database or network. */
+function runDiff(oldPath: string | undefined, newPath: string | undefined) {
+  if (!oldPath || !newPath) {
+    console.error("usage: elections diff <old.json> <new.json>");
+    process.exit(1);
+  }
+  const read = (path: string) => JSON.parse(readFileSync(path, "utf8")) as unknown;
+  process.stdout.write(renderTranscriptDiff(diffTranscripts(read(oldPath), read(newPath))));
 }
 
 function runActivate(value: string | undefined) {

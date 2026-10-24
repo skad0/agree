@@ -174,6 +174,11 @@ export type CandidateSourceList = {
   ballotLetters: string | null;
   submittedByHe: string | null;
   rosterPublished: boolean;
+  /** False when the list stopped running after filing (for example, every candidate resigned). */
+  running: boolean;
+  withdrawnEvidenceUrl: string | null;
+  pagePublished: string | null;
+  pageUpdated: string | null;
 };
 
 export type CandidateSourceRow = {

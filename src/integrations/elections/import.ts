@@ -3,7 +3,7 @@ import type { Db } from "../../db.js";
 import { insertDirectoryPublication, insertElection, insertSourceSnapshot } from "./repository.js";
 import type { CandidateSource, CandidateSourceList, CandidateSourceRow, ImportResult } from "./types.js";
 
-export const TRANSCRIPT_PARSER_VERSION = "transcript-2";
+export const TRANSCRIPT_PARSER_VERSION = "transcript-3";
 
 /** Validates a manual official transcript. Rejects rather than repairing: a bad transcript must not become data. */
 export function parseCandidateSource(raw: unknown): CandidateSource {
@@ -14,8 +14,10 @@ export function parseCandidateSource(raw: unknown): CandidateSource {
   for (const field of ["retrievedAt", "publishedAt"]) if (source[field] != null && !Number.isFinite(Date.parse(String(source[field])))) throw new Error(`Invalid source.${field}`);
   officialUrl(source.sourceUrl);
   const approvalState = expectEnum(source.approvalState, ["submitted_not_approved", "approved"], "source.approvalState");
-  const lists = expectArray(doc.lists, "lists").map((entry, index) => parseList(entry, index));
-  const rows = expectArray(doc.rows, "rows").map((entry, index) => parseRow(entry, index));
+  const rawLists = expectArray(doc.lists, "lists");
+  const rawRows = expectArray(doc.rows, "rows");
+  const lists = rawLists.map((entry, index) => parseList(entry, index));
+  const rows = rawRows.map((entry, index) => parseRow(entry, index));
 
   if (!lists.length) throw new Error("lists must not be empty");
   if (new Set(lists.map(listKey)).size !== lists.length) throw new Error("duplicate officialListKey");
@@ -27,15 +29,34 @@ export function parseCandidateSource(raw: unknown): CandidateSource {
     if (seen.has(key)) throw new Error(`duplicate rank ${row.rank} in list ${row.officialListKey}`);
     seen.add(key);
   }
+  // Some captures repeat list labels on every row. They are not stored, but they must agree with the list.
+  rawRows.forEach((entry, index) => {
+    const raw = entry as Record<string, unknown>;
+    const list = byKey.get(String(raw.officialListKey))!;
+    if (raw.listTitleHe != null && raw.listTitleHe !== list.listTitleHe) throw new Error(`rows[${index}].listTitleHe disagrees with its list`);
+    if (raw.ballotLetters != null && raw.ballotLetters !== list.ballotLetters) throw new Error(`rows[${index}].ballotLetters disagrees with its list`);
+  });
   for (const list of lists) {
     const ranks = rows.filter((row) => row.officialListKey === list.officialListKey).map((row) => row.rank).sort((a, b) => a - b);
     if (list.candidateCount != null && list.candidateCount !== ranks.length) throw new Error(`candidateCount mismatch for ${listKey(list)}`);
+    if (!list.running) {
+      if (ranks.length || list.rosterPublished) throw new Error(`list ${list.listTitleHe} is not running but carries a roster`);
+      if (!list.withdrawnEvidenceUrl) throw new Error(`list ${list.listTitleHe} is not running without withdrawnEvidenceUrl`);
+      continue;
+    }
+    if (list.withdrawnEvidenceUrl) throw new Error(`list ${list.listTitleHe} is running but has withdrawnEvidenceUrl`);
     if (!list.rosterPublished) {
       if (ranks.length) throw new Error(`list ${list.listTitleHe} has rosterPublished=false but carries rows`);
       continue;
     }
     if (!ranks.length) throw new Error(`list ${list.listTitleHe} has rosterPublished=true but no rows`);
     if (ranks.some((rank, index) => rank !== index + 1)) throw new Error(`list ${list.listTitleHe} ranks are not contiguous from 1`);
+  }
+  if (approvalState === "approved") {
+    // Approved ballot letters are final, so every running list has its own.
+    const letters = lists.filter((list) => list.running).map((list) => list.ballotLetters);
+    if (letters.some((value) => !value)) throw new Error("approved lists must all carry ballot letters");
+    if (new Set(letters).size !== letters.length) throw new Error("approved ballot letters must be unique");
   }
 
   return {
@@ -91,7 +112,7 @@ export function importCandidateSource(db: Db, source: CandidateSource, raw: stri
       parserVersion: TRANSCRIPT_PARSER_VERSION,
       mediaType: "application/json",
       artifactRef: options.artifactRef ?? null,
-      extractionState: source.lists.every((list) => list.rosterPublished) ? "complete" : "incomplete"
+      extractionState: source.lists.every((list) => list.rosterPublished || !list.running) ? "complete" : "incomplete"
     });
 
     const electionId = upsertElection(db, source, snapshotId);
@@ -100,7 +121,7 @@ export function importCandidateSource(db: Db, source: CandidateSource, raw: stri
     for (const list of source.lists) {
       const listId = upsertList(db, electionId, list, snapshotId);
       listIds.set(listKey(list), listId);
-      db.prepare(`INSERT INTO electoral_list_versions (snapshot_id,list_id,official_list_key,title_he,ballot_letters,roster_published,submitted_by_raw,source_url,candidate_count) VALUES (?,?,?,?,?,?,?,?,?)`).run(snapshotId,listId,listKey(list),list.listTitleHe,list.ballotLetters,list.rosterPublished ? 1 : 0,list.submittedByHe,list.sourceUrl ?? null,source.rows.filter(row=>row.officialListKey===listKey(list)).length);
+      db.prepare(`INSERT INTO electoral_list_versions (snapshot_id,list_id,official_list_key,title_he,ballot_letters,roster_published,submitted_by_raw,source_url,candidate_count,running,withdrawn_evidence_url,page_published,page_updated) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(snapshotId,listId,listKey(list),list.listTitleHe,list.ballotLetters,list.rosterPublished ? 1 : 0,list.submittedByHe,list.sourceUrl ?? null,source.rows.filter(row=>row.officialListKey===listKey(list)).length,list.running ? 1 : 0,list.withdrawnEvidenceUrl,list.pagePublished,list.pageUpdated);
     }
 
     const insertRecord = db.prepare(`INSERT INTO source_records (snapshot_id, record_key, payload_json) VALUES (?, ?, ?) RETURNING id`);
@@ -136,7 +157,7 @@ export function importCandidateSource(db: Db, source: CandidateSource, raw: stri
       version,
       lists: listIds.size,
       candidacies,
-      listsWithoutRoster: source.lists.filter((list) => !list.rosterPublished).length
+      listsWithoutRoster: source.lists.filter((list) => list.running && !list.rosterPublished).length
     };
   } catch (error) {
     db.exec("ROLLBACK");
@@ -215,15 +236,58 @@ function activePublicationId(db: Db, electionId: number): number | null {
 
 function parseList(raw: unknown, index: number): CandidateSourceList {
   const list = expectObject(raw, `lists[${index}]`);
+  if (list.sourceUrl != null && list.pageUrl != null && list.sourceUrl !== list.pageUrl) throw new Error(`lists[${index}] sourceUrl and pageUrl disagree`);
+  const pageUrl = list.sourceUrl ?? list.pageUrl;
   return {
     officialListKey: optionalString(list.officialListKey),
-    listTitleHe: expectString(list.listTitleHe, `lists[${index}].listTitleHe`),
+    listTitleHe: listText(expectString(list.listTitleHe, `lists[${index}].listTitleHe`), `lists[${index}].listTitleHe`)!,
     ballotLetters: optionalString(list.ballotLetters),
-    submittedByHe: optionalString(list.submittedByHe),
-    sourceUrl: list.sourceUrl == null ? null : officialUrl(list.sourceUrl),
+    submittedByHe: listText(optionalString(list.submittedByHe), `lists[${index}].submittedByHe`),
+    sourceUrl: pageUrl == null ? null : officialUrl(pageUrl),
     candidateCount: list.candidateCount == null ? null : expectNumber(list.candidateCount,"candidateCount"),
-    rosterPublished: expectBoolean(list.rosterPublished,"rosterPublished")
+    rosterPublished: expectBoolean(list.rosterPublished,"rosterPublished"),
+    running: list.running == null ? true : expectBoolean(list.running,"running"),
+    withdrawnEvidenceUrl: list.withdrawnEvidenceUrl == null ? null : officialUrl(list.withdrawnEvidenceUrl),
+    pagePublished: pageDate(list.pagePublished, `lists[${index}].pagePublished`),
+    pageUpdated: pageDate(list.pageUpdated, `lists[${index}].pageUpdated`)
   };
+}
+
+/** Accepts ISO dates or the Israeli dd.mm.yyyy printed on gov.il pages; stores ISO. */
+function pageDate(value: unknown, label: string): string | null {
+  if (value == null) return null;
+  const text = expectString(value, label);
+  const israeli = /^(\d{2})\.(\d{2})\.(\d{4})$/.exec(text);
+  const iso = israeli ? `${israeli[3]}-${israeli[2]}-${israeli[1]}` : text;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso) || Number.isNaN(Date.parse(`${iso}T00:00:00Z`)) || new Date(`${iso}T00:00:00Z`).toISOString().slice(0, 10) !== iso) throw new Error(`${label} must be a date`);
+  return iso;
+}
+
+/**
+ * Rejects the marks a lossy capture leaves in a name: a cut-off hyphen, a comma or hyphen
+ * with a space on one side only, doubled spaces, Latin letters or digits, a lone token.
+ */
+export function nameTextProblem(name: string): string | null {
+  const punctuation = punctuationProblem(name);
+  if (punctuation) return punctuation;
+  if (/[A-Za-z0-9]/.test(name)) return "Latin letters or digits";
+  if (name.split(" ").length < 2) return "a single token";
+  return null;
+}
+
+/** The reflow marks that also damage list titles and submitted-by text. */
+export function punctuationProblem(text: string): string | null {
+  if (/^[-–,.]|[-–,]$/.test(text)) return "starts or ends with punctuation";
+  if (/\s,/.test(text)) return "space before a comma";
+  if (/\s[-–]\S|\S[-–]\s/.test(text)) return "hyphen spaced on one side only";
+  if (/\s{2,}/.test(text)) return "repeated whitespace";
+  return null;
+}
+
+function listText(value: string | null, label: string): string | null {
+  const problem = value == null ? null : punctuationProblem(value);
+  if (problem) throw new Error(`${label} looks damaged (${problem}): ${value}`);
+  return value;
 }
 
 function parseRow(raw: unknown, index: number): CandidateSourceRow {
@@ -233,11 +297,17 @@ function parseRow(raw: unknown, index: number): CandidateSourceRow {
   return {
     officialListKey: expectString(row.officialListKey, `rows[${index}].officialListKey`),
     rank,
-    fullNameHe: expectString(row.fullNameHe, `rows[${index}].fullNameHe`),
+    fullNameHe: nameText(expectString(row.fullNameHe, `rows[${index}].fullNameHe`), `rows[${index}].fullNameHe`),
     viaPartyHe: optionalString(row.viaPartyHe),
     cityPublished: optionalString(row.cityPublished),
     status: expectEnum(row.status, ["listed", "withdrawn", "replaced"], `rows[${index}].status`)
   };
+}
+
+function nameText(name: string, label: string): string {
+  const problem = nameTextProblem(name);
+  if (problem) throw new Error(`${label} looks damaged (${problem}): ${name}`);
+  return name;
 }
 
 function expectObject(value: unknown, label: string): Record<string, unknown> {
