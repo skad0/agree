@@ -523,7 +523,7 @@ function sharePartyLabel(locale: Locale, party: PartyCompliance): string {
   return `${party.partyNameHe} (${gloss})`;
 }
 
-function PoliticalName({
+export function PoliticalName({
   locale,
   officialHe,
   reading,
