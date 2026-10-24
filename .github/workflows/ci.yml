@@ -30,7 +30,4 @@ jobs:
           node-version: 22.13.0
           cache: npm
       - run: npm ci --ignore-scripts
-      # Temporary, scoped exception: the known moderate Windows-only serve-static
-      # advisory in @hono/node-server is not used by production Linux runtime.
-      # Reassess and remove this threshold by 2026-09-30; high/critical remain blocking.
-      - run: npm audit --omit=dev --audit-level=high
+      - run: npm audit --omit=dev
