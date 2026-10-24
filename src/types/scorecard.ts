@@ -131,8 +131,14 @@ export type PartyCompliance = {
   basis: Record<CriterionId, Localized>;
   evidenceMap: Record<CriterionId, string[]>;
   officialResponse?: OfficialResponse;
-  /** Official CEC roster page for this submitted 2026 list, when published. */
+  /** gov.il page slug of this party's list in data/elections/knesset-26-lists.json. */
+  officialListKey: string;
+  /** Ballot letters as approved by the CEC. */
+  ballotLetters: string;
+  /** Official CEC roster page for this list. */
   rosterUrl?: string;
+  /** Set when the list filed but is no longer on the ballot. */
+  withdrawn?: { evidenceUrl: string; pageUpdated: string };
 };
 
 /** PASS count over the five criteria. Partial and uncommitted do not count as passed. */
@@ -240,6 +246,12 @@ export function assertScorecardDataset(dataset: ScorecardDataset): void {
     assert(isPartyBlock(party.block), `bad block ${party.partyId}`);
     assert(isParliamentaryStatus(party.parliamentaryStatus), `bad parliamentary status ${party.partyId}`);
     if (party.rosterUrl) assert(OFFICIAL_HOST.test(party.rosterUrl), `non-official roster URL ${party.partyId}`);
+    assert(party.officialListKey.trim().length > 0, `missing list key ${party.partyId}`);
+    assert(party.ballotLetters.trim().length > 0, `missing ballot letters ${party.partyId}`);
+    if (party.withdrawn) {
+      assert(OFFICIAL_HOST.test(party.withdrawn.evidenceUrl), `non-official withdrawal evidence ${party.partyId}`);
+      assert(ISO_DATE.test(party.withdrawn.pageUpdated), `bad withdrawal date ${party.partyId}`);
+    }
     for (const criterionId of CRITERION_IDS) {
       const status = party.scores[criterionId];
       assert(isComplianceStatus(status), `bad score ${party.partyId}/${criterionId}`);
