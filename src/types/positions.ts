@@ -75,6 +75,7 @@ export const POSITION_SOURCE_HOSTS = [
   "www.zman.co.il",
   "www.themarker.com",
   "www.idi.org.il",
+  "www.haaretz.co.il",
   "beytenu.org.il",
   "be-yahad.org.il",
   "yes.democrats.org.il",

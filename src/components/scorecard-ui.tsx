@@ -16,6 +16,8 @@ import type {
 import { complianceMetrics, isComplianceStatus, isCriterionId, isPartyBlock, isPartyId } from "../types/scorecard.js";
 import { normalizeHebrew } from "../integrations/elections/normalize-hebrew.js";
 import { s } from "../share-copy.js";
+import { pc } from "../positions-copy.js";
+import { positions2026 } from "../data/positions-2026.js";
 
 export const SCORECARD_SEGMENTS = ["all", "incumbent", "challenger", "high"] as const;
 export type ScorecardSegment = (typeof SCORECARD_SEGMENTS)[number];
@@ -592,6 +594,7 @@ export function ScorecardTable({
                   {party.ballotNoteHe ? <span class="scorecard-party-note" lang="he" dir="rtl">{party.ballotNoteHe}</span> : null}
                   <span class="scorecard-party-block" lang={locale} dir={dirOf(locale)}>{parliamentaryLabel(locale, party)} · {blockLabel(locale, party.block)}</span>
                   {party.withdrawn ? <WithdrawnBadge locale={locale} /> : <ComplianceGauge locale={locale} party={party} />}
+                  <PositionsLink locale={locale} party={party} />
                 </th>
                 {criteria.map((criterion) => {
                   const href = `${path}?${scorecardQuery(filters, { party: party.partyId, evidence: criterion.id })}#evidence`;
@@ -624,6 +627,7 @@ export function ScorecardTable({
               </summary>
               <p class="scorecard-party-block">{parliamentaryLabel(locale, party)} · {blockLabel(locale, party.block)}</p>
               {party.ballotNoteHe ? <p class="scorecard-party-note" lang="he" dir="rtl">{party.ballotNoteHe}</p> : null}
+              <PositionsLink locale={locale} party={party} />
               <ul class="scorecard-card-scores">
                 {criteria.map((criterion) => {
                   const href = `${path}?${scorecardQuery(filters, { party: party.partyId, evidence: criterion.id })}#evidence`;
@@ -649,6 +653,12 @@ export function ScorecardTable({
       <CriteriaLegend locale={locale} criteria={dataset.criteria} />
     </>
   );
+}
+
+/** Bridges a scored row to the unscored record of what the same list has said, when one exists. */
+function PositionsLink({ locale, party }: { locale: Locale; party: PartyCompliance }) {
+  if (!(positions2026.tracked as string[]).includes(party.partyId)) return null;
+  return <a class="scorecard-positions-link" href={`/${locale}/positions?view=list&list=${party.partyId}#list-${party.partyId}`}>{pc(locale, "partyLink")}</a>;
 }
 
 function CriteriaLegend({ locale, criteria }: { locale: Locale; criteria: Criterion[] }) {

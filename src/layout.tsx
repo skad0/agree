@@ -1,5 +1,6 @@
 import { s } from "./share-copy.js";
 import { sc } from "./scorecard-copy.js";
+import { pc } from "./positions-copy.js";
 import type { Child } from "hono/jsx";
 import { cssPath, jsPath, themePath } from "./assets.js";
 import { identityPath } from "./identity-assets.js";
@@ -68,9 +69,10 @@ export function Layout({ locale, title, path, languageQuery = "", languageHref, 
       <div class="public-rule" aria-hidden="true"><span></span><span></span></div>
       <header class="wrap site-header">
         <a class="wordmark" href={`/${locale}`}><img src={identityPath("favicon.svg")} width="32" height="32" alt="" />{t(locale, "siteName")}</a>
-        {/* The same three destinations appear in the same order on every public page. */}
+        {/* The same four destinations appear in the same order on every public page. */}
         <nav class="primary" aria-label={s(locale,"problems")}>
           <a class="nav-threshold" href={`/${locale}`} aria-current={suffix === "" ? "page" : suffix.startsWith("/issues/") ? "location" : undefined}>{s(locale,"problems")}</a>
+          <a href={`/${locale}/positions`} aria-current={suffix === "/positions" ? "page" : undefined}>{pc(locale, "navShort")}</a>
           <a href={`/${locale}/scorecard`} aria-current={suffix === "/scorecard" ? "page" : undefined}>{scNav(locale)}</a>
           <a href={`/${locale}/about`} aria-current={suffix === "/about" ? "page" : undefined}>{s(locale,"about")}</a>
         </nav>

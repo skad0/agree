@@ -821,18 +821,74 @@ button.danger:hover { background: var(--caution); color: var(--paper); border-co
 }
 
 /* Public positions: a dated record of statements. Round marks, not the scorecard's labelled badges, so it never reads as graded. */
-.issue-positions-link a, .issue-onrecord a { display: inline-flex; align-items: center; gap: .35rem; min-block-size: 44px; font-weight: 650; }
-.issue-card > p.issue-onrecord { margin-block: 0 .25rem; font-size: .9rem; }
+/* On each index card the marks are the eye-catcher; the whole strip is one link with a 44px target. */
+.issue-card > p.issue-onrecord { margin-block: .25rem .75rem; font-size: .88rem; }
+.issue-onrecord a { display: flex; flex-wrap: wrap; align-items: center; gap: .35rem .6rem; min-block-size: 44px; padding: .45rem .7rem; border: 1px solid var(--rule); border-radius: .5rem; background: var(--paper); text-decoration: none; color: var(--ink); }
+.issue-onrecord a:hover, .issue-onrecord a:focus-visible { border-color: var(--seal); }
+.issue-onrecord-count { font-weight: 700; color: var(--seal); }
+/* Near the top of a question page: the one link that says the answers are below. */
+.positions-jump { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "label arrow" "meta meta"; align-items: center; gap: .35rem .75rem; margin-block: 1rem 1.5rem; padding: .75rem 1rem; min-block-size: 48px; border: 1px solid var(--rule); border-inline-start: 4px solid var(--seal); border-radius: .5rem; background: var(--paper); text-decoration: none; color: var(--ink); }
+.positions-jump:hover, .positions-jump:focus-visible { border-color: var(--seal); }
+.positions-jump-label { grid-area: label; font-weight: 700; color: var(--seal); }
+.positions-jump-arrow { grid-area: arrow; font-weight: 700; font-size: 1.15rem; color: var(--seal); }
+.positions-jump-meta { grid-area: meta; display: flex; flex-wrap: wrap; align-items: center; gap: .3rem .6rem; }
+.positions-jump-count { font-size: .85rem; color: var(--mute); }
+.positions-hint { margin: .25rem 0 .5rem; font-weight: 650; color: var(--ink); }
 .positions-intro { max-inline-size: 48rem; margin-block-end: 1.5rem; }
-.positions-intro h1 { font-size: clamp(1.8rem, 4vw, 2.8rem); line-height: 1.15; }
-.positions-not-scored { max-inline-size: 48rem; padding: .75rem 1rem; border-inline-start: 3px solid var(--caution); background: var(--paper); }
-.positions-guide { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 1.5rem 2.5rem; margin-block: 1.75rem 1rem; }
-.positions-legend h2, .positions-key h2 { font-size: 1.05rem; margin-block: 0 .65rem; }
-.positions-legend ul { list-style: none; padding: 0; margin: 0; display: grid; gap: .45rem; }
+.positions-intro h1 { font-size: clamp(1.8rem, 4vw, 2.8rem); line-height: 1.15; margin-block-start: .35rem; }
+.positions-intro .eyebrow { margin-block-end: 0; }
+.positions-not-scored { max-inline-size: 60ch; margin-block: 0 1rem; padding-inline-start: .75rem; border-inline-start: 3px solid var(--caution); font-size: .85rem; color: var(--mute); }
+/* The way in from the main page and the scorecard: a full-width card with one filled action. */
+.positions-cta { margin-block: 1.5rem 2rem; padding: 1.4rem 1.4rem 1.5rem; border: 2px solid var(--seal); border-radius: .75rem; background: var(--card); box-shadow: 0 6px 24px -14px var(--seal); }
+.positions-cta h2 { margin: .2rem 0 .5rem; font-size: clamp(1.35rem, 3.6vw, 1.9rem); line-height: 1.2; }
+.positions-cta-eyebrow { margin: 0; font-size: .82rem; font-weight: 700; color: var(--seal); }
+.positions-cta-body { margin: 0 0 .9rem; max-inline-size: 60ch; }
+.positions-cta-strip { display: flex; flex-wrap: wrap; gap: .2rem; margin: 0 0 1.1rem; }
+.positions-cta-strip .stance-mark { inline-size: 1.1rem; block-size: 1.1rem; font-size: .6rem; border-width: 1px; }
+.positions-cta-button { display: inline-flex; align-items: center; justify-content: center; min-block-size: 48px; padding-inline: 1.4rem; border-radius: .5rem; background: var(--seal); color: var(--pico-primary-inverse); font-weight: 700; text-decoration: none; }
+.positions-cta-button:hover, .positions-cta-button:focus-visible { background: var(--seal-deep); color: var(--pico-primary-inverse); }
+.positions-cta-compact { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .75rem 1.5rem; padding: 1rem 1.2rem; margin-block: 1rem 1.5rem; box-shadow: none; }
+.positions-cta-compact h2 { font-size: 1.15rem; margin-block-end: 0; }
+.positions-cta-compact .positions-cta-text { flex: 1 1 18rem; min-inline-size: 0; }
+.positions-switch { display: flex; gap: 0; margin-block: 1.25rem .75rem; border: 1px solid var(--seal); border-radius: .5rem; inline-size: fit-content; max-inline-size: 100%; overflow: hidden; }
+.positions-switch a { display: inline-flex; align-items: center; justify-content: center; min-block-size: 44px; padding-inline: 1.1rem; text-decoration: none; font-weight: 650; color: var(--seal); }
+.positions-switch a[aria-current] { background: var(--seal); color: var(--pico-primary-inverse); }
+.positions-legend { margin-block: .5rem 1.25rem; }
+.positions-legend ul { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: .35rem .9rem; }
 .positions-legend li { list-style: none; margin: 0; }
-.positions-key ol { margin: 0; padding-inline-start: 1.75rem; columns: 2 16rem; column-gap: 2rem; }
-.positions-key li { break-inside: avoid; margin-block-end: .2rem; }
-.positions-key a { display: inline-block; padding-block: .3rem; }
+.positions-legend .stance { font-size: .78rem; font-weight: 600; }
+.positions-legend .stance-mark { inline-size: 1.3rem; block-size: 1.3rem; font-size: .72rem; }
+.positions-fold-list { list-style: none; padding: 0; margin: 1rem 0 1.5rem; display: grid; gap: .6rem; }
+.positions-fold-list > li { list-style: none; margin: 0; scroll-margin-block-start: 1rem; }
+.positions-fold { margin: 0; border: 1px solid var(--rule); border-radius: .6rem; background: var(--card); }
+.positions-fold[open] { border-color: var(--seal); box-shadow: 0 0 0 1px var(--seal); }
+/* While reading a long open section, its header stays in view: the reader always knows where they are and can fold it with one tap. */
+.positions-fold[open] > summary { position: sticky; inset-block-start: 0; z-index: 3; background: var(--card); border-block-end: 1px solid var(--rule); border-radius: .6rem .6rem 0 0; }
+.positions-fold > summary { display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "num title" "num meta"; gap: .2rem .75rem; align-items: center; min-block-size: 56px; padding: .85rem 1rem; cursor: pointer; list-style: none; }
+.positions-fold > summary::-webkit-details-marker { display: none; }
+.positions-fold > summary { position: relative; padding-inline-end: 2.75rem; }
+/* Physical borders on purpose: a down-pointing chevron is the same in both directions. */
+.positions-fold > summary::after { content: ""; position: absolute; inset-inline-end: 1.1rem; inset-block-start: 1.25rem; float: none; inline-size: .6rem; block-size: .6rem; margin: 0; background: none; border: 0; border-right: 2px solid var(--mute); border-bottom: 2px solid var(--mute); transform: rotate(45deg); transition: transform .15s ease; }
+.positions-fold[open] > summary::after { transform: rotate(-135deg); inset-block-start: 1.5rem; }
+.positions-fold-number { grid-area: num; align-self: start; font-weight: 800; color: var(--seal); font-size: 1.1rem; }
+.positions-fold-title { grid-area: title; font-weight: 700; font-size: 1.02rem; line-height: 1.35; color: var(--ink); }
+.positions-fold-meta { grid-area: meta; display: flex; flex-wrap: wrap; align-items: center; gap: .35rem .75rem; font-size: .82rem; color: var(--mute); }
+.positions-fold-list > li > .positions-fold > summary:not(:has(.positions-fold-number)) { grid-template-areas: "title title" "meta meta"; }
+.positions-fold-body { padding: 0 1rem 1rem; }
+.positions-fold-body .position-list { margin-block-start: .25rem; }
+.positions-fold-more { margin: .75rem 0 0; }
+.positions-mini { display: inline-flex; flex-wrap: wrap; gap: .2rem; }
+.positions-mini .stance { gap: .1rem; font-size: .68rem; color: var(--mute); }
+.positions-mini .stance-mark { inline-size: 1.05rem; block-size: 1.05rem; font-size: .58rem; border-width: 1px; }
+.positions-mini .stance-none .stance-mark { border: 1px dashed var(--rule); }
+.positions-mini-label { font-variant-numeric: tabular-nums; }
+.position-question { margin: 0; font-size: .98rem; line-height: 1.35; }
+.position-question a { text-decoration: none; }
+.positions-silent { font-size: .85rem; color: var(--mute); }
+.positions-silent a { display: inline-block; min-inline-size: 1.75rem; padding-block: .25rem; text-align: center; }
+.positions-fold-body .positions-other-card { margin-block-start: 1rem; background: var(--paper); }
+.positions-row-link { text-decoration: none; color: inherit; }
+.scorecard-positions-link { display: inline-flex; align-items: center; min-block-size: 44px; margin-block-start: .25rem; font-size: .85rem; font-weight: 650; }
 .stance { display: inline-flex; align-items: center; gap: .45rem; font-size: .82rem; font-weight: 650; color: var(--ink); }
 .stance-mark, .stance-cell { display: inline-grid; place-items: center; flex: none; border-radius: 50%; border: 1.5px solid var(--rule); font-weight: 700; line-height: 1; color: var(--mute); background: var(--card); }
 .stance-mark { inline-size: 1.6rem; block-size: 1.6rem; font-size: .85rem; }
@@ -844,7 +900,6 @@ a.stance-cell:hover, a.stance-cell:focus-visible { box-shadow: 0 0 0 3px var(--r
 .stance-statement-available .stance-mark, .stance-cell.stance-statement-available { border-color: var(--ink); color: var(--ink); }
 .stance-declined .stance-mark, .stance-cell.stance-declined { border-style: dotted; border-color: var(--mute); color: var(--mute); }
 .stance-none .stance-mark, .stance-cell.stance-none { border-color: transparent; background: transparent; }
-.positions-scroll-hint { display: none; font-size: .9rem; color: var(--mute); }
 /* Positioned so the visually hidden column titles stay inside the scroll frame instead of widening the phone viewport. */
 .positions-table-wrap { position: relative; overflow-x: auto; margin-block: 1rem 1.5rem; border: 1px solid var(--rule); border-radius: 4px; background: var(--card); }
 .positions-table-wrap:focus-visible { outline: 2px solid var(--seal); outline-offset: 2px; }
@@ -880,19 +935,25 @@ a.stance-cell:hover, a.stance-cell:focus-visible { box-shadow: 0 0 0 3px var(--r
 .positions-quiet ul { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: .5rem; }
 .positions-quiet li { list-style: none; margin: 0; padding: .4rem .65rem; border: 1px dashed var(--rule); border-radius: 4px; scroll-margin-block-start: 5rem; }
 .positions-quiet li:target { border-color: var(--seal); border-style: solid; }
-.positions-other { margin-block: 2.75rem 1.5rem; }
-.positions-other > h2 { margin-block-end: .4rem; }
-.positions-other-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 22rem), 1fr)); gap: 1rem; align-items: start; }
 .positions-other-card { margin: 0; padding: 1rem 1.1rem; border: 1px solid var(--rule); border-radius: .5rem; background: var(--card); box-shadow: none; }
 .positions-other-card h3 { margin: 0 0 .75rem; font-size: 1rem; }
 .positions-other-card ul { list-style: none; padding: 0; margin: 0; display: grid; gap: .85rem; }
 .positions-other-card li { list-style: none; margin: 0; padding-block-start: .85rem; border-block-start: 1px solid var(--rule); }
 .positions-other-card li:first-child { padding-block-start: 0; border-block-start: 0; }
 .positions-other-card .position-summary { margin-block-start: 0; }
+/* A phone reads the same data as folding sections; the grid only earns its place with room for all ten columns. */
 @media (max-width: 47.99rem) {
-  .positions-guide { grid-template-columns: minmax(0, 1fr); }
-  .positions-scroll-hint { display: block; }
-  .positions-table tbody th, .positions-table thead th:first-child { min-inline-size: 8rem; padding-inline: .6rem; }
+  .positions-table-wrap { display: none; }
+  .positions-cta { padding: 1.1rem 1rem 1.2rem; }
+  .positions-cta-strip { display: none; }
+  .positions-intro { margin-block-end: .75rem; }
+  .positions-intro .lede { font-size: 1rem; }
+  .positions-switch { margin-block-start: .5rem; }
+  .positions-legend ul { gap: .3rem .7rem; }
+  .positions-cta-button { inline-size: 100%; }
+  .positions-switch { inline-size: 100%; }
+  .positions-switch a { flex: 1 1 0; padding-inline: .5rem; }
+  .position-item { padding: .9rem; }
 }
 
 .public-site footer.wrap { display: flex; flex-wrap: wrap; gap: .5rem 1rem; }

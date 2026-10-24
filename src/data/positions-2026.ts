@@ -6,7 +6,7 @@ import { assertPositionsDataset, type PositionSource, type PositionsDataset, typ
  * 26th Knesset election. Every entry was read at its source; summaries are paraphrases, not quotes.
  * A stance compares the statement with the standard's commitment as written; it is not a score.
  *
- * Coverage: statements were collected for the 14 tracked lists. The other 23 approved lists were not reviewed.
+ * Coverage: statements were collected for the 15 tracked lists. The other 22 approved lists were not reviewed.
  * Non-Hebrew text is machine-translated and pending human review (docs/TRANSLATION-REVIEW.md).
  */
 
@@ -39,7 +39,11 @@ const src = {
   beytenuPlatform: accessed("Yisrael Beiteinu", "https://beytenu.org.il/party-platform/"),
   beyahadPlans: accessed("Beyachad", "https://be-yahad.org.il/plans/?bennett_plans_cat=198"),
   democratsSite: accessed("The Democrats", "https://yes.democrats.org.il/"),
-  israelFirstPlan: accessed("Israel First", "https://israelfirst.co.il/work-plan/")
+  israelFirstPlan: accessed("Israel First", "https://israelfirst.co.il/work-plan/"),
+  ynetElectionDate: accessed("Ynet", "https://www.ynet.co.il/news/article/bj4s2gwnfx"),
+  haaretzZini: published("Haaretz", "https://www.haaretz.co.il/news/elections/2026-07-12/ty-article/.highlight/0000019f-52b3-de66-a5bf-53f3aa070000", "2026-07-12"),
+  kikarNoam: published("Kikar HaShabbat", "https://www.kikar.co.il/israel-news/tjpzrq", "2026-08-13"),
+  makoGolan100: accessed("N12", "https://www.mako.co.il/news-israel-elections/2026/Article-53c6ffa50321f91027.htm")
 };
 
 const kisch: PositionSpeaker = {
@@ -84,7 +88,8 @@ export const positions2026: PositionsDataset = {
     "raam",
     "joint-list",
     "reservists-economy",
-    "israel-first"
+    "israel-first",
+    "noam"
   ],
 
   context: [
@@ -92,15 +97,15 @@ export const positions2026: PositionsDataset = {
       id: "ctx-election-date",
       question: "elections-on-time",
       summary: L({
-        he: "לא מצאנו הצעת חוק להארכת כהונת הכנסת ה-25. הכנסת קידמה את פיזורה (קריאה ראשונה 106–0, 2.6.2026), והבחירות מתקיימות במועד האחרון שקובע החוק, 27.10.2026.",
-        ar: "لم نجد أي مشروع قانون لتمديد ولاية الكنيست الـ25. دفع الكنيست بقانون حلّه (القراءة الأولى 106–0، 2.6.2026)، وتُجرى الانتخابات في آخر موعد يحدده القانون، 27.10.2026.",
-        yi: "מיר האָבן ניט געפֿונען קיין געזעץ־פֿאָרשלאָג צו פֿאַרלענגערן די קאַדענץ פֿון דער 25סטער כנסת. די כנסת האָט פֿאָרגעטריבן איר אייגענע צעלאָזונג (ערשטע לייענונג 106–0, 2.6.2026), און די וואַלן פֿאַלן אויף דעם לעצטן דאַטום וואָס דאָס געזעץ דערלויבט, 27.10.2026.",
-        ru: "Мы не нашли законопроекта о продлении полномочий Кнессета 25-го созыва. Кнессет продвинул закон о самороспуске (первое чтение 106–0, 2.6.2026), а выборы проходят в последний допустимый законом день — 27.10.2026.",
-        uk: "Ми не знайшли законопроєкту про продовження повноважень Кнесету 25-го скликання. Кнесет просунув закон про саморозпуск (перше читання 106–0, 2.6.2026), а вибори відбуваються в останній дозволений законом день — 27.10.2026.",
-        en: "We found no bill to extend the 25th Knesset's term. The Knesset advanced its own dissolution (first reading 106–0, 2.6.2026), and the vote is held on the latest statutory date, 27.10.2026.",
-        am: "የ25ኛውን ክኔሴት የሥልጣን ዘመን የሚያራዝም ረቂቅ ሕግ አላገኘንም። ክኔሴቱ ራሱን የሚበትን ረቂቅ አራምዷል (የመጀመሪያ ንባብ 106–0፣ 2.6.2026)፣ ምርጫውም ሕጉ በሚፈቅደው የመጨረሻ ቀን 27.10.2026 ይካሄዳል።"
+        he: "לא מצאנו הצעת חוק להארכת כהונת הכנסת ה-25. ועדת הכנסת קבעה את פיזור הכנסת ל-17.7.2026, והבחירות מתקיימות במועדן המקורי, 27.10.2026 — לראשונה מאז 1988. הצעת חוק הפיזור עברה בקריאה ראשונה ב-106–0 (2.6.2026).",
+        ar: "لم نجد أي مشروع قانون لتمديد ولاية الكنيست الـ25. حدّدت لجنة الكنيست حلّه في 17.7.2026، وتُجرى الانتخابات في موعدها الأصلي، 27.10.2026 — لأول مرة منذ 1988. وأُقرّ مشروع قانون الحل بالقراءة الأولى 106–0 (2.6.2026).",
+        yi: "מיר האָבן ניט געפֿונען קיין געזעץ־פֿאָרשלאָג צו פֿאַרלענגערן די קאַדענץ פֿון דער 25סטער כנסת. די כנסת־קאָמיסיע האָט באַשטימט די צעלאָזונג אויפֿן 17.7.2026, און די וואַלן פֿאַלן אויף זייער אָריגינעלן דאַטום, 27.10.2026 — צום ערשטן מאָל זינט 1988. דער צעלאָזונג־פֿאָרשלאָג איז דורכגעגאַנגען ערשטע לייענונג 106–0 (2.6.2026).",
+        ru: "Мы не нашли законопроекта о продлении полномочий Кнессета 25-го созыва. Комиссия Кнессета назначила роспуск на 17.7.2026, а выборы проходят в изначальный срок — 27.10.2026, впервые с 1988 года. Законопроект о роспуске прошёл первое чтение 106–0 (2.6.2026).",
+        uk: "Ми не знайшли законопроєкту про продовження повноважень Кнесету 25-го скликання. Комісія Кнесету призначила розпуск на 17.7.2026, а вибори відбуваються в первісний строк — 27.10.2026, уперше з 1988 року. Законопроєкт про розпуск пройшов перше читання 106–0 (2.6.2026).",
+        en: "We found no bill to extend the 25th Knesset's term. The Knesset Committee set dissolution for 17.7.2026, and the election is held on its original date, 27.10.2026, for the first time since 1988. The dissolution bill passed first reading 106–0 (2.6.2026).",
+        am: "የ25ኛውን ክኔሴት የሥልጣን ዘመን የሚያራዝም ረቂቅ ሕግ አላገኘንም። የክኔሴቱ ኮሚቴ መበተኑን ለ17.7.2026 ወስኗል፤ ምርጫውም ከ1988 ወዲህ ለመጀመሪያ ጊዜ በመጀመሪያ ቀኑ 27.10.2026 ይካሄዳል። የመበተኛ ረቂቁ የመጀመሪያ ንባብን በ106–0 አልፏል (2.6.2026)።"
       }),
-      sources: [src.toiDissolution]
+      sources: [src.ynetElectionDate, src.toiDissolution]
     },
     {
       id: "ctx-results",
@@ -454,6 +459,24 @@ export const positions2026: PositionsDataset = {
       sources: [src.markerHendel]
     },
 
+    {
+      id: "pos-noam-coalition",
+      partyId: "noam",
+      question: "coalition-choices",
+      stance: "statement_available",
+      speaker: "list",
+      summary: L({
+        he: "מתחייבת לדרוש שחקיקת פסקת ההתגברות תעבור עוד לפני השבעת הממשלה הבאה, כתנאי מקדים ולא כהבטחה לעתיד.",
+        ar: "تتعهد بأن تشترط إقرار فقرة التغلب قبل أداء الحكومة المقبلة اليمين، شرطًا مسبقًا لا وعدًا مؤجلًا.",
+        yi: "זאָגט צו צו פֿאָדערן אַז דאָס געזעץ פֿון דער פּסקת התגברות זאָל דורכגיין נאָך פֿאַר דער באַשווערונג פֿון דער קומענדיקער רעגירונג, ווי אַ פֿאָרויס־תּנאַי און ניט קיין צוזאָג אויף שפּעטער.",
+        ru: "Обязуется требовать принятия «преодолевающей оговорки» ещё до присяги следующего правительства — как предварительного условия, а не обещания на будущее.",
+        uk: "Зобов’язується вимагати ухвалення «положення про подолання» ще до присяги наступного уряду — як попередньої умови, а не обіцянки на майбутнє.",
+        en: "Commits to requiring that an override clause is legislated before the next government is sworn in, as a precondition rather than a later promise.",
+        am: "የመሻሪያ አንቀጹ የሚቀጥለው መንግሥት ከመማሉ በፊት እንዲጸድቅ፣ ለወደፊት ቃል ሳይሆን ቅድመ ሁኔታ አድርጎ ለመጠየቅ ቃል ገብቷል።"
+      }),
+      sources: [src.kikarNoam]
+    },
+
     // 5 — size of the government
     {
       id: "pos-yashar-size",
@@ -524,6 +547,24 @@ export const positions2026: PositionsDataset = {
         am: "ዕቅዶቹ ከአዲሱ መንግሥት የመጀመሪያ ቀን ጀምሮ ለትግበራ ዝግጁ ናቸው ይላል፤ የ100 ቀናት የጊዜ ሰሌዳ አልታተመም።"
       }),
       sources: [src.beyahadPlans]
+    },
+
+    {
+      id: "pos-dem-100",
+      partyId: "the-democrats",
+      question: "first-100-days",
+      stance: "supports_with_reservations",
+      speaker: "leader",
+      summary: L({
+        he: "פרסם תוכנית מדינית-ביטחונית ל-100 הימים הראשונים בממשלה הבאה: עזה, יהודה ושומרון, לבנון ואיראן. אין בה מועדים, גורמים אחראים או תקציב לכל צעד.",
+        ar: "نشر خطة سياسية-أمنية للمئة يوم الأولى في الحكومة المقبلة: غزة والضفة الغربية ولبنان وإيران. لا تتضمن مواعيد أو جهات مسؤولة أو ميزانية لكل خطوة.",
+        yi: "האָט פֿאַרעפֿנטלעכט אַ מדיניש־זיכערהייט־פּלאַן פֿאַר די ערשטע 100 טעג פֿון דער קומענדיקער רעגירונג: עזה, יהודה און שומרון, לבנון און איראַן. ער האָט ניט קיין טערמינען, פֿאַראַנטוואָרטלעכע גופֿים אָדער בודזשעט פֿאַר יעדן שריט.",
+        ru: "Опубликовал политико-оборонный план на первые 100 дней следующего правительства: Газа, Иудея и Самария, Ливан и Иран. Сроков, ответственных органов и бюджета по шагам в нём нет.",
+        uk: "Оприлюднив політико-оборонний план на перші 100 днів наступного уряду: Газа, Юдея і Самарія, Ліван та Іран. Строків, відповідальних органів і бюджету за кроками в ньому немає.",
+        en: "Published a diplomatic and security plan for the next government's first 100 days: Gaza, the West Bank, Lebanon and Iran. It gives no deadlines, responsible bodies or budget per step.",
+        am: "ለሚቀጥለው መንግሥት የመጀመሪያ 100 ቀናት የዲፕሎማሲና የደህንነት ዕቅድ አውጥቷል፦ ጋዛ፣ ዌስት ባንክ፣ ሊባኖስ እና ኢራን። ለእያንዳንዱ እርምጃ የጊዜ ገደብ፣ ኃላፊ አካል ወይም በጀት የለውም።"
+      }),
+      sources: [src.makoGolan100]
     },
 
     // 8 — state commission of inquiry into 7 October
@@ -726,15 +767,15 @@ export const positions2026: PositionsDataset = {
       stance: "statement_available",
       speaker: "leader",
       summary: L({
-        he: "הוצאת בן גביר מתפקיד השר והקמה מחדש של קבינט המלחמה בפשיעה שבנט הקים כראש ממשלה.",
-        ar: "إقالة بن غفير من الوزارة وإعادة تشكيل المجلس الوزاري لمكافحة الجريمة الذي أنشأه بينيت حين كان رئيسًا للحكومة.",
-        yi: "אַראָפּנעמען בן גביר פֿון זײַן מיניסטער־פּאָסטן און ווידער אויפֿשטעלן דעם קאַבינעט קעגן קרימינאַליטעט וואָס בנט האָט געגרינדעט ווי פּרעמיער.",
-        ru: "Снять Бен-Гвира с поста министра и восстановить кабинет по борьбе с преступностью, созданный Беннетом на посту премьера.",
-        uk: "Звільнити Бен-Ґвіра з посади міністра й відновити кабінет боротьби зі злочинністю, створений Беннетом на посаді прем’єра.",
-        en: "Remove Ben Gvir as minister and re-establish the cabinet against crime that Bennett set up as prime minister.",
-        am: "ቤን ግቪርን ከሚኒስትርነት ማንሳት እና ቤኔት ጠቅላይ ሚኒስትር በነበረበት ወቅት ያቋቋመውን የወንጀል መከላከያ ካቢኔ እንደገና ማቋቋም።"
+        he: "הוצאת בן גביר מתפקיד השר והקמה מחדש של קבינט המלחמה בפשיעה. ביולי 2026 כתב בנט שמשרת ציבור שמפר את חובת האמונים ומנצל את תפקידו פוליטית \"יודח באופן מיידי\".",
+        ar: "إقالة بن غفير من الوزارة وإعادة تشكيل المجلس الوزاري لمكافحة الجريمة. في تموز/يوليو 2026 كتب بينيت أن أي موظف عام يخلّ بواجب الولاء ويستغل منصبه سياسيًا «سيُقال فورًا».",
+        yi: "אַראָפּנעמען בן גביר פֿון זײַן מיניסטער־פּאָסטן און ווידער אויפֿשטעלן דעם קאַבינעט קעגן קרימינאַליטעט. אין יולי 2026 האָט בנט געשריבן אַז אַ ציבור־באַאַמטער וואָס ברעכט זײַן געטרײַשאַפֿט און נוצט זײַן אַמט פּאָליטיש \"וועט גלײַך אָפּגעזאָגט ווערן\".",
+        ru: "Снять Бен-Гвира с поста министра и восстановить кабинет по борьбе с преступностью. В июле 2026 года Беннет написал, что госслужащий, нарушивший долг верности и использующий должность в политических целях, «будет немедленно уволен».",
+        uk: "Звільнити Бен-Ґвіра з посади міністра й відновити кабінет боротьби зі злочинністю. У липні 2026 року Беннет написав, що державного службовця, який порушить обов’язок вірності й використовуватиме посаду в політичних цілях, «буде негайно звільнено».",
+        en: "Remove Ben Gvir as minister and re-establish the cabinet against crime. In July 2026 Bennett wrote that any public servant who breaches the duty of loyalty and uses the role politically 'will be dismissed immediately'.",
+        am: "ቤን ግቪርን ከሚኒስትርነት ማንሳት እና የወንጀል መከላከያ ካቢኔን እንደገና ማቋቋም። በሐምሌ 2026 ቤኔት የታማኝነት ግዴታውን የጣሰና ሥልጣኑን ለፖለቲካ የተጠቀመ የሕዝብ አገልጋይ 'ወዲያውኑ ይባረራል' ሲል ጽፏል።"
       }),
-      sources: [src.ynetPolice]
+      sources: [src.ynetPolice, src.haaretzZini]
     },
     {
       id: "pos-yb-security",
@@ -786,6 +827,24 @@ export const positions2026: PositionsDataset = {
         am: "ፖሊስን 'በተቻለ መጠን ከፖለቲካ የራቀ' ማድረግ እና ለፖሊሶች ድጋፍ መስጠት።"
       }),
       sources: [src.ynetPolice]
+    },
+
+    {
+      id: "pos-noam-security",
+      partyId: "noam",
+      question: "professional-security-services",
+      stance: "statement_available",
+      speaker: "list",
+      summary: L({
+        he: "מבקשת לשנות את אופן מינוי השופטים והבכירים כך שלנבחרי הציבור יהיה משקל מכריע במינויים.",
+        ar: "تريد تغيير طريقة تعيين القضاة وكبار المسؤولين بحيث يكون للمنتخَبين وزن حاسم في التعيينات.",
+        yi: "וויל ענדערן ווי מע באַשטימט ריכטער און הויכע באַאַמטע, אַזוי אַז די געוויילטע זאָלן האָבן אַן אויספֿירנדיקע וואָג אין די באַשטימונגען.",
+        ru: "Хочет изменить порядок назначения судей и высокопоставленных чиновников, чтобы решающий вес в назначениях был у избранных политиков.",
+        uk: "Хоче змінити порядок призначення суддів і високопосадовців, щоб вирішальна вага в призначеннях була в обраних політиків.",
+        en: "Wants to change how judges and senior officials are appointed so that elected officials have the decisive weight.",
+        am: "የዳኞችና የከፍተኛ ባለሥልጣናት አሿሿም እንዲቀየርና በሹመቶች ውስጥ ወሳኙ ክብደት ለተመረጡ ባለሥልጣናት እንዲሆን ትፈልጋለች።"
+      }),
+      sources: [src.kikarNoam]
     },
 
     // 10 — publishing coalition and budget commitments
@@ -1108,7 +1167,22 @@ export const positions2026: PositionsDataset = {
         am: "ከፍተኛው ፍርድ ቤት ሕግን የሻረበትን ውሳኔ መሻር ከ72 በላይ የክኔሴት አባላት ሲኖሩ ብቻ፤ የምክንያታዊነት መሥፈርትን ማጥበብ እንጂ ማስቀረት አይደለም።"
       }),
       sources: [src.ynetJudiciary]
-    }
+    },
+    {
+      id: "oth-noam-ag",
+      partyId: "noam",
+      speaker: "list",
+      summary: L({
+        he: "פיצול תפקיד היועמ\"ש וצמצומו.",
+        ar: "فصل منصب المستشار القضائي للحكومة وتقليصه.",
+        yi: "צעטיילן און פֿאַרקלענערן דעם יועמ\"ש־אַמט.",
+        ru: "Разделить и сузить должность юридического советника правительства.",
+        uk: "Розділити й звузити посаду юридичного радника уряду.",
+        en: "Split the attorney general's role and narrow it.",
+        am: "የጠቅላይ ዐቃቤ ሕጉን ሚና መከፋፈልና ማጥበብ።"
+      }),
+      sources: [src.kikarNoam]
+    },
   ]
 };
 
