@@ -20,8 +20,8 @@
     "elections": "npm run build && node --env-file-if-exists=.env dist/scripts/elections.js"
   },
   "dependencies": {
-    "@hono/node-server": "1.19.14",
-    "hono": "4.12.29",
+    "@hono/node-server": "1.19.17",
+    "hono": "4.13.13",
     "jose": "6.2.3",
     "marked": "17.0.1"
   },

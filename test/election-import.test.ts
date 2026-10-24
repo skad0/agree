@@ -4,7 +4,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { openDatabase } from "../src/db.js";
-import { activatePublication, importCandidateSource, parseCandidateSource } from "../src/integrations/elections/import.js";
+import { activatePublication, importCandidateSource, nameTextProblem, parseCandidateSource } from "../src/integrations/elections/import.js";
+import { diffTranscripts, renderTranscriptDiff } from "../src/integrations/elections/diff.js";
 import { directoryElectionState, listNamedRecipients } from "../src/recipients.js";
 
 import { candidateLists, candidateRows, candidatePublication } from "../src/candidates.js";
@@ -158,9 +159,135 @@ test("the shipped 26th Knesset transcript parses and matches its own published c
   const raw = readFileSync(join(process.cwd(), "data/elections/knesset-26-lists.json"), "utf8");
   const source = parseCandidateSource(JSON.parse(raw));
   assert.equal(source.electionNumber, 26);
-  assert.equal(source.source.approvalState, "submitted_not_approved");
+  assert.equal(source.source.approvalState, "approved");
+  assert.equal(source.source.approvalEvidenceUrl, "https://www.gov.il/he/pages/candidates-lists-26");
   assert.equal(source.lists.length, 38);
-  assert.equal(source.lists.filter((list) => list.rosterPublished).length, 38);
-  assert.equal(source.rows.length, 1379);
-  assert.ok(source.rows.every((row) => row.fullNameHe.trim().length > 1));
+  assert.equal(source.lists.filter((list) => list.running).length, 37);
+  assert.equal(source.lists.filter((list) => list.rosterPublished).length, 37);
+  const withdrawn = source.lists.filter((list) => !list.running);
+  assert.deepEqual(withdrawn.map((list) => list.officialListKey), ["kachol-lavan_list30"]);
+  assert.equal(withdrawn[0]!.withdrawnEvidenceUrl, "https://www.gov.il/he/pages/kachol-lavan_list30");
+  assert.equal(source.rows.length, 1322);
+  assert.equal(new Set(source.lists.map((list) => list.ballotLetters)).size, 38);
+  assert.ok(source.rows.every((row) => nameTextProblem(row.fullNameHe) === null));
+  assert.ok(source.lists.every((list) => list.pageUpdated && /^2026-\d{2}-\d{2}$/.test(list.pageUpdated)));
+});
+
+test("transcript-3 keeps a withdrawn list apart from a list without a roster", () => {
+  const withdrawn = clone(transcript) as any;
+  withdrawn.lists.push({ officialListKey: "list-w", listTitleHe: "רשימה שפרשה", ballotLetters: "כן", submittedByHe: null,
+    rosterPublished: false, running: false, withdrawnEvidenceUrl: "https://www.gov.il/he/pages/list-w", pagePublished: "08.09.2026", pageUpdated: "21.10.2026" });
+  const parsed = parseCandidateSource(withdrawn);
+  const list = parsed.lists.find((entry) => entry.officialListKey === "list-w")!;
+  assert.equal(list.running, false);
+  assert.equal(list.pagePublished, "2026-09-08");
+  assert.equal(list.pageUpdated, "2026-10-21");
+  assert.equal(parsed.lists[0]!.running, true, "a transcript-2 list without the field is running");
+
+  const noEvidence = clone(withdrawn);
+  noEvidence.lists[2].withdrawnEvidenceUrl = null;
+  assert.throws(() => parseCandidateSource(noEvidence), /without withdrawnEvidenceUrl/);
+  const unofficialEvidence = clone(withdrawn);
+  unofficialEvidence.lists[2].withdrawnEvidenceUrl = "https://example.org/resigned";
+  assert.throws(() => parseCandidateSource(unofficialEvidence), /official HTTPS/);
+  const withRows = clone(withdrawn);
+  withRows.rows.push({ officialListKey: "list-w", rank: 1, fullNameHe: "גנץ בנימין", viaPartyHe: null, cityPublished: null, status: "listed" });
+  assert.throws(() => parseCandidateSource(withRows), /not running but carries a roster/);
+  const runningWithEvidence = clone(transcript) as any;
+  runningWithEvidence.lists[0].withdrawnEvidenceUrl = "https://www.gov.il/he/pages/list-a";
+  assert.throws(() => parseCandidateSource(runningWithEvidence), /running but has withdrawnEvidenceUrl/);
+  const badDate = clone(withdrawn);
+  badDate.lists[2].pageUpdated = "31.02.2026";
+  assert.throws(() => parseCandidateSource(badDate), /must be a date/);
+  const urls = clone(transcript) as any;
+  urls.lists[0].sourceUrl = "https://www.gov.il/he/pages/list-a";
+  urls.lists[0].pageUrl = "https://www.gov.il/he/pages/list-b";
+  assert.throws(() => parseCandidateSource(urls), /sourceUrl and pageUrl disagree/);
+  delete urls.lists[0].sourceUrl;
+  assert.equal(parseCandidateSource(urls).lists[0]!.sourceUrl, "https://www.gov.il/he/pages/list-b");
+
+  withDb((db) => {
+    const result = importCandidateSource(db, parsed, JSON.stringify(withdrawn));
+    assert.ok(result.ok); if (!result.ok) return;
+    assert.equal(result.listsWithoutRoster, 1, "only the running list without a roster counts as missing");
+    const row = db.prepare("SELECT running, withdrawn_evidence_url AS evidence, page_updated AS updated FROM electoral_list_versions WHERE official_list_key='list-w'").get() as { running: number; evidence: string; updated: string };
+    assert.deepEqual({ ...row }, { running: 0, evidence: "https://www.gov.il/he/pages/list-w", updated: "2026-10-21" });
+    assert.equal(activatePublication(db, result.publicationId).ok, true);
+    const state = directoryElectionState(db);
+    assert.equal(state.kind, "submitted");
+    if (state.kind === "submitted") assert.equal(state.listsWithoutRoster, 1);
+    assert.equal(candidateLists(db, candidatePublication(db)!.snapshotId).find((entry) => entry.title === "רשימה שפרשה")?.running, 0);
+  });
+});
+
+test("approved transcripts need final, unique ballot letters", () => {
+  const approved = clone(transcript) as any;
+  approved.source.approvalState = "approved";
+  approved.source.approvalEvidenceUrl = "https://www.gov.il/he/pages/candidates-lists-26";
+  assert.ok(parseCandidateSource(approved));
+  const duplicate = clone(approved);
+  duplicate.lists[1].ballotLetters = "אמת";
+  assert.throws(() => parseCandidateSource(duplicate), /must be unique/);
+  const missing = clone(approved);
+  missing.lists[1].ballotLetters = null;
+  assert.throws(() => parseCandidateSource(missing), /must all carry ballot letters/);
+  const submitted = clone(transcript) as any;
+  submitted.lists[1].ballotLetters = "אמת";
+  assert.ok(parseCandidateSource(submitted), "submitted letters may still collide");
+});
+
+test("damaged name text and disagreeing row labels are refused, not repaired", () => {
+  for (const [name, problem] of [
+    ["גרוסמן ידידיה-", /punctuation/],
+    ["אלקרינאוי ,טלאל", /space before a comma/],
+    ["בר -שלום יוסף", /one side only/],
+    ["כהן  ישראל", /repeated whitespace/],
+    ["Cohen ישראל", /Latin/],
+    ["כהן", /single token/]
+  ] as const) {
+    const damaged = clone(transcript);
+    damaged.rows[0]!.fullNameHe = name;
+    assert.throws(() => parseCandidateSource(damaged), problem, name);
+  }
+  for (const name of ["אלקרינאוי, טלאל", "בר - שלום יוסף", "גרוסמן ידידיה-חיים", "חאג' יחיא מטאנע"]) assert.equal(nameTextProblem(name), null, name);
+
+  const reflowed = clone(transcript) as any;
+  reflowed.lists[0].submittedByHe = "מטעם מפלגת יש עתיד -בראשות יאיר לפיד";
+  assert.throws(() => parseCandidateSource(reflowed), /submittedByHe looks damaged/);
+  reflowed.lists[0].submittedByHe = "מטעם מפלגת יש עתיד - בראשות יאיר לפיד";
+  assert.ok(parseCandidateSource(reflowed));
+  reflowed.lists[0].listTitleHe = "הליכוד ,תנועה לאומית";
+  assert.throws(() => parseCandidateSource(reflowed), /listTitleHe looks damaged/);
+
+  const labelled = clone(transcript) as any;
+  labelled.rows[0].listTitleHe = "רשימה א";
+  labelled.rows[0].ballotLetters = "אמת";
+  assert.ok(parseCandidateSource(labelled));
+  labelled.rows[0].listTitleHe = "רשימה אחרת";
+  assert.throws(() => parseCandidateSource(labelled), /listTitleHe disagrees/);
+});
+
+test("transcript diff classifies truncation, punctuation, spelling, removal and list changes", () => {
+  const before = clone(transcript) as any;
+  before.rows.push(
+    { officialListKey: "list-a", rank: 3, fullNameHe: "גרוסמן ידידיה-חיים", viaPartyHe: null, cityPublished: null, status: "listed" },
+    { officialListKey: "list-a", rank: 4, fullNameHe: "מזלתרים מאיר", viaPartyHe: null, cityPublished: null, status: "listed" },
+    { officialListKey: "list-a", rank: 5, fullNameHe: "יוגב מוטי", viaPartyHe: null, cityPublished: null, status: "listed" }
+  );
+  const after = clone(before);
+  after.lists[0].ballotLetters = "א";
+  after.rows = [
+    after.rows[0],
+    { ...after.rows[2], rank: 2, fullNameHe: "גרוסמן ידידיה-" },
+    { ...after.rows[3], rank: 3, fullNameHe: "מזל תרים מאיר" },
+    { ...after.rows[4], rank: 4, fullNameHe: "יוגב מטי" }
+  ];
+  const diff = diffTranscripts(before, after);
+  const kinds = Object.fromEntries(diff.names.map((change) => [change.oldName ?? change.newName, change.kind]));
+  assert.deepEqual(kinds, { "גרוסמן ידידיה-חיים": "truncated", "מזלתרים מאיר": "punctuation", "יוגב מוטי": "spelling", "השכל שרן מרים": "removed" });
+  assert.equal(diff.lists.length, 1);
+  assert.equal(diff.lists[0]!.oldLetters, "אמת");
+  const rendered = renderTranscriptDiff(diff);
+  assert.match(rendered, /Rows: 5 → 4\./);
+  assert.match(rendered, /truncated 1, punctuation 1, spelling 1, removed 1, added 0/);
 });

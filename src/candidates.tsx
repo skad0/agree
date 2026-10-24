@@ -12,9 +12,9 @@ export function candidatePublication(db: Db, electionNumber=26): CandidatePublic
     JOIN election_snapshot_metadata m ON m.snapshot_id=p.snapshot_id AND m.election_id=e.id
     JOIN source_snapshots s ON s.id=p.snapshot_id WHERE p.status='active' AND e.number=?`).get(electionNumber) as CandidatePublication | undefined;
 }
-type List = {id:number;title:string;letters:string|null;roster:number;sourceUrl:string|null};
+type List = {id:number;title:string;letters:string|null;roster:number;running:number;sourceUrl:string|null};
 export function candidateLists(db: Db,snapshotId:number): List[] {
-  return db.prepare(`SELECT list_id AS id,title_he AS title,ballot_letters AS letters,roster_published AS roster,source_url AS sourceUrl
+  return db.prepare(`SELECT list_id AS id,title_he AS title,ballot_letters AS letters,roster_published AS roster,running,source_url AS sourceUrl
     FROM electoral_list_versions WHERE snapshot_id=? ORDER BY title_he,list_id`).all(snapshotId) as List[];
 }
 export function candidateRows(db: Db,snapshotId:number) {

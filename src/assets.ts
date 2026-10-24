@@ -773,6 +773,8 @@ button.danger:hover { background: var(--caution); color: var(--paper); border-co
 .score-gauge-fill { fill: var(--seal); }
 .score-gauge-fraction { font-size: .82rem; font-weight: 700; color: var(--ink); }
 .scorecard-party-note { display: block; font-size: .78rem; color: var(--mute); font-weight: 400; margin-block-start: .15rem; }
+.scorecard-withdrawn { display: inline-block; margin-block-start: .35rem; padding-inline-start: .5rem; border-inline-start: 3px solid var(--caution); font-size: .82rem; font-weight: 700; color: var(--ink); }
+.scorecard-withdrawn-note { border-inline-start: 3px solid var(--caution); padding-inline-start: .9rem; }
 .scorecard-share { margin-block: 1rem; padding: .85rem 1rem; border: 1px solid var(--rule); border-radius: 4px; background: var(--paper); }
 .scorecard-share h3 { margin: 0 0 .4rem; font-size: 1rem; }
 .scorecard-share-actions { display: flex; flex-wrap: wrap; gap: .5rem; }

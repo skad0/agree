@@ -110,6 +110,8 @@ export function filterParties(dataset: ScorecardDataset, filters: ScorecardFilte
   const terms = normalizeHebrew(filters.q).toLowerCase().split(/\s+/).filter(Boolean);
   return dataset.parties.filter((party) => {
     if (filters.block && party.block !== filters.block) return false;
+    // A withdrawn list stays findable in the full list, but no segment counts it as on the ballot.
+    if (filters.segment !== "all" && party.withdrawn) return false;
     if (filters.segment === "incumbent" && party.parliamentaryStatus !== "INCUMBENT") return false;
     if (filters.segment === "challenger" && party.parliamentaryStatus !== "CHALLENGER") return false;
     if (filters.segment === "high" && complianceMetrics(party).passedCount < 3) return false;
@@ -128,6 +130,7 @@ export function filterParties(dataset: ScorecardDataset, filters: ScorecardFilte
 }
 
 function compareParties(a: PartyCompliance, b: PartyCompliance, sort: ScorecardSort): number {
+  if (Boolean(a.withdrawn) !== Boolean(b.withdrawn)) return a.withdrawn ? 1 : -1;
   const byName = () => a.partyNameHe.localeCompare(b.partyNameHe, "he");
   const byScore = () => {
     const delta = complianceMetrics(b).passedCount - complianceMetrics(a).passedCount;
@@ -212,6 +215,10 @@ export function StatusBadge({
       <span class="score-tip">{tip}</span>
     </a>
   );
+}
+
+function WithdrawnBadge({ locale }: { locale: Locale }) {
+  return <span class="scorecard-withdrawn" lang={locale} dir={dirOf(locale)}>{sc(locale, "withdrawnBadge")}</span>;
 }
 
 function ComplianceGauge({ locale, party }: { locale: Locale; party: PartyCompliance }) {
@@ -341,14 +348,18 @@ export function EvidenceDrawer({
       {party.rosterUrl ? (
         <p><a href={party.rosterUrl} rel="noreferrer">{sc(locale, "evidenceLink")}</a></p>
       ) : null}
-      <div class="scorecard-share">
-        <h3>{sc(locale, "shareCivicId")}</h3>
-        <p lang={locale} dir={dirOf(locale)}>{sentence}</p>
-        <p class="scorecard-share-actions">
-          <a class="primary-action" href={whatsapp} rel="noreferrer">WhatsApp</a>
-          <a href={xShare} rel="noreferrer">X</a>
-        </p>
-      </div>
+      {party.withdrawn ? (
+        <p class="scorecard-withdrawn-note" lang={locale} dir={dirOf(locale)}>{sc(locale, "withdrawnNote")}</p>
+      ) : (
+        <div class="scorecard-share">
+          <h3>{sc(locale, "shareCivicId")}</h3>
+          <p lang={locale} dir={dirOf(locale)}>{sentence}</p>
+          <p class="scorecard-share-actions">
+            <a class="primary-action" href={whatsapp} rel="noreferrer">WhatsApp</a>
+            <a href={xShare} rel="noreferrer">X</a>
+          </p>
+        </div>
+      )}
       {!records.length ? <p role="status">{sc(locale, "noEvidence")}</p> : null}
       <ol class="scorecard-evidence-list">
         {records.map((record) => (
@@ -503,7 +514,7 @@ function parliamentaryLabel(locale: Locale, party: PartyCompliance): string {
 
 function partySearchKey(party: PartyCompliance): string {
   const readings = [party.partyName, party.leaderName].flatMap((row) => Object.values(row));
-  return normalizeHebrew(`${party.partyNameHe} ${party.leaderHe} ${party.searchAliasesHe ?? ""} ${party.ballotNoteHe ?? ""} ${readings.join(" ")}`).toLowerCase();
+  return normalizeHebrew(`${party.partyNameHe} ${party.leaderHe} ${party.ballotLetters} ${party.searchAliasesHe ?? ""} ${party.ballotNoteHe ?? ""} ${readings.join(" ")}`).toLowerCase();
 }
 
 function sharePartyLabel(locale: Locale, party: PartyCompliance): string {
@@ -578,9 +589,9 @@ export function ScorecardTable({
                 <th scope="row">
                   <PoliticalName locale={locale} officialHe={party.partyNameHe} reading={party.partyName} emphasis />
                   <PoliticalName locale={locale} officialHe={party.leaderHe} reading={party.leaderName} />
-                  {party.ballotNoteHe ? <span class="scorecard-party-note">{party.ballotNoteHe}</span> : null}
+                  {party.ballotNoteHe ? <span class="scorecard-party-note" lang="he" dir="rtl">{party.ballotNoteHe}</span> : null}
                   <span class="scorecard-party-block" lang={locale} dir={dirOf(locale)}>{parliamentaryLabel(locale, party)} · {blockLabel(locale, party.block)}</span>
-                  <ComplianceGauge locale={locale} party={party} />
+                  {party.withdrawn ? <WithdrawnBadge locale={locale} /> : <ComplianceGauge locale={locale} party={party} />}
                 </th>
                 {criteria.map((criterion) => {
                   const href = `${path}?${scorecardQuery(filters, { party: party.partyId, evidence: criterion.id })}#evidence`;
@@ -609,7 +620,7 @@ export function ScorecardTable({
               <summary>
                 <PoliticalName locale={locale} officialHe={party.partyNameHe} reading={party.partyName} emphasis />
                 <PoliticalName locale={locale} officialHe={party.leaderHe} reading={party.leaderName} />
-                <ComplianceGauge locale={locale} party={party} />
+                {party.withdrawn ? <WithdrawnBadge locale={locale} /> : <ComplianceGauge locale={locale} party={party} />}
               </summary>
               <p class="scorecard-party-block">{parliamentaryLabel(locale, party)} · {blockLabel(locale, party.block)}</p>
               {party.ballotNoteHe ? <p class="scorecard-party-note" lang="he" dir="rtl">{party.ballotNoteHe}</p> : null}
@@ -663,7 +674,7 @@ export function ScorecardIntro({ locale, children }: { locale: Locale; children?
       <p class="eyebrow">{sc(locale, "nav")}</p>
       <h1>{sc(locale, "title")}</h1>
       <p class="lede">{sc(locale, "lede")}</p>
-      <p class="scorecard-pending">{sc(locale, "listsPending")}</p>
+      <p class="scorecard-pending">{sc(locale, "listsApproved")}</p>
       <ol class="scorecard-steps">
         <li>{sc(locale, "stepSegment")}</li>
         <li>{sc(locale, "stepSearch")}</li>

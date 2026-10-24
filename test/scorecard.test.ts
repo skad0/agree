@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -137,3 +137,66 @@ test("scorecard route returns 200 with localized chrome in every site locale", a
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
+
+type TranscriptList = { officialListKey: string; listTitleHe: string; ballotLetters: string; sourceUrl: string; running: boolean; withdrawnEvidenceUrl: string | null; pageUpdated: string };
+type Transcript = { source: { approvalState: string }; lists: TranscriptList[]; rows: { officialListKey: string; rank: number; fullNameHe: string }[] };
+
+/** Display names that are shorter than the official rank-1 name, with the token they add. */
+const LEADER_NICKNAMES: Record<string, string[]> = { yashar: ["גדי"] };
+
+test("scorecard parties match the approved 26th Knesset transcript", () => {
+  const transcript = JSON.parse(readFileSync(join(process.cwd(), "data/elections/knesset-26-lists.json"), "utf8")) as Transcript;
+  assert.equal(transcript.source.approvalState, "approved");
+  const used = new Map<string, string>();
+  // Geresh and quote marks vary between the roster and common spelling; other punctuation splits words.
+  const tokens = (text: string) => text.replace(/['\u05f3\u05f4"]/g, "").replace(/[,.!()\u2013-]/g, " ").split(/\s+/).filter(Boolean);
+  for (const party of scorecard2026.parties) {
+    const list = transcript.lists.find((row) => row.officialListKey === party.officialListKey);
+    assert.ok(list, `${party.partyId} points at a list in the transcript`);
+    assert.equal(used.get(list.officialListKey), undefined, `${list.officialListKey} is claimed twice`);
+    used.set(list.officialListKey, party.partyId);
+    assert.equal(party.ballotLetters, list.ballotLetters, `${party.partyId} letters`);
+    assert.equal(party.rosterUrl, list.sourceUrl, `${party.partyId} roster URL`);
+    assert.equal(Boolean(party.withdrawn), !list.running, `${party.partyId} running state`);
+    if (party.withdrawn) {
+      assert.equal(party.withdrawn.evidenceUrl, list.withdrawnEvidenceUrl);
+      assert.equal(party.withdrawn.pageUpdated, list.pageUpdated);
+    }
+    const first = transcript.rows.find((row) => row.officialListKey === list.officialListKey && row.rank === 1);
+    const official = new Set([...tokens(list.listTitleHe), ...(first ? tokens(first.fullNameHe) : []), ...(LEADER_NICKNAMES[party.partyId] ?? [])]);
+    for (const token of tokens(party.leaderHe)) assert.ok(official.has(token), `${party.partyId}: leader token ${token} is not in the official title or rank-1 name`);
+  }
+  assert.equal(used.size, transcript.lists.length, "every list in the transcript has a scorecard row");
+});
+
+test("a withdrawn list stays findable but is not scored, segmented or shared as on the ballot", async () => {
+  const blueWhite = scorecard2026.parties.find((party) => party.partyId === "blue-white")!;
+  assert.ok(blueWhite.withdrawn);
+  const all = filterParties(scorecard2026, parseScorecardFilters({}).filters);
+  assert.equal(all.at(-1)?.partyId, "blue-white", "sorted after every running list");
+  for (const segment of ["incumbent", "challenger", "high"]) {
+    assert.ok(!filterParties(scorecard2026, parseScorecardFilters({ segment }).filters).some((party) => party.withdrawn), segment);
+  }
+  assert.deepEqual(filterParties(scorecard2026, parseScorecardFilters({ q: "גנץ" }).filters).map((party) => party.partyId), ["blue-white"]);
+  assert.deepEqual(filterParties(scorecard2026, parseScorecardFilters({ q: "מחל" }).filters).map((party) => party.partyId), ["likud"], "ballot letters are searchable");
+
+  const dir = mkdtempSync(join(tmpdir(), "agree-scorecard-withdrawn-"));
+  const { app, close } = createApp({ sqlitePath: join(dir, "app.db") });
+  try {
+    const page = await (await app.request("/en/scorecard")).text();
+    assert.match(page, /Lists as approved by the Central Elections Committee on 27\.9\.2026\./);
+    assert.doesNotMatch(page, /not yet (approved|published)/);
+    assert.match(page, /class="scorecard-withdrawn"[^>]*>Withdrew — not on the ballot</);
+    const drawer = await (await app.request("/en/scorecard?party=blue-white&evidence=equal-service")).text();
+    assert.match(drawer, /class="scorecard-withdrawn-note"/);
+    assert.doesNotMatch(drawer, /class="scorecard-share"/);
+    const running = await (await app.request("/en/scorecard?party=likud&evidence=equal-service")).text();
+    assert.match(running, /class="scorecard-share"/);
+    const challenger = await (await app.request("/en/scorecard?party=pirates&evidence=equal-service")).text();
+    assert.match(challenger, /as approved by the committee plenum on 27\.9\.2026/);
+    assert.match(challenger, /The list was approved by the Central Elections Committee \(committee plenum, 27\.9\.2026\)/);
+  } finally {
+    close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

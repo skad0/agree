@@ -1,24 +1,83 @@
-# Project Status — Civic Platform (agree)
+# Project Status — Common Bar · רף משותף (agree)
 
-_Last updated: 2026-07-31 (+03)_
+_Last updated: 2026-10-24 (+03), after the post-approval candidate data update ([plan](docs/CANDIDATE_DATA_UPDATE_PLAN.md), [refresh report](docs/CANDIDATE_REFRESH_2026-10-24.md))._
 
 ## Current state
 
-The Hono/TypeScript MVP is implemented in the working tree with server-rendered Hono JSX/native forms, Pico CSS, SQLite WAL, six locales, Render configuration, tests, and operational documentation. It starts without third-party configuration at the application layer; admin fails closed and credential-dependent actions degrade as documented.
+A server-rendered Hono JSX / SQLite WAL site in seven locales (he, ar, yi, ru, en, am, uk). It is implemented and passing all checks locally and in CI. It is **not deployed**: no deploy is recorded in the repository, and the production domain `rafmeshutaf.org.il` could not be reached from this review session.
 
-Verified in the working tree: `npm test` 33/33, `npm run typecheck` clean, and both smoke suites pass; keyless startup serves the public pages and returns `/admin` 403.
+The public product is now **share-first**: the earlier write-to-your-representative ("action-first") flow is retired.
 
-## Implemented
+- **Problems (the index, `/:locale`)**: ten problem cards with stable `/:locale/issues/:slug` pages. Sharing goes to WhatsApp, Facebook, Telegram, X, the native share menu, or copy. Sharing writes nothing and keeps no counters.
+- **Scorecard (`/:locale/scorecard`)**: "Shared Threshold" civic matrix for the 26th Knesset election. It has 5 criteria (equal service, core curriculum, budget integrity, judicial independence, term limits) and 12 evidence records on official hosts. It covers the 38 lists the Central Elections Committee (CEC) approved on 27.9.2026, in every locale. Blue and White is marked as withdrawn: every candidate resigned, so it is not on the ballot. It stays searchable with its 25th-Knesset record but is not scored, segmented or shared. Incumbent scores rest on 25th-Knesset votes and agreements. New lists stay "uncommitted" rather than failing. Party and leader names stay in Hebrew, with a localized reading next to each. A test checks each party's list key, approved ballot letters, roster URL, running state and leader name against the shipped transcript.
+- **About**, plus supporting documents in the footer: standard, coalition agreement, first 100 days, government model, methodology, privacy, and the appearance switcher.
+- Header is **Problems · Scorecard · About**, with Problems marked as the index. `/:locale/candidates` now redirects (302) to the index. The public candidate directory was retired on 2026-09-25.
+- Retired and paused flows: all nine old appeal POST routes return 410. `/responses*` and `/support` return 503. Historical `/request/result` links and privacy self-deletion still work. `/admin` fails closed (403) without Cloudflare Access.
+- Candidate data: `data/elections/knesset-26-lists.json` is a `transcript-3` snapshot captured on 2026-10-23. It has 38 lists (37 running, plus Blue and White withdrawn) and 1,322 rows, with state `approved`. 36 name strings and 12 submitted-by strings the capture damaged or changed were not taken from it; see the refresh report. It has not been imported or activated in any production database, and no public page reads it at runtime.
+- Storage: 22 migrations (`001`–`022`). Object storage (S3/R2) and external backups are no longer part of the deploy; persistence is the Render disk at `/data/app.db`.
 
-- E0: Hono Node server binds `0.0.0.0:$PORT`; 14-table migrations, foreign keys, WAL, NORMAL sync, 5s busy timeout, `/health`, 5 GB `/data` Render disk, one instance.
-- E1: six locale dictionaries/routes; cookie/Accept-Language selection; equivalent language links; correct `lang`/`dir`; logical responsive CSS; explicit missing-translation state.
-- E2: DB-seeded localized demands/recipients/templates, home/demands pages, separate aggregate counters, short public cache headers.
-- E3: support form, CSRF/Turnstile/rate checks, normalized unique email, expiring hashed verification tokens, Resend delivery, keyless development link, exactly-once verified count.
-- E4: localized recipient/demand builder and templates, preview, email/WhatsApp/copy/report-sent actions, public posting to X/Facebook/WhatsApp/Telegram, editable generated text, share result, separate action metrics, no personalized message storage.
-- E5: response form/moderation state, signed submission-token idempotency, date/text/email validation, 10 MB limit, MIME magic-byte validation, durable upload/delete work with retry and bounded PUT timeout, in-memory S3/R2 streaming, DB metadata, admin-only download.
-- E6: Cloudflare Access JWKS issuer/audience JWT validation, 403 without credentials/token, demand/recipient/template management, response moderation, stats/supporter CSV, audit transaction for every mutation, form/recipient/campaign kill switches.
-- E7 application work: strict CSP/HSTS/security headers, body limits, CSRF, optional Turnstile, rate limits, six privacy pages, confirmed data deletion/anonymization, external daily/weekly SQLite backup, integrity-checked restore, semantic/keyboard-friendly markup and skip link.
-- Integration repairs: Phase 1 capability/role/CSV/demand preservation, copy telemetry, social-handle sharing, localization and private-cache behavior; Phase 2 response idempotency, attachment cleanup/retry, privacy deletion, timeout maintenance, and refresh-safe confirmation are covered by deterministic Node integration tests.
+## Verified 2026-10-24 (after the data update, Node 22.22.0)
+
+| Check | Result |
+| --- | --- |
+| `npm run typecheck` | Pass |
+| `npm test` | **131 passed, 0 failed** |
+| `npm run smoke` | Pass. Public routes 200, `/admin` 403 |
+| `npm run smoke:pages` | Pass |
+| `npm audit --omit=dev` (CI gate, default level) | **0 vulnerabilities** after upgrading `hono` to 4.13.13 and `@hono/node-server` to 1.19.17 |
+| Migration `022` on a populated pre-022 database | 1,379 rows kept, `integrity_check` ok, no foreign-key errors; the new import activates as `approved` |
+| Browser, `/he` and `/en` `/scorecard` at 375 and 1440 px | No horizontal overflow; withdrawn badge and note shown; no share option on the withdrawn list. Pico's CDN stylesheet was blocked by the session proxy, so its base styles were absent |
+
+## Changes since the previous status (2026-07-31 → 2026-10-24)
+
+- **2026-07-31**: Ukrainian locale (migration `007`); Knesset member contact batch (`006`); accessibility and hierarchy pass on public forms.
+- **2026-08-01**: privacy, retention and restore hardening (migrations `008`–`015`).
+- **2026-08-02**: public civic redesign.
+- **2026-09-09**: merged PRs #2–#6: election directory schema (`016`), searchable directory, signed recipient selection, reviewed stances, and the finance schema (`017`). Then the **action-only privacy cut** (`018`): public flow without S3, with no stored appeal text and no public counters. Also fixed share links (`019` normalizes template newlines) and reply uploads.
+- **2026-09-19**: **share-first** rebuild (`012eb1a`): ten problem cards and issue pages, a single ShareOptions control, retired appeal writes, paused intake, and the snapshot-isolated candidate directory (`020`, `021`). CEC candidate refresh: 38 lists, 1,379 rows, 0 missing rosters. Site-owner contacts removed from every locale. Local `.env` loading added. Election 26 pinned, with ETL and scheduling off. Details: [docs/SHARE_FIRST_VERIFICATION.md](docs/SHARE_FIRST_VERIFICATION.md), [docs/CANDIDATE_REFRESH_2026-09-19.md](docs/CANDIDATE_REFRESH_2026-09-19.md).
+- **2026-09-23 → 25**: civic **scorecard** added (PR #8), localized to all seven locales (PR #10), and expanded to all 38 submitted lists with segment filters, a compliance gauge and a share option (PR #11). Localized readings of Hebrew names added (PR #12).
+- **2026-09-25**: **Common Bar / רף משותף identity**: logo, favicons, manifest, OG and X images, new share PNGs, and brand guide [docs/brand/README.md](docs/brand/README.md) (QA: [docs/brand/QA.md](docs/brand/QA.md)). Header changed to Problems · Scorecard · About, and the public candidates page was retired.
+- **2026-10-24**: **post-approval data update**. The candidate transcript moved to `transcript-3`, with lists marked as not running, page dates, text-damage checks and an `elections diff` command; migration `022` adds the new columns. The scorecard now follows the approved lists and marks Blue and White as withdrawn. Hono was upgraded and the CI audit exception removed.
+
+## Open pull requests (2026-10-24)
+
+- **#1** Add `/terms`, `/accessibility` and `/corrections` pages from the canonical package. Open since 2026-08-24, not merged. Those routes still do not exist on `main`.
+- **#7** (draft) Directory slice 6, a Knesset 26 draft CEC import, and privacy contact hardening. Not merged. The share-first work adapted the checkpoint's full-name importer instead (see SHARE_FIRST_VERIFICATION).
+- **#9** (draft) Move the scorecard into the footer with methodology. That runs against `main`, which put Scorecard in the header on 2026-09-25.
+
+## Remaining launch gates / blockers
+
+1. **Translation review (largest gate).** Political, legal and privacy text outside Russian is machine-translated and unreviewed. Ukrainian is a draft that needs a named native legal/political reviewer. New share-first questions and UI prose, and all scorecard copy, are unreviewed in **every** locale, including Hebrew and Russian. See [docs/TRANSLATION-REVIEW.md](docs/TRANSLATION-REVIEW.md).
+2. **Page checks for the 2026-10-24 data update.** The approval, the Blue and White withdrawal, 36 unverified name strings and 12 submitted-by strings come from a capture that this session could not re-check: gov.il was refused by the network proxy. The open items are listed in [docs/CANDIDATE_REFRESH_2026-10-24.md](docs/CANDIDATE_REFRESH_2026-10-24.md#still-to-verify-on-the-pages).
+3. **Accessibility.** Lighthouse and axe have not been run. NVDA/VoiceOver/TalkBack, 200% zoom, forced colors and real touch devices have not been tested.
+4. **Device and platform checks.** Real iOS and Android share sheets and clipboard permissions have not been tested. Crawler previews (X, Facebook, WhatsApp, Telegram) have not been checked on a deployed URL.
+5. **Deployment.** The Render deploy and the persistence of `/data` across redeploys are unverified, and so are the production Cloudflare Access, WAF and cache rules and the perimeter secrets (`SESSION_SECRET`, `TRUSTED_PROXY_SECRET`). `npm run load` has not been run against staging. No monitoring or alerting setup is recorded.
+6. **Candidate snapshot.** Activation is only needed if a page reads the snapshot at runtime; none does now. If it is activated: back up first, then `elections import` and `elections activate`.
+7. **Canonical site map.** `/terms`, `/accessibility` and `/corrections` are not on `main` (PR #1 is open). The "Initiator" section is still removed from About, so the operator is not named anywhere on the site. That needs a decision before launch.
+
+## Inconsistencies noticed on 2026-10-24
+
+- Fixed on 2026-10-24: the scorecard `publishedAt` (now 2026-09-23) and the "2026-03" heading in TRANSLATION-REVIEW.
+- `docs/SHARE_FIRST_VERIFICATION.md` (116 tests) and `docs/brand/QA.md` (124) record the counts at the time they were written. The suite now has 131.
+
+## Key deployment decisions
+
+- Render paid Starter web service with a single instance (`numInstances: 1`), the 5 GB persistent disk at `/data`, and SQLite at `/data/app.db`, on Node 24.16.0.
+- Cloudflare caches only public GET pages and assets, and protects `/admin*`. The origin validates Access JWTs independently. Production requires `SESSION_SECRET`, `TRUSTED_PROXY=cloudflare`, `TRUSTED_PROXY_SECRET` and an HTTPS `APP_BASE_URL`.
+- No object storage or external backups in this deploy. Rely on the Render disk and its snapshots. Election ETL and its schedule stay disabled.
+- Missing third-party keys never prevent startup or public pages. Access fails closed.
+
+---
+
+# History: July 2026 build-out (action-first design)
+
+The sections below record the July 2026 work. They describe the action-first design that the 2026-09 share-first and action-only changes superseded: the numbered support/write/reply bar, the email/WhatsApp appeal builder, S3 uploads and external backups, the six-locale count, and placeholder recipients. Visual, palette, CSP and RTL decisions still apply.
+
+## Initial MVP (2026-07-19 → 31)
+
+The Hono/TypeScript MVP was implemented with server-rendered Hono JSX/native forms, Pico CSS, SQLite WAL, six locales, Render configuration, tests, and operational documentation. Verified then: `npm test` 33/33, `npm run typecheck` clean, both smoke suites passing.
+
+- E0–E7: server, migrations, i18n, seeded demands, support/verification, appeal builder and sharing, response intake with S3, Cloudflare Access admin, security headers, privacy deletion, backup/restore, accessibility basics.
 - Docs/deploy: `README.md`, `.env.example`, `docs/SECRETS.md`, `render.yaml`, backup/restore/load/smoke scripts.
 
 ## Appearance switcher (2026-07-28)
@@ -92,33 +151,6 @@ Verified: zero horizontal overflow at 320 px on every public page in every local
 - Upgrade path verified on a populated database: row counts preserved, `PRAGMA foreign_key_check` clean, `integrity_check` ok, `idx_actions_type` recreated, widened CHECK still rejects unknown action types.
 - `render.yaml` targets `rafmeshutaf.org.il`; not yet deployed.
 
-## Verification completed
+## July verification and gates (superseded)
 
-- Clean offline frozen install from the existing npm cache: 7 packages installed, exit 0.
-- `npm test`: 33/33 integration tests pass, exit 0.
-- `npm run typecheck`: exit 0.
-- `npm run build`: exit 0.
-- `npm audit --offline --omit=dev`: 0 vulnerabilities, exit 0.
-- `npm run smoke` and `npm run smoke:pages`: keyless public routes returned 200 and `/admin` returned 403, exit 0.
-- S3 upload/delete sequencing, response replay protection, attachment compensation/retry, Access JWT/JWKS, backup/restore, privacy deletion, audit, dedup, and no-personal-text invariants are exercised with local deterministic fakes (no provider credentials).
-- Regression coverage is server-side only: there is no browser-level clipboard, fallback-copy, or runtime CSP execution test. Response confirmation GET is refresh-safe and response POST replay is protected by signed submission-token tombstones.
-
-## Remaining launch gates / environment blockers
-
-- Lighthouse ≥95 and axe zero serious/critical are still unrun. Layout, overflow, target size and RTL were checked manually in a browser at 320/375/768/1440 px on 2026-07-28; that is not a substitute for an axe pass.
-- `npm run load` (staging p95/error/load targets) has not been run against a deployed instance.
-- Real Cloudflare Turnstile/Access, R2, Resend, external backup bucket, Cloudflare cache/WAF, Render persistence across redeploy, and live restore require credentials/infrastructure and remain unverified.
-- **Political, legal and privacy text in he/ar/yi/en/am is machine-translated and unreviewed; Ukrainian is a high-quality implementation draft requiring named native/legal reviewer approval.** No human review is claimed for Ukrainian. This is the largest open gate; see [docs/TRANSLATION-REVIEW.md](docs/TRANSLATION-REVIEW.md).
-- Recipients are still the placeholder seed. Real party names and official contact addresses must be entered through `/admin/recipients`; they were deliberately not invented here.
-- `/terms`, `/accessibility` and `/corrections` from the canonical site map are not built yet.
-- The "Initiator" section was removed from the About page in all six locales on 2026-07-28, so the operator is not named anywhere on the site. Part X of the canonical package lists it among the published items; decide before launch whether to restore it with a real name or legal entity.
-- Share deep links (X, Facebook, WhatsApp, Telegram) are asserted in tests but have not been opened against the live platforms.
-- Clipboard success/fallback behavior and CSP enforcement still need an actual browser-level check; the test only verifies the copy action's server-facing endpoint where the harness permits.
-- Deploy to Render and verify the live service (Render MCP not connected in this session).
-
-## Key deployment decisions
-
-- Render paid Starter web service, single instance, persistent disk at `/data`, SQLite at `/data/app.db`.
-- Cloudflare caches only public GET/assets and protects `/admin*`; origin independently validates Access JWTs.
-- Response files and backups use private S3-compatible buckets; no binary blobs are written to the app disk.
-- Missing third-party keys never prevent health/public-page startup. Access fails closed; file/email/backup-dependent operations report unavailable or remain disabled.
+The July verification (33 tests) and the July launch-gate list have been replaced by the "Verified 2026-10-24" and "Remaining launch gates" sections above.

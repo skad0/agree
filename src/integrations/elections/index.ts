@@ -37,7 +37,9 @@ export type {
   SourceResource,
   SourceSnapshotRow
 } from "./types.js";
-export { activatePublication, importCandidateSource, parseCandidateSource, TRANSCRIPT_PARSER_VERSION } from "./import.js";
+export { activatePublication, importCandidateSource, nameTextProblem, parseCandidateSource, punctuationProblem, TRANSCRIPT_PARSER_VERSION } from "./import.js";
+export { diffTranscripts, renderTranscriptDiff } from "./diff.js";
+export type { ListChange, NameChange, NameChangeClass, TranscriptDiff } from "./diff.js";
 export type { ImportOptions } from "./import.js";
 export type {
   CandidateApprovalState,
