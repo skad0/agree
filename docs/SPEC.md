@@ -38,7 +38,7 @@ Home/issue reads use the short public cache. Locale preference requests set cook
 
 ## Candidate publication
 
-`data/elections/knesset-26-lists.json` transcribes the official 26th Knesset source. The September 19 snapshot contains 38 lists and 1,379 rows, all rosters available. It is **submitted, not approved**. Do not infer approval from roster existence or contactability.
+`data/elections/knesset-26-lists.json` transcribes the official 26th Knesset source. The 2026-10-23 capture contains 38 lists: 37 running, plus Blue and White, which withdrew. It has 1,322 rows and is **approved** (CEC plenum, 27.9.2026). The scorecard reads its list keys, letters and running state from the same facts, and a test keeps them equal. Approval comes only from official evidence, never from roster existence or contactability.
 
 Import validates election/schema, official HTTPS provenance, list identities, strict roster flags, row references, unique contiguous ranks and declared counts. An approved transcript requires an explicit official evidence URL and operator review. Duplicate normalized content is a successful CLI no-op even when the retrieval timestamp changed.
 

@@ -2,7 +2,26 @@
 
 _Drafted 2026-10-24 (+03). Baseline: `main` at `8cf84bf`, plus `STATUS.md` as updated on 2026-10-24._
 
-This plan brings the repository's 26th-Knesset data in line with the official post-approval state. It also slots in every other open item from [`STATUS.md`](../STATUS.md). Nothing in it has been carried out yet. Each step lists the evidence it needs and the check that closes it.
+This plan brings the repository's 26th-Knesset data in line with the official post-approval state. It also slots in every other open item from [`STATUS.md`](../STATUS.md). Each step lists the evidence it needs and the check that closes it.
+
+## Execution status — 2026-10-24
+
+The recommended option was taken for each decision in section 5:
+
+1. Blue and White stays visible, marked withdrawn.
+2. Leaders keep their common names, and real spelling differences follow the official pages.
+3. The family/given split is not imported.
+4. The scorecard is checked against the transcript at build and test time; there is no runtime read.
+5. The approval patch was not split off; everything shipped together.
+
+| Workstream | State |
+| --- | --- |
+| WS-A evidence and repair | **Partly done.** The transcript was repaired from the 2026-10-23 capture and the 2026-09-19 transcript; see [the refresh report](CANDIDATE_REFRESH_2026-10-24.md). gov.il could not be opened from this session, so the page checks it lists are still open. |
+| WS-B `transcript-3`, migration `022`, text checks, `elections diff` | Done, with tests. Migration upgrade checked on a populated pre-022 database. |
+| WS-C snapshot and report | Done. |
+| WS-D scorecard | Done: approval wording in 7 locales, Blue and White withdrawn, one table of list keys and letters, consistency test, 8 leader spellings, Tkuma ballot name, `publishedAt` = 2026-09-23. |
+| WS-E production activation | Not needed: no public page reads the snapshot. |
+| WS-F | Hono upgraded and the CI audit exception removed. Translation review, accessibility, devices, deploy, PR triage and the initiator decision remain with the owner. |
 
 ## 1. Input under review
 

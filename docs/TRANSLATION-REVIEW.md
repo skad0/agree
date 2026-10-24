@@ -59,7 +59,7 @@ A translation that blurs submitted into approved misstates an official act durin
 period. Review these against the Hebrew source wording on the CEC page —
 `רשימות אלה אינן סופיות וועדת הבחירות המרכזית טרם אישרה אותן` — before public launch.
 
-## Scorecard dataset and chrome — 2026-03 (unreviewed)
+## Scorecard dataset and chrome — 2026-09-23 (unreviewed)
 
 Civic scorecard UI (`src/scorecard-copy.ts`) and verified evidence/basis strings
 (`src/data/scorecard-2026.ts`) now ship in all seven locales. Hebrew is the factual
@@ -83,3 +83,17 @@ Party and leader readings in `src/data/scorecard-entity-glosses.ts` sit beside t
 official Hebrew ballot name. They are unreviewed drafts in Arabic, Yiddish, Russian,
 Ukrainian, English, and Amharic. Hebrew is copied from the ballot string and is not
 a second translation.
+
+## Approved lists and the Blue and White withdrawal — 2026-10-24 (unreviewed)
+
+The scorecard now says the lists were approved by the CEC plenum on 27.9.2026, and that Blue and White is not on the ballot. These strings are new or rewritten in all seven locales, including Hebrew and Russian, and none is reviewed:
+
+| Where | What it asserts |
+|---|---|
+| `src/scorecard-copy.ts` `listsApproved` | The lists shown are the ones the Committee approved on 27.9.2026 |
+| `src/scorecard-copy.ts` `withdrawnBadge`, `withdrawnNote` | A list is not on the ballot because every candidate resigned (CEC page updated 21.10.2026) |
+| `src/data/scorecard-2026.ts` evidence `ev-cec-approved-lists-26` | The CEC page lists the approved slates, and Blue and White is not running |
+| `src/data/scorecard-2026.ts` `challengerBasis` | A new list was approved by the Committee (plenum, 27.9.2026) |
+| `src/data/scorecard-entity-glosses.ts` | New readings for "דרך חזון ותקומה" and for the leaders renamed to their official spelling: Shvili, Yeshua Yisrael Ben David, Salomovich, Denis Lipkin, Topchiashvili, Baumrind, Elmalech, Elkana Federman |
+
+"Approved" must not be weakened to "submitted", and "withdrew" must not read as "disqualified": the Committee did not disqualify the list.

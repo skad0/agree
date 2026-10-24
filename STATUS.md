@@ -1,6 +1,6 @@
 # Project Status — Common Bar · רף משותף (agree)
 
-_Last updated: 2026-10-24 (+03). Reviewed against `main` at `8cf84bf` (2026-09-25); no commits have landed on `main` since._
+_Last updated: 2026-10-24 (+03), after the post-approval candidate data update ([plan](docs/CANDIDATE_DATA_UPDATE_PLAN.md), [refresh report](docs/CANDIDATE_REFRESH_2026-10-24.md))._
 
 ## Current state
 
@@ -9,25 +9,26 @@ A server-rendered Hono JSX / SQLite WAL site in seven locales (he, ar, yi, ru, e
 The public product is now **share-first**: the earlier write-to-your-representative ("action-first") flow is retired.
 
 - **Problems (the index, `/:locale`)**: ten problem cards with stable `/:locale/issues/:slug` pages. Sharing goes to WhatsApp, Facebook, Telegram, X, the native share menu, or copy. Sharing writes nothing and keeps no counters.
-- **Scorecard (`/:locale/scorecard`)**: "Shared Threshold" civic matrix for the 26th Knesset election. It has 5 criteria (equal service, core curriculum, budget integrity, judicial independence, term limits) and 12 evidence records on official hosts. It covers all 38 lists submitted to the Central Elections Committee (CEC). Incumbent scores rest on 25th-Knesset votes and agreements. New lists stay "uncommitted" rather than failing. Party and leader names stay in Hebrew, with a localized reading next to each.
+- **Scorecard (`/:locale/scorecard`)**: "Shared Threshold" civic matrix for the 26th Knesset election. It has 5 criteria (equal service, core curriculum, budget integrity, judicial independence, term limits) and 12 evidence records on official hosts. It covers the 38 lists the Central Elections Committee (CEC) approved on 27.9.2026, in every locale. Blue and White is marked as withdrawn: every candidate resigned, so it is not on the ballot. It stays searchable with its 25th-Knesset record but is not scored, segmented or shared. Incumbent scores rest on 25th-Knesset votes and agreements. New lists stay "uncommitted" rather than failing. Party and leader names stay in Hebrew, with a localized reading next to each. A test checks each party's list key, approved ballot letters, roster URL, running state and leader name against the shipped transcript.
 - **About**, plus supporting documents in the footer: standard, coalition agreement, first 100 days, government model, methodology, privacy, and the appearance switcher.
 - Header is **Problems · Scorecard · About**, with Problems marked as the index. `/:locale/candidates` now redirects (302) to the index. The public candidate directory was retired on 2026-09-25.
 - Retired and paused flows: all nine old appeal POST routes return 410. `/responses*` and `/support` return 503. Historical `/request/result` links and privacy self-deletion still work. `/admin` fails closed (403) without Cloudflare Access.
-- Candidate data: an immutable snapshot of 38 lists and 1,379 candidate rows, retrieved from the CEC on 2026-09-19, is in `data/elections/knesset-26-lists.json` with state `submitted_not_approved`. It has not been imported or activated in any production database. Since the directory was retired, no public page reads it.
-- Storage: 21 migrations (`001`–`021`). Object storage (S3/R2) and external backups are no longer part of the deploy; persistence is the Render disk at `/data/app.db`.
+- Candidate data: `data/elections/knesset-26-lists.json` is a `transcript-3` snapshot captured on 2026-10-23. It has 38 lists (37 running, plus Blue and White withdrawn) and 1,322 rows, with state `approved`. 36 name strings and 12 submitted-by strings the capture damaged or changed were not taken from it; see the refresh report. It has not been imported or activated in any production database, and no public page reads it at runtime.
+- Storage: 22 migrations (`001`–`022`). Object storage (S3/R2) and external backups are no longer part of the deploy; persistence is the Render disk at `/data/app.db`.
 
-## Verified 2026-10-24 (this review, Node 22.22.0, clean `npm ci --ignore-scripts`)
+## Verified 2026-10-24 (after the data update, Node 22.22.0)
 
 | Check | Result |
 | --- | --- |
 | `npm run typecheck` | Pass |
-| `npm test` | **125 passed, 0 failed** |
+| `npm test` | **131 passed, 0 failed** |
 | `npm run smoke` | Pass. Public routes 200, `/admin` 403 |
 | `npm run smoke:pages` | Pass |
-| `npm audit --omit=dev --audit-level=high` (CI gate) | Pass (exit 0). **2 moderate**: `hono` 4.12.29 (fix 4.13.13) and `@hono/node-server` 1.19.14 (fix 1.19.17), both non-major |
-| GitHub Actions CI on `main` @ `8cf84bf` | Success (run #103, 2026-09-25) |
+| `npm audit --omit=dev` (CI gate, default level) | **0 vulnerabilities** after upgrading `hono` to 4.13.13 and `@hono/node-server` to 1.19.17 |
+| Migration `022` on a populated pre-022 database | 1,379 rows kept, `integrity_check` ok, no foreign-key errors; the new import activates as `approved` |
+| Browser, `/he` and `/en` `/scorecard` at 375 and 1440 px | No horizontal overflow; withdrawn badge and note shown; no share option on the withdrawn list. Pico's CDN stylesheet was blocked by the session proxy, so its base styles were absent |
 
-## Changes since the previous status (2026-07-31 → 2026-09-25)
+## Changes since the previous status (2026-07-31 → 2026-10-24)
 
 - **2026-07-31**: Ukrainian locale (migration `007`); Knesset member contact batch (`006`); accessibility and hierarchy pass on public forms.
 - **2026-08-01**: privacy, retention and restore hardening (migrations `008`–`015`).
@@ -36,6 +37,7 @@ The public product is now **share-first**: the earlier write-to-your-representat
 - **2026-09-19**: **share-first** rebuild (`012eb1a`): ten problem cards and issue pages, a single ShareOptions control, retired appeal writes, paused intake, and the snapshot-isolated candidate directory (`020`, `021`). CEC candidate refresh: 38 lists, 1,379 rows, 0 missing rosters. Site-owner contacts removed from every locale. Local `.env` loading added. Election 26 pinned, with ETL and scheduling off. Details: [docs/SHARE_FIRST_VERIFICATION.md](docs/SHARE_FIRST_VERIFICATION.md), [docs/CANDIDATE_REFRESH_2026-09-19.md](docs/CANDIDATE_REFRESH_2026-09-19.md).
 - **2026-09-23 → 25**: civic **scorecard** added (PR #8), localized to all seven locales (PR #10), and expanded to all 38 submitted lists with segment filters, a compliance gauge and a share option (PR #11). Localized readings of Hebrew names added (PR #12).
 - **2026-09-25**: **Common Bar / רף משותף identity**: logo, favicons, manifest, OG and X images, new share PNGs, and brand guide [docs/brand/README.md](docs/brand/README.md) (QA: [docs/brand/QA.md](docs/brand/QA.md)). Header changed to Problems · Scorecard · About, and the public candidates page was retired.
+- **2026-10-24**: **post-approval data update**. The candidate transcript moved to `transcript-3`, with lists marked as not running, page dates, text-damage checks and an `elections diff` command; migration `022` adds the new columns. The scorecard now follows the approved lists and marks Blue and White as withdrawn. Hono was upgraded and the CI audit exception removed.
 
 ## Open pull requests (2026-10-24)
 
@@ -46,19 +48,17 @@ The public product is now **share-first**: the earlier write-to-your-representat
 ## Remaining launch gates / blockers
 
 1. **Translation review (largest gate).** Political, legal and privacy text outside Russian is machine-translated and unreviewed. Ukrainian is a draft that needs a named native legal/political reviewer. New share-first questions and UI prose, and all scorecard copy, are unreviewed in **every** locale, including Hebrew and Russian. See [docs/TRANSLATION-REVIEW.md](docs/TRANSLATION-REVIEW.md).
-2. **Scorecard facts need a re-check before launch.** The roster is stated as of the CEC page "updated 25.9.2026", when the lists were submitted but not yet approved. The CEC source could not be reached from this session (`www.gov.il` was refused by the network proxy), so the current approval status has not been verified here. An unconfirmed web-search summary reports that the CEC approved 38 lists, some conditionally. Confirm it against the official page, then update the snapshot's `approvalState`/`approvalEvidenceUrl` and the scorecard source label. Approval is not a flag to toggle without official evidence.
-   **Update 2026-10-24:** a newer transcript was uploaded, retrieved 2026-10-23. It says the lists were approved on 27.9.2026 and that Blue and White withdrew, leaving 37 running lists and 1,322 rows. It also has parser defects and doesn't pass the importer. See [docs/CANDIDATE_DATA_UPDATE_PLAN.md](docs/CANDIDATE_DATA_UPDATE_PLAN.md).
-3. **Dependency advisories.** The CI audit exception for moderate Hono advisories was due for reassessment by **2026-09-30** (`.github/workflows/ci.yml`), and that date has passed. Non-major fixes are available (`hono` 4.13.13, `@hono/node-server` 1.19.17).
-4. **Accessibility.** Lighthouse and axe have not been run. NVDA/VoiceOver/TalkBack, 200% zoom, forced colors and real touch devices have not been tested.
-5. **Device and platform checks.** Real iOS and Android share sheets and clipboard permissions have not been tested. Crawler previews (X, Facebook, WhatsApp, Telegram) have not been checked on a deployed URL.
-6. **Deployment.** The Render deploy and the persistence of `/data` across redeploys are unverified, and so are the production Cloudflare Access, WAF and cache rules and the perimeter secrets (`SESSION_SECRET`, `TRUSTED_PROXY_SECRET`). `npm run load` has not been run against staging. No monitoring or alerting setup is recorded.
-7. **Candidate snapshot.** Staging import and deliberate activation are still pending. A backup is needed before activation.
-8. **Canonical site map.** `/terms`, `/accessibility` and `/corrections` are not on `main` (PR #1 is open). The "Initiator" section is still removed from About, so the operator is not named anywhere on the site. That needs a decision before launch.
+2. **Page checks for the 2026-10-24 data update.** The approval, the Blue and White withdrawal, 36 unverified name strings and 12 submitted-by strings come from a capture that this session could not re-check: gov.il was refused by the network proxy. The open items are listed in [docs/CANDIDATE_REFRESH_2026-10-24.md](docs/CANDIDATE_REFRESH_2026-10-24.md#still-to-verify-on-the-pages).
+3. **Accessibility.** Lighthouse and axe have not been run. NVDA/VoiceOver/TalkBack, 200% zoom, forced colors and real touch devices have not been tested.
+4. **Device and platform checks.** Real iOS and Android share sheets and clipboard permissions have not been tested. Crawler previews (X, Facebook, WhatsApp, Telegram) have not been checked on a deployed URL.
+5. **Deployment.** The Render deploy and the persistence of `/data` across redeploys are unverified, and so are the production Cloudflare Access, WAF and cache rules and the perimeter secrets (`SESSION_SECRET`, `TRUSTED_PROXY_SECRET`). `npm run load` has not been run against staging. No monitoring or alerting setup is recorded.
+6. **Candidate snapshot.** Activation is only needed if a page reads the snapshot at runtime; none does now. If it is activated: back up first, then `elections import` and `elections activate`.
+7. **Canonical site map.** `/terms`, `/accessibility` and `/corrections` are not on `main` (PR #1 is open). The "Initiator" section is still removed from About, so the operator is not named anywhere on the site. That needs a decision before launch.
 
-## Inconsistencies noticed during this review (not changed)
+## Inconsistencies noticed on 2026-10-24
 
-- The scorecard dataset declares `publishedAt: "2026-03-01"` (`src/data/scorecard-2026.ts`), and `docs/TRANSLATION-REVIEW.md` heads the scorecard section "2026-03". The scorecard was committed on 2026-09-23 and its roster is dated 25.9.2026.
-- `docs/SHARE_FIRST_VERIFICATION.md` reports 116 tests and `docs/brand/QA.md` reports 124. Today there are 125. Each figure was correct when it was written.
+- Fixed on 2026-10-24: the scorecard `publishedAt` (now 2026-09-23) and the "2026-03" heading in TRANSLATION-REVIEW.
+- `docs/SHARE_FIRST_VERIFICATION.md` (116 tests) and `docs/brand/QA.md` (124) record the counts at the time they were written. The suite now has 131.
 
 ## Key deployment decisions
 

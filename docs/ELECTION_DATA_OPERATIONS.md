@@ -1,6 +1,6 @@
 # Election directory operations (deployment)
 
-Status: the public directory is read-only and snapshot-based. The September 19 transcript has 38 lists and 1,379 candidates, explicitly submitted, not approved. No production activation was performed during implementation. Automatic import and scheduling remain **off**.
+Status: the public directory is retired; `/:locale/candidates` redirects to the index. The scorecard checks its list keys, letters and running state against the shipped transcript in tests. The shipped transcript (`transcript-3`, captured 2026-10-23) has 38 lists, of which 37 are running, and 1,322 candidates, approved by the CEC plenum on 27.9.2026. See [the refresh report](CANDIDATE_REFRESH_2026-10-24.md). No production activation has been performed. Automatic import and scheduling remain **off**.
 
 ## Runtime shape
 
@@ -29,6 +29,7 @@ node dist/scripts/elections.js dry-run [manifest] [fixture]
 node dist/scripts/elections.js import <transcript.json>
 node dist/scripts/elections.js activate <publicationId>
 node dist/scripts/elections.js report
+node dist/scripts/elections.js diff <old.json> <new.json>
 ```
 
 - `source-check` loads the manifest; live probe only when `ELECTION_ETL_ENABLED=true`.
@@ -38,11 +39,12 @@ node dist/scripts/elections.js report
   Re-importing normalized identical content returns `already_imported` with CLI exit code 0. Retrieval timestamp alone does not create a new snapshot.
 - `activate` atomically selects a validated snapshot for the read-only directory. It changes no contact recipients. The previous publication becomes `rolled_back`. Run `activate <previousPublicationId>` to roll back data.
 - `report` prints local coverage counts from SQLite.
+- `diff` prints the refresh-report tables for two transcripts: list title, letter, row-count and running changes, and each changed name classed as truncated, punctuation, spelling, removed or added. It reads files only. Use it for every refresh report instead of writing tables by hand.
 
 ## Candidate transcripts
 
 `data/elections/knesset-26-lists.json` is a transcript of the official CEC pages, taken with a
-browser because the host returns HTTP 403 to non-browser clients. Shape and rules:
+browser because the host returns HTTP 403 to non-browser clients. The importer is `transcript-3`. Shape and rules:
 
 - `source.approvalState` is `submitted_not_approved` or `approved`. Submitted lists are what the
   parties filed; the CEC approves them later. The directory banner is driven by this field, so
@@ -51,8 +53,19 @@ browser because the host returns HTTP 403 to non-browser clients. Shape and rule
   the family/given split is not mechanically derivable (`השכל שרן מרים` is Haskel / Sharan Miriam,
   not `השכל שרן` / `מרים`). `candidacy_versions.given_name_raw` and `family_name_raw` stay null
   until a reviewed source fills them.
-- `ballotLetters` are the letters as submitted. They are neither final nor unique across lists
-  (`ב`, `כן`, `יד` and `רץ` each appear twice in the 26th-Knesset submissions). Never key on them.
+- `ballotLetters` in a submitted transcript are the letters as filed. They are neither final nor
+  unique (`ב`, `כן`, `יד` and `רץ` each appeared twice in the September submissions). In an
+  `approved` transcript the import requires one letter combination per running list, unique
+  across lists. Still never key on letters; key on `officialListKey`.
+- A list that filed and then withdrew has `running: false`, `rosterPublished: false`, zero rows
+  and an official `withdrawnEvidenceUrl`. It is not counted as a list without a roster.
+- `pagePublished` / `pageUpdated` record each list page's printed dates (`dd.mm.yyyy` or ISO;
+  stored as ISO). `pageUrl` is accepted as another name for `sourceUrl`.
+- Name, title and submitted-by text is refused when it starts or ends with a hyphen or comma,
+  has a space before a comma, has a hyphen spaced on one side only, or has repeated spaces.
+  Names are also refused if they contain Latin letters or digits, or have only one word. These
+  are the marks a PDF or RTL reflow leaves. When a capture has them, check the page and transcribe
+  it again; do not repair the text by guesswork.
 - A list that publishes no roster is recorded with `rosterPublished: false` and zero rows, and the
   directory says how many such lists exist. Do not fill those rows from media or encyclopedias:
   the import refuses a list that claims a roster but carries none, and vice versa.
