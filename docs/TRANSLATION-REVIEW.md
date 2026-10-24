@@ -97,3 +97,14 @@ The scorecard now says the lists were approved by the CEC plenum on 27.9.2026, a
 | `src/data/scorecard-entity-glosses.ts` | New readings for "דרך חזון ותקומה" and for the leaders renamed to their official spelling: Shvili, Yeshua Yisrael Ben David, Salomovich, Denis Lipkin, Topchiashvili, Baumrind, Elmalech, Elkana Federman |
 
 "Approved" must not be weakened to "submitted", and "withdrew" must not read as "disqualified": the Committee did not disqualify the list.
+
+## Public positions on the ten questions — 2026-10-24 (unreviewed)
+
+New in all seven locales, including Hebrew and Russian. None of it is reviewed:
+
+| Where | What it asserts |
+|---|---|
+| `src/positions-copy.ts` | Page chrome, the stance labels ("matches the commitment", "partly matches", "contrary", "on record, not a commitment", "declined", "no public statement found") and the scope note (14 lists; the rest not reviewed) |
+| `src/data/positions-2026.ts` `records`, `other`, `context` | Paraphrases of dated party statements, each tied to a source URL. Speaker readings for Yoav Kisch, Moshe Feiglin and Yair Lapid |
+
+A reviewer should compare each summary with its linked source, not only with the English. A stance word must not be strengthened: "on record" is not support, and "declined to answer" is not opposition. Paraphrases must stay paraphrases; do not expand them into long quotations.

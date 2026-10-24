@@ -8,6 +8,7 @@ import { localeFromRequest } from "./i18n.js";
 import { registerShareRoutes } from "./share-pages.js";
 import { registerCandidateRoutes } from "./candidates.js";
 import { registerScorecardRoutes } from "./scorecard.js";
+import { registerPositionsRoutes } from "./positions.js";
 import { shareImages } from "./share-images.js";
 import { registerPrivacyRoutes } from "./privacy.js";
 import { registerSupportRoutes } from "./support.js";
@@ -39,6 +40,7 @@ export function registerPublicRoutes(app: Hono, db: Db, config: Config) {
   font(amharicRegularPath, AMHARIC_REGULAR);
   font(amharicBoldPath, AMHARIC_BOLD);
 
+  registerPositionsRoutes(app, db, config);
   registerShareRoutes(app, db, config);
   registerCandidateRoutes(app, db, config);
   registerScorecardRoutes(app, db, config);

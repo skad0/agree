@@ -8,6 +8,10 @@ import { s } from "./share-copy.js";
 import { ShareOptions } from "./components/share-options.js";
 import { privateNoStore, publicCache, publicCampaignActive, rememberLocale } from "./public-state.js";
 import { shareImagePath } from "./share-images.js";
+import { positions2026 } from "./data/positions-2026.js";
+import { IssuePositions, onRecordCount } from "./components/positions-ui.js";
+import { pc } from "./positions-copy.js";
+import { isIssueSlug } from "./types/positions.js";
 
 export function registerShareRoutes(app: Hono, db: Db, config: Config) {
   const issueUrl = (locale: Locale, issue: Issue) => `${config.appBaseUrl}/${locale}/issues/${issue.slug}`;
@@ -21,11 +25,13 @@ export function registerShareRoutes(app: Hono, db: Db, config: Config) {
     publicCache(context);
     return context.html(<Layout locale={locale} title={s(locale,"home")} path={context.req.path}
       shareMeta={meta(locale,`${config.appBaseUrl}/${locale}`,s(locale,"intro"))}>
-      <section class="issue-intro"><p class="eyebrow">{t(locale,"slogan")}</p><h1>{s(locale,"home")}</h1><p class="lede">{s(locale,"intro")}</p><p class="neutrality">{s(locale,"neutrality")}</p></section>
+      <section class="issue-intro"><p class="eyebrow">{t(locale,"slogan")}</p><h1>{s(locale,"home")}</h1><p class="lede">{s(locale,"intro")}</p><p class="issue-positions-link"><a href={`/${locale}/positions`}>{pc(locale,"title")}</a></p><p class="neutrality">{s(locale,"neutrality")}</p></section>
       <ol class="issue-grid">{listIssues(db,locale).map(issue => <li class="issue-card">
         <span class="issue-number" aria-hidden="true">{String(issue.sortOrder).padStart(2,"0")}</span>
         <h2><a href={`/${locale}/issues/${issue.slug}`}>{issue.title}</a></h2>
-        <p>{issue.rationale}</p>{share(locale,issue)}
+        <p>{issue.rationale}</p>
+        {isIssueSlug(issue.slug) ? <p class="issue-onrecord"><a href={`/${locale}/issues/${issue.slug}#positions`}><bdi dir="ltr">{onRecordCount(positions2026,issue.slug)}/{positions2026.tracked.length}</bdi> {pc(locale,"onRecord")}</a></p> : null}
+        {share(locale,issue)}
       </li>)}</ol>
       <p><a href={`/${locale}/standard`}>{t(locale,"readFull")}</a></p>
     </Layout>);
@@ -47,6 +53,7 @@ export function registerShareRoutes(app: Hono, db: Db, config: Config) {
         {share(locale,issue)}
         {issue.verification ? <details class="issue-explanation"><summary>{t(locale,"verification")}</summary><p>{issue.verification}</p></details> : null}
         {issue.exceptions ? <details class="issue-explanation"><summary>{t(locale,"exceptions")}</summary><p>{issue.exceptions}</p></details> : null}
+        {isIssueSlug(issue.slug) ? <IssuePositions locale={locale} slug={issue.slug} dataset={positions2026} /> : null}
         <p><a href={`/${locale}/standard#clause-${issue.sortOrder}`}>{t(locale,"readFull")}</a></p>
         <p class="neutrality">{s(locale,"neutrality")}</p>
       </article>
