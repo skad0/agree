@@ -107,4 +107,6 @@ New in all seven locales, including Hebrew and Russian. None of it is reviewed:
 | `src/positions-copy.ts` | Page chrome, the stance labels ("matches the commitment", "partly matches", "contrary", "on record, not a commitment", "declined", "no public statement found") and the scope note (14 lists; the rest not reviewed) |
 | `src/data/positions-2026.ts` `records`, `other`, `context` | Paraphrases of dated party statements, each tied to a source URL. Speaker readings for Yoav Kisch, Moshe Feiglin and Yair Lapid |
 
+Added 25.10.2026, also unreviewed: the browsing chrome in `src/positions-copy.ts` (Positions nav item, by question / by list, tap hints, the main-page card, the scorecard link, the jump link) and the Noam, Democrats 100-day and Bennett public-service entries in `src/data/positions-2026.ts`.
+
 A reviewer should compare each summary with its linked source, not only with the English. A stance word must not be strengthened: "on record" is not support, and "declined to answer" is not opposition. Paraphrases must stay paraphrases; do not expand them into long quotations.

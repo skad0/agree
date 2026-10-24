@@ -5,7 +5,8 @@ import { isLocale } from "./i18n.js";
 import { Layout } from "./layout.js";
 import { s } from "./share-copy.js";
 import { sc } from "./scorecard-copy.js";
-import { pc } from "./positions-copy.js";
+import { positions2026 } from "./data/positions-2026.js";
+import { PositionsCta } from "./components/positions-ui.js";
 import { scorecard2026 } from "./data/scorecard-2026.js";
 import {
   EvidenceDrawer,
@@ -78,7 +79,7 @@ export function registerScorecardRoutes(app: Hono, db: Db, config: Config) {
         }}
       >
         <ScorecardIntro locale={locale} />
-        <p class="issue-positions-link"><a href={`/${locale}/positions`}>{pc(locale, "scorecardLink")}</a></p>
+        <PositionsCta locale={locale} dataset={positions2026} compact />
         <PledgeBanner locale={locale} shareUrl={shareUrl} />
         <div data-scorecard>
         <ScorecardFiltersForm locale={locale} path={path} dataset={scorecard2026} filters={filters} />

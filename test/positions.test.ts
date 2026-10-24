@@ -13,7 +13,7 @@ import { onRecordCount } from "../src/components/positions-ui.js";
 
 test("positions dataset is complete, dated and cites only listed hosts", () => {
   assertPositionsDataset(positions2026);
-  assert.equal(positions2026.tracked.length, 14);
+  assert.equal(positions2026.tracked.length, 15);
   for (const id of positions2026.tracked) {
     const party = scorecard2026.parties.find((row) => row.partyId === id);
     assert.ok(party, `tracked party ${id} exists in the scorecard`);
@@ -57,7 +57,12 @@ test("positions page, issue sections and index counts render in every locale", a
       assert.doesNotMatch(page, /translation unavailable/);
       assert.doesNotMatch(page, /\sstyle="/, "CSP forbids inline styles");
       assert.equal((page.match(/class="stance [^"]*stance-cell"/g) ?? []).length, positions2026.tracked.length * issueSlugs.length);
-      assert.match(page, /positions-other-card/);
+      assert.equal((page.match(/class="positions-fold"/g) ?? []).length, issueSlugs.length);
+      assert.match(page, new RegExp(`href="/${locale}/positions" aria-current="page"`), "header marks the positions page");
+
+      const byList = await (await app.request(`/${locale}/positions?view=list`)).text();
+      assert.equal((byList.match(/class="positions-fold"/g) ?? []).length, positions2026.tracked.length);
+      assert.match(byList, /positions-other-card/);
 
       const issue = await (await app.request(`/${locale}/issues/october-7-inquiry`)).text();
       assert.match(issue, /id="positions"/);
@@ -65,14 +70,27 @@ test("positions page, issue sections and index counts render in every locale", a
       assert.match(issue, /https:\/\/www\.ynet\.co\.il\/news\/elections2026\/article\/yokra14915209/);
 
       const home = await (await app.request(`/${locale}`)).text();
-      assert.match(home, new RegExp(`href="/${locale}/positions"`));
+      assert.match(home, new RegExp(`class="positions-cta-button" href="/${locale}/positions"`));
       assert.equal((home.match(/class="issue-onrecord"/g) ?? []).length, issueSlugs.length);
     }
     // Lists without a statement are named, not hidden.
     const quiet = await (await app.request("/en/issues/coalition-choices")).text();
     assert.match(quiet, /positions-quiet[\s\S]*id="pos-israel-first"/);
+
+    // The scorecard index offers the way in twice: the card, and a link on every tracked row.
     const scorecard = await (await app.request("/en/scorecard")).text();
-    assert.match(scorecard, /href="\/en\/positions"/);
+    assert.match(scorecard, /class="positions-cta-button" href="\/en\/positions"/);
+    assert.match(scorecard, /class="scorecard-positions-link" href="\/en\/positions\?view=list&amp;list=yashar#list-yashar"/);
+    assert.doesNotMatch(scorecard, /list=pirates/, "untracked lists get no link");
+
+    // Deep links open their section on the server, so a phone lands on content without scripting.
+    const opened = await (await app.request("/en/positions?view=list&list=yashar")).text();
+    assert.match(opened, /id="list-yashar"><details class="positions-fold" open/);
+    const question = await (await app.request("/en/positions?q=october-7-inquiry")).text();
+    assert.match(question, /id="q-october-7-inquiry"><details class="positions-fold" open/);
+    const bogus = await app.request("/en/positions?view=nope&list=nobody&q=nothing");
+    assert.equal(bogus.status, 200);
+    assert.doesNotMatch(await bogus.text(), /positions-fold" open/);
   } finally {
     close();
     rmSync(dir, { recursive: true, force: true });

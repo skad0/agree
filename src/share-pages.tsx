@@ -9,8 +9,7 @@ import { ShareOptions } from "./components/share-options.js";
 import { privateNoStore, publicCache, publicCampaignActive, rememberLocale } from "./public-state.js";
 import { shareImagePath } from "./share-images.js";
 import { positions2026 } from "./data/positions-2026.js";
-import { IssuePositions, onRecordCount } from "./components/positions-ui.js";
-import { pc } from "./positions-copy.js";
+import { IssueCardPositions, IssueJump, IssuePositions, PositionsCta } from "./components/positions-ui.js";
 import { isIssueSlug } from "./types/positions.js";
 
 export function registerShareRoutes(app: Hono, db: Db, config: Config) {
@@ -25,12 +24,13 @@ export function registerShareRoutes(app: Hono, db: Db, config: Config) {
     publicCache(context);
     return context.html(<Layout locale={locale} title={s(locale,"home")} path={context.req.path}
       shareMeta={meta(locale,`${config.appBaseUrl}/${locale}`,s(locale,"intro"))}>
-      <section class="issue-intro"><p class="eyebrow">{t(locale,"slogan")}</p><h1>{s(locale,"home")}</h1><p class="lede">{s(locale,"intro")}</p><p class="issue-positions-link"><a href={`/${locale}/positions`}>{pc(locale,"title")}</a></p><p class="neutrality">{s(locale,"neutrality")}</p></section>
+      <section class="issue-intro"><p class="eyebrow">{t(locale,"slogan")}</p><h1>{s(locale,"home")}</h1><p class="lede">{s(locale,"intro")}</p><p class="neutrality">{s(locale,"neutrality")}</p></section>
+      <PositionsCta locale={locale} dataset={positions2026} />
       <ol class="issue-grid">{listIssues(db,locale).map(issue => <li class="issue-card">
         <span class="issue-number" aria-hidden="true">{String(issue.sortOrder).padStart(2,"0")}</span>
         <h2><a href={`/${locale}/issues/${issue.slug}`}>{issue.title}</a></h2>
         <p>{issue.rationale}</p>
-        {isIssueSlug(issue.slug) ? <p class="issue-onrecord"><a href={`/${locale}/issues/${issue.slug}#positions`}><bdi dir="ltr">{onRecordCount(positions2026,issue.slug)}/{positions2026.tracked.length}</bdi> {pc(locale,"onRecord")}</a></p> : null}
+        {isIssueSlug(issue.slug) ? <IssueCardPositions locale={locale} dataset={positions2026} slug={issue.slug} /> : null}
         {share(locale,issue)}
       </li>)}</ol>
       <p><a href={`/${locale}/standard`}>{t(locale,"readFull")}</a></p>
@@ -49,6 +49,7 @@ export function registerShareRoutes(app: Hono, db: Db, config: Config) {
       <article class="issue-detail">
         <a href={`/${locale}`}>{s(locale,"all")}</a>
         <h1>{issue.title}</h1><p class="lede">{issue.rationale}</p>
+        {isIssueSlug(issue.slug) ? <IssueJump locale={locale} dataset={positions2026} slug={issue.slug} /> : null}
         <section class="commitment"><h2>{t(locale,"obligation")}</h2><p>{issue.body}</p></section>
         {share(locale,issue)}
         {issue.verification ? <details class="issue-explanation"><summary>{t(locale,"verification")}</summary><p>{issue.verification}</p></details> : null}
