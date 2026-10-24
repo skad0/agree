@@ -6,6 +6,8 @@ import { scorecard2026 } from "../data/scorecard-2026.js";
 import type { PartyCompliance, PartyId } from "../types/scorecard.js";
 import type { IssueSlug, PositionRecord, PositionSource, PositionSpeaker, PositionStance, PositionsDataset } from "../types/positions.js";
 import { PoliticalName, formatIsraeliDate } from "./scorecard-ui.js";
+import { ShareOptions } from "./share-options.js";
+import { s } from "../share-copy.js";
 
 const STANCE_ORDER: PositionStance[] = ["supports", "supports_with_reservations", "opposes", "statement_available", "declined"];
 const hebrewOrder = new Intl.Collator("he");
@@ -43,6 +45,23 @@ function sortedRecords(records: PositionRecord[]): PositionRecord[] {
 /** Count of tracked lists with a statement on a question, for the index cards. A refusal is not one. */
 export function onRecordCount(dataset: PositionsDataset, slug: IssueSlug): number {
   return new Set(recordsFor(dataset, slug).filter((record) => record.stance !== "declined").map((record) => record.partyId)).size;
+}
+
+/** Permalink to one statement: the server opens its question and the fragment lands on it. Record ids are unique. */
+export function entryHref(locale: Locale, record: PositionRecord): string {
+  return `/${locale}/positions?entry=${record.id}#${record.id}`;
+}
+
+/** What a shared statement says before anyone opens it: list, question, and the paraphrase. */
+export function entryShareCopy(locale: Locale, record: PositionRecord): { title: string; text: string } {
+  const row = party(record.partyId);
+  const gloss = row.partyName[locale];
+  const name = gloss.trim() === row.partyNameHe.trim() ? row.partyNameHe : `${row.partyNameHe} (${gloss})`;
+  return { title: `${name} — ${issueHeading(locale, record.question)}`, text: record.summary[locale] };
+}
+
+export function recordById(dataset: PositionsDataset, id: string): PositionRecord | undefined {
+  return dataset.records.find((record) => record.id === id);
 }
 
 /** Deep link that opens one list's section on the positions page, server-side, without scripting. */
@@ -98,31 +117,38 @@ function ContextNotes({ locale, dataset, slug }: { locale: Locale; dataset: Posi
 }
 
 /** One list's statement on one question. `heading` picks what the card is titled by: the list or the question. */
-function PositionEntry({ locale, record, heading, id }: { locale: Locale; record: PositionRecord; heading: "party" | "question"; id?: string }) {
+function PositionEntry({ locale, record, heading, baseUrl }: { locale: Locale; record: PositionRecord; heading: "party" | "question"; baseUrl: string }) {
   const row = party(record.partyId);
-  return <li class="position-item" id={id}>
+  const href = entryHref(locale, record);
+  const share = entryShareCopy(locale, record);
+  return <li class="position-item" id={record.id}>
     <div class="position-head">
       {heading === "party"
         ? <PoliticalName locale={locale} officialHe={row.partyNameHe} reading={row.partyName} emphasis />
-        : <h4 class="position-question"><a href={`/${locale}/issues/${record.question}#pos-${record.partyId}`}><bdi dir="ltr">{questionNumber(record.question)}</bdi> {issueHeading(locale, record.question)}</a></h4>}
+        : <h4 class="position-question"><a href={`/${locale}/issues/${record.question}#${record.id}`}><bdi dir="ltr">{questionNumber(record.question)}</bdi> {issueHeading(locale, record.question)}</a></h4>}
       <StanceBadge locale={locale} stance={record.stance} />
     </div>
     <SpeakerLine locale={locale} speaker={record.speaker} row={row} />
     <Summary locale={locale} text={record.summary[locale]} />
     <Sources locale={locale} sources={record.sources} />
+    <div class="position-actions">
+      <a class="position-permalink" href={href}><span aria-hidden="true">#</span> {s(locale, "link")}</a>
+      <ShareOptions locale={locale} id={record.id} title={share.title} text={share.text} url={`${baseUrl}${href.split("#")[0]}#${record.id}`} showText={false} />
+    </div>
   </li>;
 }
 
-function QuietLists({ locale, rows }: { locale: Locale; rows: PartyCompliance[]; }) {
+/** `anchors` only where a list appears once per page (a question page); folds would repeat the ids. */
+function QuietLists({ locale, rows, anchors = false }: { locale: Locale; rows: PartyCompliance[]; anchors?: boolean }) {
   if (!rows.length) return null;
   return <div class="positions-quiet">
     <h3>{pc(locale, "noneFound")}</h3>
-    <ul>{rows.map((row) => <li id={`pos-${row.partyId}`}><a href={listHref(locale, row.partyId)}><PoliticalName locale={locale} officialHe={row.partyNameHe} reading={row.partyName} /></a></li>)}</ul>
+    <ul>{rows.map((row) => <li id={anchors ? `pos-${row.partyId}` : undefined}><a href={listHref(locale, row.partyId)}><PoliticalName locale={locale} officialHe={row.partyNameHe} reading={row.partyName} /></a></li>)}</ul>
   </div>;
 }
 
 /** The section under each question page: background facts, then each list's statement. */
-export function IssuePositions({ locale, slug, dataset }: { locale: Locale; slug: IssueSlug; dataset: PositionsDataset }) {
+export function IssuePositions({ locale, slug, dataset, baseUrl }: { locale: Locale; slug: IssueSlug; dataset: PositionsDataset; baseUrl: string }) {
   const records = sortedRecords(recordsFor(dataset, slug));
   const quiet = trackedParties(dataset).filter((row) => !records.some((record) => record.partyId === row.partyId));
   return <section class="positions" id="positions" aria-labelledby="positions-title">
@@ -132,9 +158,9 @@ export function IssuePositions({ locale, slug, dataset }: { locale: Locale; slug
     </header>
     <ContextNotes locale={locale} dataset={dataset} slug={slug} />
     {records.length ? <ol class="position-list">
-      {records.map((record) => <PositionEntry locale={locale} record={record} heading="party" id={`pos-${record.partyId}`} />)}
+      {records.map((record) => <PositionEntry locale={locale} record={record} heading="party" baseUrl={baseUrl} />)}
     </ol> : null}
-    <QuietLists locale={locale} rows={quiet} />
+    <QuietLists locale={locale} rows={quiet} anchors />
     <p class="positions-note">{pc(locale, "notReviewed")} {pc(locale, "notScored")}</p>
     <p><a href={`/${locale}/positions`}>{pc(locale, "allPositions")}</a></p>
   </section>;
@@ -225,7 +251,7 @@ export function PositionsMatrix({ locale, dataset }: { locale: Locale; dataset: 
           const label = `${issueHeading(locale, slug)}: ${stanceLabel(locale, stance)}`;
           return <td>
             {record
-              ? <a class={`${stanceClass(stance)} stance-cell`} href={`/${locale}/positions?q=${slug}#q-${slug}`} aria-label={label} title={label}>
+              ? <a class={`${stanceClass(stance)} stance-cell`} href={entryHref(locale, record)} aria-label={label} title={label}>
                   <span aria-hidden="true">{stanceMark(stance)}</span>
                 </a>
               : <span class={`${stanceClass(stance)} stance-cell`} role="img" aria-label={label}><span aria-hidden="true">{stanceMark(stance)}</span></span>}
@@ -244,7 +270,7 @@ function MiniMarks({ marks }: { marks: Array<{ key: string; stance: PositionStan
 }
 
 /** Each question folds open in place with every list's statement; nothing navigates away. */
-export function PositionsByQuestion({ locale, dataset, open }: { locale: Locale; dataset: PositionsDataset; open?: IssueSlug }) {
+export function PositionsByQuestion({ locale, dataset, open, baseUrl }: { locale: Locale; dataset: PositionsDataset; open?: IssueSlug; baseUrl: string }) {
   const tracked = trackedParties(dataset);
   return <ol class="positions-fold-list">
     {issueSlugs.map((slug) => {
@@ -263,7 +289,7 @@ export function PositionsByQuestion({ locale, dataset, open }: { locale: Locale;
           <div class="positions-fold-body">
             <ContextNotes locale={locale} dataset={dataset} slug={slug} />
             {records.length ? <ol class="position-list">
-              {records.map((record) => <PositionEntry locale={locale} record={record} heading="party" />)}
+              {records.map((record) => <PositionEntry locale={locale} record={record} heading="party" baseUrl={baseUrl} />)}
             </ol> : null}
             <QuietLists locale={locale} rows={quiet} />
             <p class="positions-fold-more"><a href={`/${locale}/issues/${slug}`}>{pc(locale, "openQuestion")}</a></p>
@@ -275,7 +301,7 @@ export function PositionsByQuestion({ locale, dataset, open }: { locale: Locale;
 }
 
 /** Each list folds open in place with its statements across the ten questions and its other commitments. */
-export function PositionsByList({ locale, dataset, open }: { locale: Locale; dataset: PositionsDataset; open?: PartyId }) {
+export function PositionsByList({ locale, dataset, open, baseUrl }: { locale: Locale; dataset: PositionsDataset; open?: PartyId; baseUrl: string }) {
   return <ol class="positions-fold-list">
     {trackedParties(dataset).map((row) => {
       const records = issueSlugs.flatMap((slug) => dataset.records.filter((record) => record.partyId === row.partyId && record.question === slug));
@@ -292,7 +318,7 @@ export function PositionsByList({ locale, dataset, open }: { locale: Locale; dat
           </summary>
           <div class="positions-fold-body">
             {records.length ? <ol class="position-list">
-              {records.map((record) => <PositionEntry locale={locale} record={record} heading="question" />)}
+              {records.map((record) => <PositionEntry locale={locale} record={record} heading="question" baseUrl={baseUrl} />)}
             </ol> : null}
             {silent.length ? <p class="positions-silent">{pc(locale, "noStatementOn")}: {silent.map((slug, index) => <>
               {index > 0 ? ", " : null}<a href={`/${locale}/issues/${slug}`} title={issueHeading(locale, slug)}><bdi dir="ltr">{questionNumber(slug)}</bdi></a>
